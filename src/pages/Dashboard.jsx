@@ -60,9 +60,8 @@ export default function Dashboard() {
           setUserData(docSnap.data());
         }
 
-        // 2. Consome os chamados da API do seu backend com log para inspeção
+        // 2. Consome os chamados da API do seu backend
         const responseChamados = await api.get("/chamados");
-        console.log("DADOS DOS CHAMADOS VINDOS DA API:", responseChamados.data);
         setChamadosBrutos(Array.isArray(responseChamados.data) ? responseChamados.data : []);
 
       } catch (error) {

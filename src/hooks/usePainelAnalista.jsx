@@ -50,7 +50,14 @@ export const usePainelAnalista = () => {
 
   const formatarDataHora = (timestamp) => {
     if (!timestamp) return "n/a";
+    
+    // Se for um objeto do Firebase Firestore com seconds
+    if (typeof timestamp === "object" && timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleString("pt-BR");
+    }
+
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return "n/a";
     return date.toLocaleString("pt-BR");
   };
 
@@ -72,12 +79,22 @@ export const usePainelAnalista = () => {
       return { texto: "concluído", estourado: false, classe: "bg-slate-100 text-slate-500 border border-slate-200", bola: "bg-slate-400" };
     }
 
-    const timestampCriado = item?.criadoEm || item?.criatedAt;
+    const timestampCriado = item?.criadoEm || item?.criatedAt || item?.createdAt || item?.data || item?.timestamp;
     if (!timestampCriado) {
       return { texto: "--", estourado: false, classe: "bg-slate-100 text-slate-400", bola: "bg-slate-300" };
     }
 
-    const dataAbertura = timestampCriado.toDate ? timestampCriado.toDate() : new Date(timestampCriado);
+    let dataAbertura;
+    if (typeof timestampCriado === "object" && timestampCriado.seconds) {
+      dataAbertura = new Date(timestampCriado.seconds * 1000);
+    } else {
+      dataAbertura = timestampCriado.toDate ? timestampCriado.toDate() : new Date(timestampCriado);
+    }
+
+    if (isNaN(dataAbertura.getTime())) {
+      return { texto: "--", estourado: false, classe: "bg-slate-100 text-slate-400", bola: "bg-slate-300" };
+    }
+
     const agora = new Date();
     const tempoDecorridoHoras = (agora - dataAbertura) / (1000 * 60 * 60);
 
@@ -133,7 +150,7 @@ export const usePainelAnalista = () => {
     fetchUserData();
   }, [user]);
 
-  // Carrega os chamados via API do servidor (substituindo o onSnapshot direto do firebase)
+  // Carrega os chamados via API do servidor
   useEffect(() => {
     if (!user) return;
     const carregarChamados = async () => {
@@ -151,6 +168,12 @@ export const usePainelAnalista = () => {
   }, [user]);
 
   const handleAssumirChamado = async (chamado) => {
+    const chamadoId = chamado.id || chamado._id;
+    if (!chamadoId) {
+      toast.error("ID do chamado não encontrado.");
+      return;
+    }
+
     const jaTemTecnico =
       chamado.status === "em atendimento" || chamado.status === "pendente";
 
@@ -165,11 +188,11 @@ export const usePainelAnalista = () => {
           : null,
       };
 
-      await api.put(`/chamados/${chamado.id}`, dadosAtualizacao);
+      await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
       // Atualiza o estado local para refletir na tela imediatamente
       setChamados((prev) =>
-        prev.map((c) => (c.id === chamado.id ? { ...c, ...dadosAtualizacao } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
       );
 
       toast.info(
@@ -178,11 +201,13 @@ export const usePainelAnalista = () => {
           : `você assumiu a os #${chamado.numeroOs}`
       );
     } catch (err) {
+      console.error(err);
       toast.error("erro ao assumir.");
     }
   };
 
   const handleDevolverChamado = async (chamado) => {
+    const chamadoId = chamado.id || chamado._id;
     try {
       const dadosAtualizacao = {
         status: "aberto",
@@ -194,10 +219,10 @@ export const usePainelAnalista = () => {
         pausadoEm: null,
       };
 
-      await api.put(`/chamados/${chamado.id}`, dadosAtualizacao);
+      await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
       setChamados((prev) =>
-        prev.map((c) => (c.id === chamado.id ? { ...c, ...dadosAtualizacao } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
       );
 
       toast.warning("chamado devolvido para a fila.");
@@ -209,6 +234,7 @@ export const usePainelAnalista = () => {
   const handleFinalizarChamado = async (e) => {
     e.preventDefault();
     if (!patrimonio.trim()) return toast.error("informe o patrimônio.");
+    const chamadoId = chamadoSelecionado?.id || chamadoSelecionado?._id;
 
     try {
       const novosDados = {
@@ -222,10 +248,10 @@ export const usePainelAnalista = () => {
         novosDados.equipamento = equipamento.trim().toLowerCase();
       }
 
-      await api.put(`/chamados/${chamadoSelecionado.id}`, novosDados);
+      await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => (c.id === chamadoSelecionado.id ? { ...c, ...novosDados } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       setMostrarModal(false);
@@ -242,6 +268,8 @@ export const usePainelAnalista = () => {
   const handlePausarSLA = async (e) => {
     e.preventDefault();
     if (!motivoPausa) return toast.error("escolha um motivo.");
+    const chamadoId = chamadoSelecionado?.id || chamadoSelecionado?._id;
+
     try {
       const novosDados = {
         status: "pendente",
@@ -250,10 +278,10 @@ export const usePainelAnalista = () => {
         pausadoEm: new Date().toISOString(),
       };
 
-      await api.put(`/chamados/${chamadoSelecionado.id}`, novosDados);
+      await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => (c.id === chamadoSelecionado.id ? { ...c, ...novosDados } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       setMostrarModal(false);
@@ -267,16 +295,17 @@ export const usePainelAnalista = () => {
   };
 
   const handleRetomarChamado = async (chamado) => {
+    const chamadoId = chamado.id || chamado._id;
     try {
       const novosDados = {
         status: "em atendimento",
         retomadoEm: new Date().toISOString(),
       };
 
-      await api.put(`/chamados/${chamado.id}`, novosDados);
+      await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => (c.id === chamado.id ? { ...c, ...novosDados } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       toast.success("atendimento retomado!");
@@ -287,7 +316,8 @@ export const usePainelAnalista = () => {
 
   const handleEnviarParaPlanilha = async (item) => {
     if (enviandoPlanilha) return;
-    setEnviandoPlanilha(item.id);
+    const chamadoId = item.id || item._id;
+    setEnviandoPlanilha(chamadoId);
     const idToast = toast.loading(`sincronizando os #${item.numeroOs}...`);
     try {
       const payload = {
@@ -304,7 +334,7 @@ export const usePainelAnalista = () => {
             Parecer_Tecnico: item.feedbackAnalista || "sem parecer",
             Equipe: item.equipe || "",
             Finalizado_Por: item.tecnicoResponsavel || analistaNome,
-            Data: formatarDataHora(item.criatedAt || item.criadoEm),
+            Data: formatarDataHora(item.criatedAt || item.criadoEm || item.createdAt || item.data),
             Finalizado_Em: formatarDataHora(item.finalizadoEm),
           },
         ],
@@ -320,10 +350,10 @@ export const usePainelAnalista = () => {
         arquivadoEm: new Date().toISOString(),
       };
 
-      await api.put(`/chamados/${item.id}`, novosDados);
+      await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => (c.id === item.id ? { ...c, ...novosDados } : c))
+        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       toast.update(idToast, {

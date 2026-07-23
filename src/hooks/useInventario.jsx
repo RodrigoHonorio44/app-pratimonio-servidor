@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { auth } from "../services/firebase";
+import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
-
-const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useInventario = () => {
   const [itens, setItens] = useState([]);
@@ -67,13 +66,11 @@ export const useInventario = () => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
-      const resposta = await fetch(`${API_URL}/ativos`, {
+      const resposta = await api.get("/ativos", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (!resposta.ok) throw new Error("Erro ao buscar dados da API");
-
-      const todosOsDados = await resposta.json();
+      const todosOsDados = resposta.data;
       setItens(todosOsDados);
 
       if (todosOsDados.length > 0) {

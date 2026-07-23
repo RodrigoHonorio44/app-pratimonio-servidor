@@ -67,6 +67,35 @@ const PainelAnalista = () => {
     fecharModalUnificado,
   } = usePainelAnalista();
 
+  // Função robusta que tenta múltiplos campos de data possíveis do Firestore
+  const renderizarDataSegura = (item) => {
+    const valorData = item.criadoEm || item.createdAt || item.dataCriacao || item.data;
+
+    if (!valorData) return "Data não informada";
+
+    let dataObj = valorData;
+
+    if (typeof valorData.toDate === "function") {
+      dataObj = valorData.toDate();
+    } else if (typeof valorData === "string" || typeof valorData === "number") {
+      dataObj = new Date(valorData);
+    } else if (valorData && typeof valorData === "object" && "seconds" in valorData) {
+      dataObj = new Date(valorData.seconds * 1000);
+    }
+
+    if (dataObj instanceof Date && !isNaN(dataObj)) {
+      return dataObj.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    return "Data não informada";
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans antialiased">
       <style>{`
@@ -214,11 +243,11 @@ const PainelAnalista = () => {
                               rem ? "text-orange-600" : "text-blue-600"
                             }`}
                           >
-                            #{item.numeroOs}
+                            #{item.numeroOs || item.id}
                           </span>
-                          <p className="text-[10px] text-slate-400 font-bold">
-                            {formatarDataHora(item.criadoEm)}
-                          </p>
+                          <span className="text-xs text-slate-400 block">
+                            {renderizarDataSegura(item)}
+                          </span>
                         </td>
                         <td className="p-5">
                           <div className="font-bold text-slate-700 uppercase text-xs">
@@ -437,7 +466,7 @@ const PainelAnalista = () => {
             </span>
             <button
               disabled={paginaAtual === totalPaginas}
-              onClick={() => setPaginaAtual((p) => p - 1)}
+              onClick={() => setPaginaAtual((p) => p + 1)}
               className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
             >
               <FiChevronRight />

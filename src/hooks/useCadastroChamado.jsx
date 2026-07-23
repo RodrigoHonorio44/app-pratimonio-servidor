@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { auth } from "../services/firebase";
+import api from "../services/api";
 import { toast } from "react-hot-toast";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
-
-const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useCadastroChamado = () => {
   const [loading, setLoading] = useState(false);
@@ -59,13 +58,11 @@ export const useCadastroChamado = () => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
-      const resposta = await fetch(`${API_URL}/ativos`, {
+      const resposta = await api.get("/ativos", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (!resposta.ok) throw new Error("Erro ao buscar ativos");
-
-      const ativos = await resposta.json();
+      const ativos = resposta.data;
       
       const ativoEncontrado = ativos.find(a => 
         String(a.patrimonio || "").toLowerCase() === tagOriginal.toLowerCase() ||
@@ -106,11 +103,11 @@ export const useCadastroChamado = () => {
       let nomeParaSalvar = currentUser.email.split("@")[0].toLowerCase();
 
       try {
-        const userRes = await fetch(`${API_URL}/usuarios/${uidExibicao}`, {
+        const userRes = await api.get(`/usuarios/${uidExibicao}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (userRes.ok) {
-          const userData = await userRes.json();
+        if (userRes.status === 200) {
+          const userData = userRes.data;
           if (userData && userData.nome) {
             const partesNome = userData.nome.trim().split(/\s+/);
             nomeParaSalvar = partesNome.length > 1 
@@ -122,34 +119,28 @@ export const useCadastroChamado = () => {
         console.warn("Não foi possível buscar dados complementares do usuário, usando email.", err);
       }
 
-      const resposta = await fetch(`${API_URL}/chamados`, {
-        method: "POST",
+      await api.post("/chamados", {
+        equipe: equipe.toLowerCase(),
+        equipamento: equipamento.toLowerCase(),
+        patrimonio: patrimonio.trim().toLowerCase(),
+        setor: setor.toLowerCase(),
+        descricao: descricao.toLowerCase(),
+        unidade: unidade.toLowerCase(),
+        prioridade: prioridade.toLowerCase(),
+        criadoEm: new Date().toISOString(),
+        emailSolicitante: currentUser.email.toLowerCase(),
+        nome: nomeParaSalvar,
+        numeroOs: novaOs,
+        status: "aberto",
+        userId: uidExibicao,
+        feedbackAnalista: "",
+        tecnicoResponsavel: ""
+      }, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          equipe: equipe.toLowerCase(),
-          equipamento: equipamento.toLowerCase(),
-          patrimonio: patrimonio.trim().toLowerCase(),
-          setor: setor.toLowerCase(),
-          descricao: descricao.toLowerCase(),
-          unidade: unidade.toLowerCase(),
-          prioridade: prioridade.toLowerCase(),
-          criadoEm: new Date().toISOString(),
-          emailSolicitante: currentUser.email.toLowerCase(),
-          nome: nomeParaSalvar,
-          numeroOs: novaOs,
-          status: "aberto",
-          userId: uidExibicao,
-          feedbackAnalista: "",
-          tecnicoResponsavel: ""
-        })
+        }
       });
-
-      if (!resposta.ok) {
-        throw new Error("Erro ao salvar chamado no servidor");
-      }
 
       setProtocoloGerado(novaOs);
       setSucesso(true);

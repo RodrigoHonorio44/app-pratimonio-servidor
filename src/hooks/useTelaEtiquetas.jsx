@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth } from "../services/firebase";
+import api from "../services/api"; // Importa a instância centralizada do axios
 import { toast } from "react-toastify";
-
-const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useTelaEtiquetas = () => {
   const [loading, setLoading] = useState(false);
@@ -22,29 +21,27 @@ export const useTelaEtiquetas = () => {
   const [modoEdicaoSetor, setModoEdicaoSetor] = useState(false);
   const [etiquetaPronta, setEtiquetaPronta] = useState(null);
 
-  // 1. BUSCA O MAIOR NÚMERO ABSOLUTO VIA API
+  // 1. BUSCA O MAIOR NÚMERO ABSOLUTO VIA API COM TETO DE SEGURANÇA
   const buscarUltimoPatrimonioGeral = async () => {
     try {
-      const currentUser = auth.currentUser;
-      const token = currentUser ? await currentUser.getIdToken() : "";
-
-      const headers = { Authorization: `Bearer ${token}` };
-
       const [resAtivos, resEtiquetas] = await Promise.all([
-        fetch(`${API_URL}/ativos`, { headers }),
-        fetch(`${API_URL}/etiquetas_patrimonio`, { headers })
+        api.get(`/ativos`).catch(() => ({ data: [] })),
+        api.get(`/etiquetas_patrimonio`).catch(() => ({ data: [] }))
       ]);
 
-      let dadosAtivos = resAtivos.ok ? await resAtivos.json() : [];
-      let dadosEtiquetas = resEtiquetas.ok ? await resEtiquetas.json() : [];
+      let dadosAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+      let dadosEtiquetas = Array.isArray(resEtiquetas.data) ? resEtiquetas.data : [];
 
       let maiorNumero = 0;
       
       [...dadosAtivos, ...dadosEtiquetas].forEach((item) => {
         const patStr = item.patrimonio;
         if (patStr && patStr !== "s/p") {
-          const num = parseInt(patStr.replace(/\D/g, ""), 10);
-          if (!isNaN(num) && num > maiorNumero) maiorNumero = num;
+          const num = parseInt(String(patStr).replace(/\D/g, ""), 10);
+          // Ignora números altos ou testes acima de 50000 para fixar na faixa correta
+          if (!isNaN(num) && num > maiorNumero && num < 50000) {
+            maiorNumero = num;
+          }
         }
       });
 
@@ -78,19 +75,14 @@ export const useTelaEtiquetas = () => {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
-      const token = await currentUser.getIdToken();
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      };
 
       const [resAtivosCheck, resEtiquetasCheck] = await Promise.all([
-        fetch(`${API_URL}/ativos`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_URL}/etiquetas_patrimonio`, { headers: { Authorization: `Bearer ${token}` } })
+        api.get(`/ativos`).catch(() => ({ data: [] })),
+        api.get(`/etiquetas_patrimonio`).catch(() => ({ data: [] }))
       ]);
 
-      const listaAtivos = resAtivosCheck.ok ? await resAtivosCheck.json() : [];
-      const listaEtiquetas = resEtiquetasCheck.ok ? await resEtiquetasCheck.json() : [];
+      const listaAtivos = Array.isArray(resAtivosCheck.data) ? resAtivosCheck.data : [];
+      const listaEtiquetas = Array.isArray(resEtiquetasCheck.data) ? resEtiquetasCheck.data : [];
 
       const existe = [...listaAtivos, ...listaEtiquetas].some(
         item => String(item.patrimonio).trim() === String(proximoPatrimonio).trim()
@@ -118,24 +110,12 @@ export const useTelaEtiquetas = () => {
       };
 
       if (isAvulsa) {
-        await fetch(`${API_URL}/etiquetas_patrimonio`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(novoRegistro)
-        });
+        await api.post(`/etiquetas_patrimonio`, novoRegistro);
         toast.success(`Etiqueta Avulsa #${proximoPatrimonio} criada!`);
       } else {
         await Promise.all([
-          fetch(`${API_URL}/ativos`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(novoRegistro)
-          }),
-          fetch(`${API_URL}/etiquetas_patrimonio`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(novoRegistro)
-          })
+          api.post(`/ativos`, novoRegistro),
+          api.post(`/etiquetas_patrimonio`, novoRegistro)
         ]);
         toast.success(`Patrimônio #${proximoPatrimonio} cadastrado!`);
       }
@@ -152,7 +132,7 @@ export const useTelaEtiquetas = () => {
       buscarUltimoPatrimonioGeral();
     } catch (error) {
       console.error("Erro ao salvar:", error);
-      toast.error("Erro ao registrar o patrimônio.");
+      toast.error(error.response?.data?.message || "Erro ao registrar o patrimônio.");
     } finally {
       setLoading(false);
     }
@@ -166,7 +146,7 @@ export const useTelaEtiquetas = () => {
     nome,
     setNome,
     unidade,
-    setUnidade: handleMudarUnidade, // Use este no onChange do select de unidade
+    setUnidade: handleMudarUnidade,
     setSetor,
     setor,
     estado,

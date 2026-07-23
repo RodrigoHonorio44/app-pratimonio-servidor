@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { auth } from "../services/firebase";
+import api from "../services/api"; // Importa a instância centralizada do axios
 import { toast } from "react-toastify";
 import { abrirVisualizacaoTermo } from "../components/ImpressaoTransferencia";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; 
-
-const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useTransferencia = () => {
   const [patrimonioBusca, setPatrimonioBusca] = useState("");
@@ -111,10 +110,6 @@ export const useTransferencia = () => {
     setLoading(true);
     setMostrarDropdown(false);
     try {
-      const currentUser = auth.currentUser;
-      const token = currentUser ? await currentUser.getIdToken() : "";
-      const headers = { Authorization: `Bearer ${token}` };
-
       const unidadeFiltroNorm = normalizarParaComparacao(unidadeFiltro);
       const ehOrigemResidencial = unidadeFiltroNorm.includes("residencia") || unidadeFiltroNorm.includes("paciente");
 
@@ -124,12 +119,12 @@ export const useTransferencia = () => {
         const termoBuscaExato = termoOriginal.trim();
         
         const [resAtivos, resPac] = await Promise.all([
-          fetch(`${API_URL}/ativos?patrimonio=${encodeURIComponent(termoBuscaExato)}`, { headers }),
-          fetch(`${API_URL}/equipamento_com_paciente?patrimonio=${encodeURIComponent(termoBuscaExato)}`, { headers })
+          api.get(`/ativos`, { params: { patrimonio: termoBuscaExato } }).catch(() => ({ data: [] })),
+          api.get(`/equipamento_com_paciente`, { params: { patrimonio: termoBuscaExato } }).catch(() => ({ data: [] }))
         ]);
 
-        const dadosAtivos = resAtivos.ok ? await resAtivos.json() : [];
-        const dadosPac = resPac.ok ? await resPac.json() : [];
+        const dadosAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+        const dadosPac = Array.isArray(resPac.data) ? resPac.data : [];
 
         if (dadosAtivos.length > 0) {
           listaGeral = dadosAtivos.map((item) => ({
@@ -153,8 +148,8 @@ export const useTransferencia = () => {
         }
       } else {
         if (ehOrigemResidencial) {
-          const resPacientes = await fetch(`${API_URL}/equipamento_com_paciente`, { headers });
-          const dadosPacientes = resPacientes.ok ? await resPacientes.json() : [];
+          const resPacientes = await api.get(`/equipamento_com_paciente`).catch(() => ({ data: [] }));
+          const dadosPacientes = Array.isArray(resPacientes.data) ? resPacientes.data : [];
           listaGeral = dadosPacientes.map((item) => {
             return {
               id: item.equipamentoId || item.id || item._id,
@@ -168,8 +163,8 @@ export const useTransferencia = () => {
             };
           });
         } else {
-          const resGeral = await fetch(`${API_URL}/ativos`, { headers });
-          const dadosGeral = resGeral.ok ? await resGeral.json() : [];
+          const resGeral = await api.get(`/ativos`).catch(() => ({ data: [] }));
+          const dadosGeral = Array.isArray(resGeral.data) ? resGeral.data : [];
           listaGeral = dadosGeral.map((item) => ({
             ...item,
             id: item.id || item._id,
@@ -317,11 +312,6 @@ export const useTransferencia = () => {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
-      const token = await currentUser.getIdToken();
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      };
 
       const patrimonioFinal =
         normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" &&
@@ -332,26 +322,25 @@ export const useTransferencia = () => {
       // Se o item estava em uso residencial, removemos o vínculo do paciente
       if (itemSelecionado.status === "em_uso_residencial" || itemSelecionado._docPacienteId) {
         if (itemSelecionado._docPacienteId) {
-          await fetch(`${API_URL}/equipamento_com_paciente/${itemSelecionado._docPacienteId}`, {
-            method: "DELETE",
-            headers
-          });
+          await api.delete(`/equipamento_com_paciente/${itemSelecionado._docPacienteId}`);
         } else {
-          const resPac = await fetch(`${API_URL}/equipamento_com_paciente`, { headers: { Authorization: `Bearer ${token}` } });
-          const listaPac = resPac.ok ? await resPac.json() : [];
+          const resPac = await api.get(`/equipamento_com_paciente`).catch(() => ({ data: [] }));
+          const listaPac = Array.isArray(resPac.data) ? resPac.data : [];
           const pacsEncontrados = listaPac.filter(p => p.equipamentoId === itemSelecionado.id);
           for (const docP of pacsEncontrados) {
-            await fetch(`${API_URL}/equipamento_com_paciente/${docP.id || docP._id}`, {
-              method: "DELETE",
-              headers
-            });
+            await api.delete(`/equipamento_com_paciente/${docP.id || docP._id}`);
           }
         }
       }
 
       // Atualiza o registro principal na coleção "ativos"
-      const resItem = await fetch(`${API_URL}/ativos/${itemSelecionado.id}`, { headers: { Authorization: `Bearer ${token}` } });
-      const itemExiste = resItem.ok;
+      let itemExiste = false;
+      try {
+        const resItem = await api.get(`/ativos/${itemSelecionado.id}`);
+        itemExiste = resItem.status === 200;
+      } catch {
+        itemExiste = false;
+      }
 
       const atualizacaoPayload = {
         unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
@@ -362,30 +351,22 @@ export const useTransferencia = () => {
       };
 
       if (itemExiste) {
-        await fetch(`${API_URL}/ativos/${itemSelecionado.id}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(atualizacaoPayload)
-        });
+        await api.put(`/ativos/${itemSelecionado.id}`, atualizacaoPayload);
       } else {
-        await fetch(`${API_URL}/ativos`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            nome: itemSelecionado.nome.toLowerCase().trim(),
-            patrimonio: patrimonioFinal,
-            unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
-            setor: dadosSaida.novoSetor.toLowerCase().trim(),
-            status: "ativo",
-            ultimaMovimentacao: new Date().toISOString(),
-          })
+        await api.post(`/ativos`, {
+          nome: itemSelecionado.nome.toLowerCase().trim(),
+          patrimonio: patrimonioFinal,
+          unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
+          setor: dadosSaida.novoSetor.toLowerCase().trim(),
+          status: "ativo",
+          ultimaMovimentacao: new Date().toISOString(),
         });
       }
 
-      // Se o destino for o estoque, adiciona/registra também na coleção "estoque" para aparecer na Central do Estoque
+      // Se o destino for o estoque, adiciona/registra também na coleção "estoque"
       if (destinoEhEstoque) {
-        const resEstoque = await fetch(`${API_URL}/estoque`, { headers: { Authorization: `Bearer ${token}` } });
-        const listaEstoque = resEstoque.ok ? await resEstoque.json() : [];
+        const resEstoque = await api.get(`/estoque`).catch(() => ({ data: [] }));
+        const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
         const estoqueExistente = listaEstoque.find(e => String(e.patrimonio).trim() === String(patrimonioFinal).trim());
 
         const estoquePayload = {
@@ -399,17 +380,9 @@ export const useTransferencia = () => {
         };
 
         if (estoqueExistente) {
-          await fetch(`${API_URL}/estoque/${estoqueExistente.id || estoqueExistente._id}`, {
-            method: "PUT",
-            headers,
-            body: JSON.stringify(estoquePayload)
-          });
+          await api.put(`/estoque/${estoqueExistente.id || estoqueExistente._id}`, estoquePayload);
         } else {
-          await fetch(`${API_URL}/estoque`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(estoquePayload)
-          });
+          await api.post(`/estoque`, estoquePayload);
         }
       }
 
@@ -436,34 +409,26 @@ export const useTransferencia = () => {
           cpf: dadosSaida.pacienteCpf.trim(),
         };
 
-        await fetch(`${API_URL}/equipamento_com_paciente`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            equipamentoId: itemSelecionado.id,
-            equipamentoNome: itemSelecionado.nome.toLowerCase().trim(),
-            patrimonio: patrimonioFinal,
-            unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
-            setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
-            dataEntrega: new Date().toISOString(),
-            statusVinculo: "ativo",
-            paciente: {
-              nome: dadosSaida.novoSetor.toLowerCase().trim(),
-              endereco: dadosSaida.pacienteEndereco.toLowerCase().trim(),
-              telefone: dadosSaida.pacienteTelefone.trim(),
-              identidade: dadosSaida.pacienteIdentidade.trim(),
-              cpf: dadosSaida.pacienteCpf.trim(),
-              responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase().trim()
-            }
-          })
+        await api.post(`/equipamento_com_paciente`, {
+          equipamentoId: itemSelecionado.id,
+          equipamentoNome: itemSelecionado.nome.toLowerCase().trim(),
+          patrimonio: patrimonioFinal,
+          unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
+          setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
+          dataEntrega: new Date().toISOString(),
+          statusVinculo: "ativo",
+          paciente: {
+            nome: dadosSaida.novoSetor.toLowerCase().trim(),
+            endereco: dadosSaida.pacienteEndereco.toLowerCase().trim(),
+            telefone: dadosSaida.pacienteTelefone.trim(),
+            identidade: dadosSaida.pacienteIdentidade.trim(),
+            cpf: dadosSaida.pacienteCpf.trim(),
+            responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase().trim()
+          }
         });
       }
 
-      await fetch(`${API_URL}/saidaEquipamento`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payloadSaida)
-      });
+      await api.post(`/saidaEquipamento`, payloadSaida);
 
       toast.success("Transferência realizada com sucesso!");
       setShowModal(false);
@@ -487,7 +452,7 @@ export const useTransferencia = () => {
       });
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao concluir a transferência.");
+      toast.error(error.response?.data?.message || "Erro ao concluir a transferência.");
     } finally {
       setLoading(false);
     }

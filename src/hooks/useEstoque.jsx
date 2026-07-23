@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { auth } from "../services/firebase";
+import api from "../services/api"; // Importa a instância centralizada do axios
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 // 1. IMPORTAR O MAPA REAL DE SETORES
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; // <-- Ajuste o caminho se necessário
-
-const API_URL = "http://IP_DA_SUA_VPS:3000/api";
+import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
 
 export const useEstoque = () => {
   const [itensEstoque, setItensEstoque] = useState([]);
@@ -63,16 +62,9 @@ export const useEstoque = () => {
   const carregarEstoque = async () => {
     setLoading(true);
     try {
-      const currentUser = auth.currentUser;
-      const token = currentUser ? await currentUser.getIdToken() : "";
-
-      const resposta = await fetch(`${API_URL}/estoque`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (!resposta.ok) throw new Error("Erro ao buscar estoque");
-
-      const listaCompleta = await resposta.json();
+      const resposta = await api.get("/estoque");
+      const listaCompleta = Array.isArray(resposta.data) ? resposta.data : [];
+      
       // Filtra apenas os itens ativos no frontend ou mantém conforme regra
       const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase() === "ativo");
       setItensEstoque(lista);
@@ -145,60 +137,42 @@ export const useEstoque = () => {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
-      const token = await currentUser.getIdToken();
 
-      // Processa cada item do lote enviando para a API backend
+      // Processa cada item do lote enviando para a API backend usando a instância do axios
       for (const item of loteSaida) {
         const qtdSolicitada = item.quantidadeMovimentada;
 
-        // 1. Atualiza ou abate o item no estoque (via rota PATCH ou PUT se houver, ou atualiza a coleção)
-        // Como o backend padrão possui rotas POST genéricas, vamos registrar as saídas e ativos diretamente:
-
         // Cria o registro na coleção saidaEquipamento
-        await fetch(`${API_URL}/saidaEquipamento`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            estoqueId: item.id,
-            patrimonio: item.patrimonioMapeado,
-            nomeEquipamento: (item.nome || "").trim(),
-            unidadeOrigem: item.unidade || "Almoxarifado Central",
-            setorOrigem: item.setor || "Patrimônio",
-            unidadeDestino: dadosSaida.novaUnidade,
-            setorDestino: dadosSaida.novoSetor.trim(),
-            quantidadeRetirada: qtdSolicitada,
-            responsavelRecebimento: responsavelFinal,
-            motivo: dadosSaida.motivo,
-            dataSaida: new Date().toISOString()
-          })
+        await api.post("/saidaEquipamento", {
+          estoqueId: item.id,
+          patrimonio: item.patrimonioMapeado,
+          nomeEquipamento: (item.nome || "").trim(),
+          unidadeOrigem: item.unidade || "Almoxarifado Central",
+          setorOrigem: item.setor || "Patrimônio",
+          unidadeDestino: dadosSaida.novaUnidade,
+          setorDestino: dadosSaida.novoSetor.trim(),
+          quantidadeRetirada: qtdSolicitada,
+          responsavelRecebimento: responsavelFinal,
+          motivo: dadosSaida.motivo,
+          dataSaida: new Date().toISOString()
         });
 
         // Se não for bem durável, cria também na coleção de ativos
         if (item.categoriaItem !== "Bem durável") {
-          await fetch(`${API_URL}/ativos`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              nome: (item.nome || "").trim(),
-              categoriaItem: item.categoriaItem || item.tipo || "Mobiliário",
-              tipo: item.tipo || "equipamento",
-              estado: item.estado || "Bom",
-              observacoes: item.observacoes || "",
-              cadastradoPor: item.cadastradoPor || currentUser.email,
-              criadoEm: item.criadoEm || new Date().toISOString(),
-              quantidade: qtdSolicitada,
-              patrimonio: item.patrimonioMapeado,
-              unidade: dadosSaida.novaUnidade,
-              setor: dadosSaida.novoSetor.trim(),
-              status: "Ativo",
-              ultimaMovimentacao: new Date().toISOString()
-            })
+          await api.post("/ativos", {
+            nome: (item.nome || "").trim(),
+            categoriaItem: item.categoriaItem || item.tipo || "Mobiliário",
+            tipo: item.tipo || "equipamento",
+            estado: item.estado || "Bom",
+            observacoes: item.observacoes || "",
+            cadastradoPor: item.cadastradoPor || currentUser.email,
+            criadoEm: item.criadoEm || new Date().toISOString(),
+            quantidade: qtdSolicitada,
+            patrimonio: item.patrimonioMapeado,
+            unidade: dadosSaida.novaUnidade,
+            setor: dadosSaida.novoSetor.trim(),
+            status: "Ativo",
+            ultimaMovimentacao: new Date().toISOString()
           });
         }
       }
@@ -217,7 +191,7 @@ export const useEstoque = () => {
       });
       carregarEstoque();
     } catch (error) {
-      toast.error(error.message || "Erro ao efetivar transferência.");
+      toast.error(error.response?.data?.message || error.message || "Erro ao efetivar transferência.");
     } finally {
       setProcessando(false);
     }
