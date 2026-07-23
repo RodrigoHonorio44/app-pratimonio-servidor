@@ -517,4 +517,4 @@ const FormRemanejamento = ({ onClose }) => {
   );
 };
 
-exportFormRemanejamento;
+export default FormRemanejamento;
