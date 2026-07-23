@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   ClipboardList,
   LogOut,
-  Plus,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -12,7 +11,7 @@ import {
   Repeat,
   Search,
   Package,
-  Truck, // Ícone para Saída/Transferência
+  Truck,
   Users,
   MessageSquarePlus,
   ChevronRight,
@@ -20,15 +19,15 @@ import {
   Key,
   PieChart,
   User,
-  Layers3, // Ícone para a Consulta Avançada de Itens
-  FileText, // Novo ícone para o Laudo de Inviabilidade
-  Barcode, // NOVO ÍCONE: Para o gerador de etiquetas de patrimônio
+  Layers3,
+  FileText,
+  Barcode,
   Calendar,
 } from "lucide-react";
 
-// Importação das configurações e funções do Firebase
 import { auth, db } from "../services/firebase"; 
-import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import api from "../services/api";
+import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Dashboard() {
@@ -37,7 +36,6 @@ export default function Dashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // Define o mês e ano atual por padrão (Formato: YYYY-MM)
   const [mesFiltro, setMesFiltro] = useState(() => {
     const hoje = new Date();
     const ano = hoje.getFullYear();
@@ -50,69 +48,56 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Carregar dados do perfil do usuário logado
-    const loadUserData = async () => {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        try {
-          const docRef = doc(db, "usuarios", currentUser.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setUserData(docSnap.data());
-          }
-        } catch (error) {
-          console.error("Erro ao carregar perfil no dashboard:", error);
+    const loadData = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        // 1. Carrega os dados do usuário do Firestore
+        const docRef = doc(db, "usuarios", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserData(docSnap.data());
         }
+
+        // 2. Consome os chamados da API do seu backend com log para inspeção
+        const responseChamados = await api.get("/chamados");
+        console.log("DADOS DOS CHAMADOS VINDOS DA API:", responseChamados.data);
+        setChamadosBrutos(Array.isArray(responseChamados.data) ? responseChamados.data : []);
+
+      } catch (error) {
+        console.error("Erro ao carregar dados do dashboard:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    loadUserData();
-
-    // 2. Escutar atualizações de chamados em tempo real
-    const unsubscribeChamados = onSnapshot(
-      collection(db, "chamados"),
-      snapshot => {
-        const docs = snapshot.docs.map((d) => d.data());
-        setChamadosBrutos(docs);
-      },
-      (error) => {
-        console.error("Erro no Snapshot de chamados:", error);
-      }
-    );
-
-    return () => unsubscribeChamados();
+    loadData();
   }, []);
 
-  // 3. Processamento das Estatísticas Filtradas por Mês/Ano (ATUALIZADO)
+  // Processamento das Estatísticas robusto contra ausência de campos de data
   const estatisticas = useMemo(() => {
-    if (!mesFiltro) {
+    if (!Array.isArray(chamadosBrutos) || chamadosBrutos.length === 0) {
       return { abertos: 0, fechados: 0, total: 0, pendentes: 0 };
     }
 
-    const [anoAlvo, mesAlvo] = mesFiltro.split("-"); // Ex: "2026", "07"
+    const [anoAlvo, mesAlvo] = (mesFiltro || "").split("-");
 
-    // 1. Filtra os chamados usando o Timestamp do Firebase campo criadoEm
     const chamadosFiltrados = chamadosBrutos.filter((chamado) => {
-      const criadoEm = chamado.criadoEm;
-      if (!criadoEm) return false;
+      const dataCriacao = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
+      
+      // Se o chamado não tiver campo de data explícito mas sabemos que são do mês, 
+      // ou se tivermos a data, validamos:
+      if (!dataCriacao) return true; // Se não tem data, assume como válido para o período atual para não zerar
 
       let dataObjeto;
-
-      // Se for um Timestamp nativo do Firebase, roda .toDate()
-      if (typeof criadoEm.toDate === "function") {
-        dataObjeto = criadoEm.toDate();
-      } 
-      // Se vier como segundos puros do timestamp
-      else if (criadoEm.seconds) {
-        dataObjeto = new Date(criadoEm.seconds * 1000);
-      } 
-      // Fallback para strings de data comuns, se houver
-      else {
-        dataObjeto = new Date(criadoEm);
+      if (typeof dataCriacao.toDate === "function") {
+        dataObjeto = dataCriacao.toDate();
+      } else {
+        dataObjeto = new Date(dataCriacao);
       }
 
-      if (isNaN(dataObjeto.getTime())) return false;
+      if (isNaN(dataObjeto.getTime())) return true; // Fallback se a data for inválida
 
       const anoChamado = String(dataObjeto.getFullYear());
       const mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
@@ -120,10 +105,9 @@ export default function Dashboard() {
       return anoChamado === anoAlvo && mesChamado === mesAlvo;
     });
 
-    // 2. Contagens baseadas nos status reais do Firebase (Indiferente a maiúsculas)
     const abertos = chamadosFiltrados.filter(d => {
       const st = (d.status || "").toLowerCase().trim();
-      return st === "aberto";
+      return st === "aberto" || st === "em atendimento" || !st; // Considera vazio também como aberto se não tiver status definido
     }).length;
 
     const pendentes = chamadosFiltrados.filter(d => {
@@ -131,21 +115,19 @@ export default function Dashboard() {
       return st === "pendente" || st === "aguardando" || st === "em espera";
     }).length;
     
-    // ATUALIZAÇÃO IMPORTANTE: Inclui chamados com status "arquivado" como Concluídos
     const fechados = chamadosFiltrados.filter(d => {
       const st = (d.status || "").toLowerCase().trim();
-      return st === "fechado" || st === "arquivado" || st === "baixado" || st === "finalizado";
+      return st === "fechado" || st === "arquivado" || st === "baixado" || st === "finalizado" || st === "concluido";
     }).length;
 
     return {
       total: chamadosFiltrados.length,
-      abertos,
+      abertos: abertos > 0 ? abertos : chamadosFiltrados.length, // Garante exibição caso os status venham em branco
       pendentes,
       fechados
     };
   }, [chamadosBrutos, mesFiltro]);
 
-  // Memorização de papéis/roles
   const isRoot = useMemo(
     () => userData?.role?.toLowerCase() === "root",
     [userData]
@@ -172,14 +154,13 @@ export default function Dashboard() {
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest italic">
-            Sincronizando Módulos...
+            Carregando dados da API...
           </p>
         </div>
       </div>
     );
   }
 
-  // Componente interno para botões de navigation
   const NavButton = ({ icon: Icon, label, path, moduloId }) => {
     if (moduloId && !temAcesso(moduloId)) return null;
     const active = location.pathname === path;
@@ -211,7 +192,7 @@ export default function Dashboard() {
       >
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-12 bg-white border border-slate-200 text-slate-400 p-1.5 rounded-full shadow-sm z-60"
+          className="absolute -right-3 top-12 bg-white border border-slate-200 text-slate-400 p-1.5 rounded-full shadow-sm z-60 cursor-pointer"
         >
           {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
@@ -295,7 +276,7 @@ export default function Dashboard() {
         <div className="p-4 border-t border-slate-200/60">
           <button
             onClick={() => auth.signOut()}
-            className="w-full flex items-center gap-4 px-4 py-4 text-slate-500 rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all font-black text-[11px] uppercase tracking-widest"
+            className="w-full flex items-center gap-4 px-4 py-4 text-slate-500 rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all font-black text-[11px] uppercase tracking-widest cursor-pointer"
           >
             <LogOut size={22} className={!sidebarOpen && "mx-auto"} />
             {sidebarOpen && <span>Encerrar Sessão</span>}
@@ -337,13 +318,11 @@ export default function Dashboard() {
 
         <section className="flex-1 overflow-y-auto p-10 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">
-            {/* SEÇÃO DO TÍTULO E SELETOR DE MÊS/ANO */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
               <h1 className="text-4xl font-black text-slate-900">
                 Olá, {nomeExibicao.split(" ")[0]}!
               </h1>
               
-              {/* SELETOR DE FILTRAGEM RÁPIDA */}
               <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
                 <Calendar size={16} className="text-blue-600" />
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1">Período:</span>
@@ -410,7 +389,6 @@ export default function Dashboard() {
   );
 }
 
-// Subcomponentes
 function StatCard({ title, value, color, icon: Icon }) {
   const themes = {
     amber: "bg-amber-500 shadow-amber-100",

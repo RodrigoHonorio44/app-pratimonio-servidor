@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { auth, db } from "../services/firebase";
-import { addDoc, collection, serverTimestamp, doc, getDoc, query, where, getDocs } from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { toast } from "react-hot-toast";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useCadastroChamado = () => {
   const [loading, setLoading] = useState(false);
@@ -55,22 +56,28 @@ export const useCadastroChamado = () => {
 
     setBuscandoAtivo(true);
     try {
-      const ativosRef = collection(db, "ativos");
-      const termosBusca = [tagOriginal.toLowerCase()];
-      if (!isNaN(tagOriginal)) {
-        termosBusca.push(Number(tagOriginal));
-      }
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
 
-      const q = query(ativosRef, where("patrimonio", "in", termosBusca));
-      const querySnapshot = await getDocs(q);
+      const resposta = await fetch(`${API_URL}/ativos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      if (!querySnapshot.empty) {
-        const dados = querySnapshot.docs[0].data();
-        setEquipamento(dados.nome || "");
-        setSetor(dados.setor || "");
-        setSetorManual(true); // ATIVA O MODO MANUAL PARA PERMITIR EDIÇÃO APÓS BUSCA
-        const unidadeBanco = dados.unidade || "";
-        setUnidade(unidadeBanco);
+      if (!resposta.ok) throw new Error("Erro ao buscar ativos");
+
+      const ativos = await resposta.json();
+      
+      const ativoEncontrado = ativos.find(a => 
+        String(a.patrimonio || "").toLowerCase() === tagOriginal.toLowerCase() ||
+        String(a.tag || "").toLowerCase() === tagOriginal.toLowerCase() ||
+        String(a.id || "") === tagOriginal
+      );
+
+      if (ativoEncontrado) {
+        setEquipamento(ativoEncontrado.nome || ativoEncontrado.equipamento || "");
+        setSetor(ativoEncontrado.setor || "");
+        setSetorManual(true);
+        setUnidade(ativoEncontrado.unidade || "");
         toast.success("equipamento cadastrado");
       } else {
         toast.error("equipamento nao cadastrado");
@@ -91,34 +98,58 @@ export const useCadastroChamado = () => {
     const novaOs = `${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     try {
-      const uidExibicao = auth.currentUser.uid;
-      let nomeParaSalvar = auth.currentUser.email.split("@")[0].toLowerCase();
-      const userDocSnap = await getDoc(doc(db, "usuarios", uidExibicao));
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
 
-      if (userDocSnap.exists() && userDocSnap.data().nome) {
-        const partesNome = userDocSnap.data().nome.trim().split(/\s+/);
-        nomeParaSalvar = partesNome.length > 1 
-          ? `${partesNome[0]} ${partesNome[partesNome.length - 1]}`.toLowerCase() 
-          : partesNome[0].toLowerCase();
+      const token = await currentUser.getIdToken();
+      const uidExibicao = currentUser.uid;
+      let nomeParaSalvar = currentUser.email.split("@")[0].toLowerCase();
+
+      try {
+        const userRes = await fetch(`${API_URL}/usuarios/${uidExibicao}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          if (userData && userData.nome) {
+            const partesNome = userData.nome.trim().split(/\s+/);
+            nomeParaSalvar = partesNome.length > 1 
+              ? `${partesNome[0]} ${partesNome[partesNome.length - 1]}`.toLowerCase() 
+              : partesNome[0].toLowerCase();
+          }
+        }
+      } catch (err) {
+        console.warn("Não foi possível buscar dados complementares do usuário, usando email.", err);
       }
 
-      await addDoc(collection(db, "chamados"), {
-        equipe: equipe.toLowerCase(),
-        equipamento: equipamento.toLowerCase(),
-        patrimonio: patrimonio.trim().toLowerCase(),
-        setor: setor.toLowerCase(),
-        descricao: descricao.toLowerCase(),
-        unidade: unidade.toLowerCase(),
-        prioridade: prioridade.toLowerCase(),
-        criadoEm: serverTimestamp(),
-        emailSolicitante: auth.currentUser.email.toLowerCase(),
-        nome: nomeParaSalvar,
-        numeroOs: novaOs,
-        status: "aberto",
-        userId: uidExibicao,
-        feedbackAnalista: "",
-        tecnicoResponsavel: "",
+      const resposta = await fetch(`${API_URL}/chamados`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          equipe: equipe.toLowerCase(),
+          equipamento: equipamento.toLowerCase(),
+          patrimonio: patrimonio.trim().toLowerCase(),
+          setor: setor.toLowerCase(),
+          descricao: descricao.toLowerCase(),
+          unidade: unidade.toLowerCase(),
+          prioridade: prioridade.toLowerCase(),
+          criadoEm: new Date().toISOString(),
+          emailSolicitante: currentUser.email.toLowerCase(),
+          nome: nomeParaSalvar,
+          numeroOs: novaOs,
+          status: "aberto",
+          userId: uidExibicao,
+          feedbackAnalista: "",
+          tecnicoResponsavel: ""
+        })
       });
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao salvar chamado no servidor");
+      }
 
       setProtocoloGerado(novaOs);
       setSucesso(true);

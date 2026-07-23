@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { db } from '../services/firebase';
-import { collection, addDoc, query, getDocs, updateDoc, doc, serverTimestamp, limit } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FiTruck, FiSearch, FiArrowLeft, FiPackage, FiEdit3, FiX, FiMapPin, FiUser } from 'react-icons/fi';
@@ -46,18 +44,11 @@ const SaidaEquipamento = () => {
         setItensEncontrados([]);
 
         try {
-            const ativosRef = collection(db, "ativos");
-            
-            // Removidos os filtros "where" engessados do Firebase para evitar bloqueios de caixa (Maiúscula/Minúscula)
-            const qGeral = query(ativosRef, limit(500));
-            const snapGeral = await getDocs(qGeral);
-            
-            const listaGeral = snapGeral.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Busca simulada no localStorage (substitua pela chamada da sua API/Banco próprio)
+            const ativosSalvos = JSON.parse(localStorage.getItem('ativos') || '[]');
             const termoNorm = normalizarParaComparacao(termoOriginal);
 
-            // Filtragem inteligente na memória do cliente
-            const filtrados = listaGeral.filter(item => {
-                // Garante a validação do status "ativo" independente de como foi salvo
+            const filtrados = ativosSalvos.filter(item => {
                 const statusItemNorm = String(item.status || "ativo").toLowerCase().trim();
                 if (statusItemNorm !== "ativo") return false;
 
@@ -72,7 +63,6 @@ const SaidaEquipamento = () => {
                     }
                     return itemPatrimonioNorm === termoNorm;
                 } else {
-                    // Busca por Nome, Setor ou Patrimônio simultaneamente
                     return (
                         itemNomeNorm.includes(termoNorm) ||
                         itemSetorNorm.includes(termoNorm) ||
@@ -109,21 +99,32 @@ const SaidaEquipamento = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const ativoRef = doc(db, "ativos", itemSelecionado.id);
-            
-            // Salva o novo patrimônio convertido para minúsculo seguindo o padrão de armazenamento local
             const patrimonioFinal = (normalizarParaComparacao(itemSelecionado.patrimonio) === 'sp' && novoPatrimonioParaSP)
-                ? novoPatrimonioParaSP.toLowerCase()
+                ? novoPatrimonioParaSP
                 : itemSelecionado.patrimonio;
 
-            await updateDoc(ativoRef, {
-                unidade: dadosSaida.novaUnidade,
-                setor: dadosSaida.novoSetor,
-                patrimonio: patrimonioFinal,
-                ultimaMovimentacao: serverTimestamp()
-            });
+            const dataAtual = new Date().toISOString();
 
-            await addDoc(collection(db, "saidaEquipamento"), {
+            // Atualiza no localStorage (Banco local / API própria)
+            const ativosSalvos = JSON.parse(localStorage.getItem('ativos') || '[]');
+            const ativosAtualizados = ativosSalvos.map(item => {
+                if (item.id === itemSelecionado.id) {
+                    return {
+                        ...item,
+                        unidade: dadosSaida.novaUnidade,
+                        setor: dadosSaida.novoSetor,
+                        patrimonio: patrimonioFinal,
+                        ultimaMovimentacao: dataAtual
+                    };
+                }
+                return item;
+            });
+            localStorage.setItem('ativos', JSON.stringify(ativosAtualizados));
+
+            // Registra histórico de saída
+            const saidasSalvas = JSON.parse(localStorage.getItem('saidaEquipamento') || '[]');
+            const novaSaida = {
+                id: Date.now().toString(),
                 ativoId: itemSelecionado.id,
                 patrimonio: patrimonioFinal,
                 nomeEquipamento: itemSelecionado.nome,
@@ -133,8 +134,9 @@ const SaidaEquipamento = () => {
                 setorDestino: dadosSaida.novoSetor,
                 responsavelRecebimento: dadosSaida.responsavelRecebimento,
                 motivo: dadosSaida.motivo,
-                dataSaida: serverTimestamp()
-            });
+                dataSaida: dataAtual
+            };
+            localStorage.setItem('saidaEquipamento', JSON.stringify([...saidasSalvas, novaSaida]));
 
             toast.success("Transferência realizada com sucesso!");
             fecharModal();
@@ -142,6 +144,7 @@ const SaidaEquipamento = () => {
             setPatrimonioBusca('');
             setNomeBusca('');
         } catch (error) {
+            console.error(error);
             toast.error("Erro ao processar transferência.");
         } finally {
             setLoading(false);
@@ -149,7 +152,7 @@ const SaidaEquipamento = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-900">
+        <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-950 flex flex-col">
             {/* HEADER */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -167,7 +170,7 @@ const SaidaEquipamento = () => {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 py-10">
+            <main className="max-w-7xl mx-auto px-6 py-10 flex-1 w-full">
                 {/* BUSCA */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
@@ -175,12 +178,13 @@ const SaidaEquipamento = () => {
                         <div className="relative flex items-center">
                             <input
                                 type="text"
-                                className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-14 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all uppercase"
+                                className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-14 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all"
                                 placeholder="Ex: HMC-001"
                                 value={patrimonioBusca}
                                 onChange={(e) => setPatrimonioBusca(e.target.value)}
                             />
                             <button 
+                                type="button"
                                 className="absolute right-2 p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100 cursor-pointer" 
                                 onClick={() => executarBusca('patrimonio')}
                             >
@@ -200,6 +204,7 @@ const SaidaEquipamento = () => {
                                 onChange={(e) => setNomeBusca(e.target.value)}
                             />
                             <button 
+                                type="button"
                                 className="absolute right-2 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 cursor-pointer" 
                                 onClick={() => executarBusca('nome')}
                             >
@@ -259,7 +264,7 @@ const SaidaEquipamento = () => {
                     <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <h3 className="text-xl font-black italic text-slate-800 uppercase tracking-tight">Confirmar Saída</h3>
-                            <button className="p-2 hover:bg-white rounded-full text-slate-400 hover:text-red-500 transition-all cursor-pointer" onClick={fecharModal}>
+                            <button type="button" className="p-2 hover:bg-white rounded-full text-slate-400 hover:text-red-500 transition-all cursor-pointer" onClick={fecharModal}>
                                 <FiX size={24} />
                             </button>
                         </div>
@@ -280,7 +285,7 @@ const SaidaEquipamento = () => {
                                         <input
                                             type="text"
                                             className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl py-4 px-5 text-sm font-bold transition-all text-slate-700"
-                                            placeholder="Ex: hmc-001"
+                                            placeholder="Ex: HMC-001"
                                             value={novoPatrimonioParaSP}
                                             onChange={(e) => setNovoPatrimonioParaSP(e.target.value)}
                                         />
@@ -293,6 +298,7 @@ const SaidaEquipamento = () => {
                                         <select 
                                             required 
                                             className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 text-sm font-bold focus:ring-2 focus:ring-blue-500 appearance-none text-slate-700 cursor-pointer bg-white"
+                                            value={dadosSaida.novaUnidade}
                                             onChange={(e) => setDadosSaida({ ...dadosSaida, novaUnidade: e.target.value })}
                                         >
                                             <option value="">Selecionar...</option>
@@ -307,6 +313,7 @@ const SaidaEquipamento = () => {
                                             required
                                             className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
                                             placeholder="Ex: UTI"
+                                            value={dadosSaida.novoSetor}
                                             onChange={(e) => setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })}
                                         />
                                     </div>
@@ -321,6 +328,7 @@ const SaidaEquipamento = () => {
                                         required
                                         className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
                                         placeholder="Quem recebeu o equipamento?"
+                                        value={dadosSaida.responsavelRecebimento}
                                         onChange={(e) => setDadosSaida({ ...dadosSaida, responsavelRecebimento: e.target.value })}
                                     />
                                 </div>

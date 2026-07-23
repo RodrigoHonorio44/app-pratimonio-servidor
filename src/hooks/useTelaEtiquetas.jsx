@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { db } from "../services/firebase";
-import { collection, getDocs, query, orderBy, limit, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { toast } from "react-toastify";
+
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useTelaEtiquetas = () => {
   const [loading, setLoading] = useState(false);
@@ -21,17 +22,26 @@ export const useTelaEtiquetas = () => {
   const [modoEdicaoSetor, setModoEdicaoSetor] = useState(false);
   const [etiquetaPronta, setEtiquetaPronta] = useState(null);
 
-  // 1. BUSCA O MAIOR NÚMERO ABSOLUTO
+  // 1. BUSCA O MAIOR NÚMERO ABSOLUTO VIA API
   const buscarUltimoPatrimonioGeral = async () => {
     try {
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [resAtivos, resEtiquetas] = await Promise.all([
+        fetch(`${API_URL}/ativos`, { headers }),
+        fetch(`${API_URL}/etiquetas_patrimonio`, { headers })
+      ]);
+
+      let dadosAtivos = resAtivos.ok ? await resAtivos.json() : [];
+      let dadosEtiquetas = resEtiquetas.ok ? await resEtiquetas.json() : [];
+
       let maiorNumero = 0;
-      const qAtivos = query(collection(db, "ativos"), orderBy("patrimonio", "desc"), limit(30));
-      const qEtiquetas = query(collection(db, "etiquetas_patrimonio"), orderBy("patrimonio", "desc"), limit(30));
       
-      const [snapAtivos, snapEtiquetas] = await Promise.all([getDocs(qAtivos), getDocs(qEtiquetas)]);
-      
-      [...snapAtivos.docs, ...snapEtiquetas.docs].forEach((doc) => {
-        const patStr = doc.data().patrimonio;
+      [...dadosAtivos, ...dadosEtiquetas].forEach((item) => {
+        const patStr = item.patrimonio;
         if (patStr && patStr !== "s/p") {
           const num = parseInt(patStr.replace(/\D/g, ""), 10);
           if (!isNaN(num) && num > maiorNumero) maiorNumero = num;
@@ -57,7 +67,7 @@ export const useTelaEtiquetas = () => {
     setModoEdicaoSetor(false);
   };
 
-  // 2. SALVA O ATIVO
+  // 2. SALVA O ATIVO VIA API
   const handleCriarAtivoEEtiqueta = async (e) => {
     e.preventDefault();
     if (!nome.trim()) return toast.error("Por favor, digite o nome do equipamento.");
@@ -66,11 +76,24 @@ export const useTelaEtiquetas = () => {
     setLoading(true);
 
     try {
-      const snapAtivosCheck = await getDocs(collection(db, "ativos"));
-      const snapEtiquetasCheck = await getDocs(collection(db, "etiquetas_patrimonio"));
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
+      const token = await currentUser.getIdToken();
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      };
 
-      const existe = [...snapAtivosCheck.docs, ...snapEtiquetasCheck.docs].some(
-        doc => String(doc.data().patrimonio).trim() === String(proximoPatrimonio).trim()
+      const [resAtivosCheck, resEtiquetasCheck] = await Promise.all([
+        fetch(`${API_URL}/ativos`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/etiquetas_patrimonio`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      const listaAtivos = resAtivosCheck.ok ? await resAtivosCheck.json() : [];
+      const listaEtiquetas = resEtiquetasCheck.ok ? await resEtiquetasCheck.json() : [];
+
+      const existe = [...listaAtivos, ...listaEtiquetas].some(
+        item => String(item.patrimonio).trim() === String(proximoPatrimonio).trim()
       );
 
       if (existe) {
@@ -81,7 +104,7 @@ export const useTelaEtiquetas = () => {
       }
 
       const novoRegistro = {
-        criadoEm: serverTimestamp(),
+        criadoEm: new Date().toISOString(),
         estado: estado.toLowerCase().trim(),
         nome: nome.toLowerCase().trim(),
         observacoes: observacoes.toLowerCase().trim() || (isAvulsa ? "etiqueta avulsa gerada" : ""),
@@ -95,11 +118,25 @@ export const useTelaEtiquetas = () => {
       };
 
       if (isAvulsa) {
-        await addDoc(collection(db, "etiquetas_patrimonio"), novoRegistro);
+        await fetch(`${API_URL}/etiquetas_patrimonio`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(novoRegistro)
+        });
         toast.success(`Etiqueta Avulsa #${proximoPatrimonio} criada!`);
       } else {
-        await addDoc(collection(db, "ativos"), novoRegistro);
-        await addDoc(collection(db, "etiquetas_patrimonio"), novoRegistro);
+        await Promise.all([
+          fetch(`${API_URL}/ativos`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(novoRegistro)
+          }),
+          fetch(`${API_URL}/etiquetas_patrimonio`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(novoRegistro)
+          })
+        ]);
         toast.success(`Patrimônio #${proximoPatrimonio} cadastrado!`);
       }
       

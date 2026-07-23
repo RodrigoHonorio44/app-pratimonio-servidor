@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { db } from "../services/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useInventario = () => {
   const [itens, setItens] = useState([]);
@@ -63,12 +64,16 @@ export const useInventario = () => {
     setPaginaAtual(1);
 
     try {
-      const querySnapshot = await getDocs(collection(db, "ativos"));
-      const todosOsDados = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
 
+      const resposta = await fetch(`${API_URL}/ativos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resposta.ok) throw new Error("Erro ao buscar dados da API");
+
+      const todosOsDados = await resposta.json();
       setItens(todosOsDados);
 
       if (todosOsDados.length > 0) {
@@ -177,7 +182,8 @@ export const useInventario = () => {
   const formatarDataBR = (timestamp) => {
     if (!timestamp) return "---";
     try {
-      const data = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const data = new Date(timestamp);
+      if (isNaN(data.getTime())) return "---";
       return data.toLocaleString("pt-BR", {
         day: "2-digit",
         month: "2-digit",

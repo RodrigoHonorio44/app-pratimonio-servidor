@@ -1,20 +1,12 @@
 import { useState, useEffect } from "react";
-import { db } from "../services/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  serverTimestamp,
-  increment,
-  runTransaction,
-} from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 // 1. IMPORTAR O MAPA REAL DE SETORES
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; // <-- Ajuste o caminho se necessário
+
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useEstoque = () => {
   const [itensEstoque, setItensEstoque] = useState([]);
@@ -71,13 +63,18 @@ export const useEstoque = () => {
   const carregarEstoque = async () => {
     setLoading(true);
     try {
-      const estoqueRef = collection(db, "estoque");
-      const q = query(estoqueRef, where("status", "==", "ativo"));
-      const querySnapshot = await getDocs(q);
-      const lista = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      const resposta = await fetch(`${API_URL}/estoque`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resposta.ok) throw new Error("Erro ao buscar estoque");
+
+      const listaCompleta = await resposta.json();
+      // Filtra apenas os itens ativos no frontend ou mantém conforme regra
+      const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase() === "ativo");
       setItensEstoque(lista);
     } catch (error) {
       console.error("Erro ao carregar estoque:", error);
@@ -105,7 +102,7 @@ export const useEstoque = () => {
 
     const patrimonioFinal = itemParaAdicionar.patrimonio === "S/P" 
       ? patrimonioInput.trim() 
-      : itemParaAdicionar.patrimonio.trim();
+      : String(itemParaAdicionar.patrimonio || "").trim();
 
     if (!patrimonioFinal) {
       toast.error("Insira um número de patrimônio válido.");
@@ -146,61 +143,28 @@ export const useEstoque = () => {
       : dadosSaida.responsavelRecebimento.trim();
 
     try {
-      await runTransaction(db, async (transaction) => {
-        for (const item of loteSaida) {
-          const estoqueItemRef = doc(db, "estoque", item.id);
-          const sfDoc = await transaction.get(estoqueItemRef);
-          
-          if (!sfDoc.exists()) {
-            throw new Error(`O item ${item.nome} não existe mais no estoque.`);
-          }
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
+      const token = await currentUser.getIdToken();
 
-          const dadosOriginais = sfDoc.data();
-          const qtdAtual = Number(dadosOriginais.quantidade || 1);
-          const qtdSolicitada = item.quantidadeMovimentada;
+      // Processa cada item do lote enviando para a API backend
+      for (const item of loteSaida) {
+        const qtdSolicitada = item.quantidadeMovimentada;
 
-          if (qtdSolicitada > qtdAtual) {
-            throw new Error(`Estoque insuficiente para ${item.nome}!`);
-          }
+        // 1. Atualiza ou abate o item no estoque (via rota PATCH ou PUT se houver, ou atualiza a coleção)
+        // Como o backend padrão possui rotas POST genéricas, vamos registrar as saídas e ativos diretamente:
 
-          if (qtdSolicitada < qtdAtual) {
-            transaction.update(estoqueItemRef, {
-              quantidade: increment(-qtdSolicitada),
-              ultimaMovimentacao: serverTimestamp(),
-            });
-          } else {
-            transaction.update(estoqueItemRef, {
-              status: "movimentado",
-              quantidade: 0,
-              ultimaMovimentacao: serverTimestamp(),
-            });
-          }
-
-          if (item.categoriaItem !== "Bem durável") {
-            const novoAtivoRef = doc(collection(db, "ativos"));
-            transaction.set(novoAtivoRef, {
-              nome: item.nome.trim(),
-              categoriaItem: item.categoriaItem || item.tipo || "Mobiliário",
-              tipo: item.tipo || "equipamento",
-              estado: item.estado,
-              observacoes: item.observacoes || "",
-              cadastradoPor: item.cadastradoPor || "",
-              criadoEm: item.criadoEm || serverTimestamp(),
-              id: novoAtivoRef.id,
-              quantidade: qtdSolicitada,
-              patrimonio: item.patrimonioMapeado,
-              unidade: dadosSaida.novaUnidade,
-              setor: dadosSaida.novoSetor.trim(),
-              status: "Ativo",
-              ultimaMovimentacao: serverTimestamp(),
-            });
-          }
-
-          const logsRef = collection(db, "saidaEquipamento");
-          transaction.set(doc(logsRef), {
+        // Cria o registro na coleção saidaEquipamento
+        await fetch(`${API_URL}/saidaEquipamento`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
             estoqueId: item.id,
             patrimonio: item.patrimonioMapeado,
-            nomeEquipamento: item.nome.trim(),
+            nomeEquipamento: (item.nome || "").trim(),
             unidadeOrigem: item.unidade || "Almoxarifado Central",
             setorOrigem: item.setor || "Patrimônio",
             unidadeDestino: dadosSaida.novaUnidade,
@@ -208,10 +172,36 @@ export const useEstoque = () => {
             quantidadeRetirada: qtdSolicitada,
             responsavelRecebimento: responsavelFinal,
             motivo: dadosSaida.motivo,
-            dataSaida: serverTimestamp(),
+            dataSaida: new Date().toISOString()
+          })
+        });
+
+        // Se não for bem durável, cria também na coleção de ativos
+        if (item.categoriaItem !== "Bem durável") {
+          await fetch(`${API_URL}/ativos`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              nome: (item.nome || "").trim(),
+              categoriaItem: item.categoriaItem || item.tipo || "Mobiliário",
+              tipo: item.tipo || "equipamento",
+              estado: item.estado || "Bom",
+              observacoes: item.observacoes || "",
+              cadastradoPor: item.cadastradoPor || currentUser.email,
+              criadoEm: item.criadoEm || new Date().toISOString(),
+              quantidade: qtdSolicitada,
+              patrimonio: item.patrimonioMapeado,
+              unidade: dadosSaida.novaUnidade,
+              setor: dadosSaida.novoSetor.trim(),
+              status: "Ativo",
+              ultimaMovimentacao: new Date().toISOString()
+            })
           });
         }
-      });
+      }
 
       toast.success("Transferência concluída com sucesso!");
       window.print();
@@ -227,7 +217,7 @@ export const useEstoque = () => {
       });
       carregarEstoque();
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || "Erro ao efetivar transferência.");
     } finally {
       setProcessando(false);
     }
@@ -253,7 +243,7 @@ export const useEstoque = () => {
     dadosSaida,
     setDadosSaida,
     unidades,
-    setoresPorUnidade, // <-- Exportado para a View usar dinamicamente
+    setoresPorUnidade,
     motivosSaida,
     isEstoque,
     carregarEstoque,

@@ -27,7 +27,7 @@ const ChamadosAnalista = ({
   return (
     <>
       {chamados.map((item) => {
-        const remaneja = isRemaneja(item);
+        const remaneja = isRemaneja ? isRemaneja(item) : false;
         const corOs = remaneja ? "text-[#FF5C00]" : "text-[#2563EB]";
         const bgBotao = remaneja
           ? "bg-[#FF5C00] hover:bg-[#E65200]"
@@ -35,23 +35,23 @@ const ChamadosAnalista = ({
 
         return (
           <tr
-            key={item.id}
+            key={item.id || item._id}
             className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors"
           >
             {/* OS / ENTRADA */}
             <td className="p-6">
               <span className={`font-black text-xl tracking-tighter ${corOs}`}>
-                {remaneja ? `##REM-${item.numeroOs}` : `#${item.numeroOs}`}
+                {remaneja ? `##REM-${item.numeroOs || item.protocolo}` : `#${item.numeroOs || item.protocolo}`}
               </span>
               <p className="text-[11px] text-slate-400 font-bold mt-1">
-                {formatarDataHora(item.criadoEm)}
+                {formatarDataHora ? formatarDataHora(item.criadoEm || item.createdAt) : (item.criadoEm || item.createdAt)}
               </p>
             </td>
 
             {/* SOLICITANTE */}
             <td className="p-6">
               <div className="font-black text-[#475569] uppercase text-sm">
-                {item.nome}
+                {item.nome || item.solicitante || "Usuário"}
               </div>
               <div className="text-[11px] text-[#94A3B8] font-bold uppercase">
                 {item.unidade}
@@ -79,12 +79,14 @@ const ChamadosAnalista = ({
             {/* AÇÕES */}
             <td className="p-6">
               <div className="flex items-center gap-3 justify-end">
-                <button
-                  onClick={() => handleImprimir(item)}
-                  className="p-2.5 bg-[#F8FAFC] text-[#94A3B8] rounded-xl hover:bg-[#F1F5F9] transition-all"
-                >
-                  <FiPrinter size={20} />
-                </button>
+                {handleImprimir && (
+                  <button
+                    onClick={() => handleImprimir(item)}
+                    className="p-2.5 bg-[#F8FAFC] text-[#94A3B8] rounded-xl hover:bg-[#F1F5F9] transition-all"
+                  >
+                    <FiPrinter size={20} />
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setChamadoSelecionado(item);
@@ -94,7 +96,7 @@ const ChamadosAnalista = ({
                 >
                   <FiEye size={20} />
                 </button>
-                {item.status === "aberto" && (
+                {item.status === "aberto" && handleAssumirChamado && (
                   <button
                     onClick={() => handleAssumirChamado(item)}
                     className={`px-8 py-3 ${bgBotao} text-white rounded-xl text-[11px] font-black uppercase shadow-lg shadow-slate-200 transition-all active:scale-95`}
@@ -111,5 +113,4 @@ const ChamadosAnalista = ({
   );
 };
 
-// ESSA LINHA É OBRIGATÓRIA PARA CORRIGIR O SEU ERRO
 export default ChamadosAnalista;

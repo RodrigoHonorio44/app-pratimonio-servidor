@@ -1,16 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { db, auth } from "../services/firebase";
-import {
-  collection,
-  query,
-  onSnapshot,
-  doc,
-  updateDoc,
-  serverTimestamp,
-  orderBy,
-  getDoc,
-  deleteField,
-} from "firebase/firestore";
+import { auth } from "../services/firebase";
+import api from "../services/api";
 import { toast } from "react-toastify";
 
 const WEB_APP_URL =
@@ -54,7 +44,7 @@ export const usePainelAnalista = () => {
       userData?.nome ||
       user?.displayName ||
       user?.email?.split("@")[0] ||
-      "Analista"
+      "analista"
     );
   }, [userData, user]);
 
@@ -64,7 +54,6 @@ export const usePainelAnalista = () => {
     return date.toLocaleString("pt-BR");
   };
 
-  // CORRIGIDO: Nome da função ajustado de ejecutarBusca para executarBusca
   const executarBusca = () => {
     setTermoBusca(inputValue);
     setPaginaAtual(1);
@@ -76,12 +65,11 @@ export const usePainelAnalista = () => {
     setPaginaAtual(1);
   };
 
-  // NOVA FUNÇÃO: Calcula dinamicamente o status do SLA baseado em 6h para atendimento e 12h para solução
   const calcularSlaLinha = useCallback((item) => {
     const statusAtual = item?.status?.toLowerCase() || "";
 
     if (statusAtual === "fechado" || statusAtual === "arquivado") {
-      return { texto: "Concluído", estourado: false, classe: "bg-slate-100 text-slate-500 border border-slate-200", bola: "bg-slate-400" };
+      return { texto: "concluído", estourado: false, classe: "bg-slate-100 text-slate-500 border border-slate-200", bola: "bg-slate-400" };
     }
 
     const timestampCriado = item?.criadoEm || item?.criatedAt;
@@ -93,32 +81,30 @@ export const usePainelAnalista = () => {
     const agora = new Date();
     const tempoDecorridoHoras = (agora - dataAbertura) / (1000 * 60 * 60);
 
-    // Regra 1: Se o chamado ainda está Aberto, o prazo limite é de 6 horas para assumir
     if (statusAtual === "aberto") {
       const limiteAtendimento = 6;
       if (tempoDecorridoHoras > limiteAtendimento) {
         const atraso = Math.floor(tempoDecorridoHoras - limiteAtendimento);
         return {
-          texto: `SLA Atendimento Estourado (+${atraso}h)`,
+          texto: `sla atendimento estourado (+${atraso}h)`,
           estourado: true,
           classe: "bg-red-100 text-red-600 animate-pulse border border-red-200",
           bola: "bg-red-600 animate-ping"
         };
       }
       return {
-        texto: "Prazo Atendimento OK",
+        texto: "prazo atendimento ok",
         estourado: false,
         classe: "bg-emerald-100 text-emerald-700 border border-emerald-200",
         bola: "bg-emerald-500"
       };
     }
 
-    // Regra 2: Se o chamado está em atendimento ou pendente, valida o limite total de solução (12 horas)
     const limiteSolucao = 12;
     if (tempoDecorridoHoras > limiteSolucao) {
       const atraso = Math.floor(tempoDecorridoHoras - limiteSolucao);
       return {
-        texto: `SLA Solução Estourado (+${atraso}h)`,
+        texto: `sla solução estourado (+${atraso}h)`,
         estourado: true,
         classe: "bg-red-100 text-red-600 animate-pulse border border-red-200",
         bola: "bg-red-600 animate-ping"
@@ -126,48 +112,42 @@ export const usePainelAnalista = () => {
     }
 
     return {
-      texto: "Prazo Solução OK",
+      texto: "prazo solução ok",
       estourado: false,
       classe: "bg-emerald-100 text-emerald-700 border border-emerald-200",
       bola: "bg-emerald-500"
     };
   }, []);
 
-  // Carrega os dados do usuário logado
+  // Carrega os dados do usuário logado via API do servidor
   useEffect(() => {
     if (!user) return;
     const fetchUserData = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "usuarios", user.uid));
-        if (docSnap.exists()) setUserData(docSnap.data());
+        const response = await api.get(`/usuarios/${user.uid}`);
+        if (response.data) setUserData(response.data);
       } catch (error) {
-        console.error("Erro ao buscar dados do usuário:", error);
+        console.error("erro ao buscar dados do usuário:", error);
       }
     };
     fetchUserData();
   }, [user]);
 
-  // Listener em tempo real dos chamados do Firebase
+  // Carrega os chamados via API do servidor (substituindo o onSnapshot direto do firebase)
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    const q = query(collection(db, "chamados"), orderBy("criadoEm", "desc"));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const lista = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setChamados(lista);
-        setLoading(false);
-      },
-      (error) => {
-        toast.error("Erro na conexão em tempo real.");
+    const carregarChamados = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get("/chamados");
+        setChamados(response.data || []);
+      } catch (error) {
+        toast.error("erro ao carregar chamados do servidor.");
+      } finally {
         setLoading(false);
       }
-    );
-    return () => unsubscribe();
+    };
+    carregarChamados();
   }, [user]);
 
   const handleAssumirChamado = async (chamado) => {
@@ -175,107 +155,140 @@ export const usePainelAnalista = () => {
       chamado.status === "em atendimento" || chamado.status === "pendente";
 
     try {
-      await updateDoc(doc(db, "chamados", chamado.id), {
+      const dadosAtualizacao = {
         status: "em atendimento",
-        tecnicoResponsavel: analistaNome,
+        tecnicoResponsavel: analistaNome.toLowerCase(),
         tecnicoId: user.uid,
-        iniciadoEm: serverTimestamp(),
+        iniciadoEm: new Date().toISOString(),
         logSeguranca: jaTemTecnico
-          ? `Override realizado por admin: ${analistaNome}`
+          ? `override realizado por admin: ${analistaNome.toLowerCase()}`
           : null,
-      });
+      };
+
+      await api.put(`/chamados/${chamado.id}`, dadosAtualizacao);
+
+      // Atualiza o estado local para refletir na tela imediatamente
+      setChamados((prev) =>
+        prev.map((c) => (c.id === chamado.id ? { ...c, ...dadosAtualizacao } : c))
+      );
+
       toast.info(
         jaTemTecnico
-          ? `Override realizado na OS #${chamado.numeroOs}`
-          : `Você assumiu a OS #${chamado.numeroOs}`
+          ? `override realizado na os #${chamado.numeroOs}`
+          : `você assumiu a os #${chamado.numeroOs}`
       );
     } catch (err) {
-      toast.error("Erro ao assumir.");
+      toast.error("erro ao assumir.");
     }
   };
 
   const handleDevolverChamado = async (chamado) => {
     try {
-      await updateDoc(doc(db, "chamados", chamado.id), {
+      const dadosAtualizacao = {
         status: "aberto",
-        tecnicoResponsavel: deleteField(),
-        tecnicoId: deleteField(),
-        iniciadoEm: deleteField(),
-        motivoPausa: deleteField(),
-        detalhePausa: deleteField(),
-        pausadoEm: deleteField(),
-      });
-      toast.warning("Chamado devolvido para a fila.");
+        tecnicoResponsavel: null,
+        tecnicoId: null,
+        iniciadoEm: null,
+        motivoPausa: null,
+        detalhePausa: null,
+        pausadoEm: null,
+      };
+
+      await api.put(`/chamados/${chamado.id}`, dadosAtualizacao);
+
+      setChamados((prev) =>
+        prev.map((c) => (c.id === chamado.id ? { ...c, ...dadosAtualizacao } : c))
+      );
+
+      toast.warning("chamado devolvido para a fila.");
     } catch (err) {
-      toast.error("Erro ao devolver.");
+      toast.error("erro ao devolver.");
     }
   };
 
   const handleFinalizarChamado = async (e) => {
     e.preventDefault();
-    if (!patrimonio.trim()) return toast.error("Informe o patrimônio.");
+    if (!patrimonio.trim()) return toast.error("informe o patrimônio.");
 
     try {
       const novosDados = {
         status: "fechado",
-        feedbackAnalista: parecerTecnico.trim(),
-        patrimonio: patrimonio.trim(),
-        finalizadoEm: serverTimestamp(),
+        feedbackAnalista: parecerTecnico.trim().toLowerCase(),
+        patrimonio: patrimonio.trim().toLowerCase(),
+        finalizadoEm: new Date().toISOString(),
       };
 
       if (equipamento.trim()) {
-        novosDados.equipamento = equipamento.trim();
+        novosDados.equipamento = equipamento.trim().toLowerCase();
       }
 
-      await updateDoc(doc(db, "chamados", chamadoSelecionado.id), novosDados);
+      await api.put(`/chamados/${chamadoSelecionado.id}`, novosDados);
+
+      setChamados((prev) =>
+        prev.map((c) => (c.id === chamadoSelecionado.id ? { ...c, ...novosDados } : c))
+      );
 
       setMostrarModal(false);
       setTipoModal("");
       setParecerTecnico("");
       setPatrimonio("");
       setEquipamento("");
-      toast.success("OS Finalizada com sucesso!");
+      toast.success("os finalizada com sucesso!");
     } catch (err) {
-      toast.error("Erro ao finalizar.");
+      toast.error("erro ao finalizar.");
     }
   };
 
   const handlePausarSLA = async (e) => {
     e.preventDefault();
-    if (!motivoPausa) return toast.error("Escolha um motivo.");
+    if (!motivoPausa) return toast.error("escolha um motivo.");
     try {
-      await updateDoc(doc(db, "chamados", chamadoSelecionado.id), {
+      const novosDados = {
         status: "pendente",
-        motivoPausa: motivoPausa,
-        detalhePausa: detalhePausa.trim(),
-        pausadoEm: serverTimestamp(),
-      });
+        motivoPausa: motivoPausa.toLowerCase(),
+        detalhePausa: detalhePausa.trim().toLowerCase(),
+        pausadoEm: new Date().toISOString(),
+      };
+
+      await api.put(`/chamados/${chamadoSelecionado.id}`, novosDados);
+
+      setChamados((prev) =>
+        prev.map((c) => (c.id === chamadoSelecionado.id ? { ...c, ...novosDados } : c))
+      );
+
       setMostrarModal(false);
       setTipoModal("");
       setMotivoPausa("");
       setDetalhePausa("");
-      toast.warning("SLA Pausado.");
+      toast.warning("sla pausado.");
     } catch (err) {
-      toast.error("Erro ao pausar.");
+      toast.error("erro ao pausar.");
     }
   };
 
   const handleRetomarChamado = async (chamado) => {
     try {
-      await updateDoc(doc(db, "chamados", chamado.id), {
+      const novosDados = {
         status: "em atendimento",
-        retomadoEm: serverTimestamp(),
-      });
-      toast.success("Atendimento retomado!");
+        retomadoEm: new Date().toISOString(),
+      };
+
+      await api.put(`/chamados/${chamado.id}`, novosDados);
+
+      setChamados((prev) =>
+        prev.map((c) => (c.id === chamado.id ? { ...c, ...novosDados } : c))
+      );
+
+      toast.success("atendimento retomado!");
     } catch (err) {
-      toast.error("Erro ao retomar.");
+      toast.error("erro ao retomar.");
     }
   };
 
   const handleEnviarParaPlanilha = async (item) => {
     if (enviandoPlanilha) return;
     setEnviandoPlanilha(item.id);
-    const idToast = toast.loading(`Sincronizando OS #${item.numeroOs}...`);
+    const idToast = toast.loading(`sincronizando os #${item.numeroOs}...`);
     try {
       const payload = {
         tipo: "CHAMADOS_POWERBI",
@@ -287,8 +300,8 @@ export const usePainelAnalista = () => {
             Setor: item.setor || item.setorOrigem || "",
             Equipamento: item.equipamento || "s/p",
             Status: "FECHADO",
-            Descricao: item.problema || item.descricao || "Sem descrição",
-            Parecer_Tecnico: item.feedbackAnalista || "Sem parecer",
+            Descricao: item.problema || item.descricao || "sem descrição",
+            Parecer_Tecnico: item.feedbackAnalista || "sem parecer",
             Equipe: item.equipe || "",
             Finalizado_Por: item.tecnicoResponsavel || analistaNome,
             Data: formatarDataHora(item.criatedAt || item.criadoEm),
@@ -301,19 +314,27 @@ export const usePainelAnalista = () => {
         mode: "no-cors",
         body: JSON.stringify(payload),
       });
-      await updateDoc(doc(db, "chamados", item.id), {
+
+      const novosDados = {
         status: "arquivado",
-        arquivadoEm: serverTimestamp(),
-      });
+        arquivadoEm: new Date().toISOString(),
+      };
+
+      await api.put(`/chamados/${item.id}`, novosDados);
+
+      setChamados((prev) =>
+        prev.map((c) => (c.id === item.id ? { ...c, ...novosDados } : c))
+      );
+
       toast.update(idToast, {
-        render: "Sincronizado e Arquivado!",
+        render: "sincronizado e arquivado!",
         type: "success",
         isLoading: false,
         autoClose: 3000,
       });
     } catch (error) {
       toast.update(idToast, {
-        render: "Erro na sincronização.",
+        render: "erro na sincronização.",
         type: "error",
         isLoading: false,
         autoClose: 3000,

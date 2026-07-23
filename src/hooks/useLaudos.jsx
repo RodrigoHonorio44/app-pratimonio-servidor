@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { db } from "../services/firebase";
-import { collection, getDocs, query, where, limit, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { toast } from "react-toastify";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; 
 
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
+
 export const useLaudos = () => {
-  // Estados para busca de Ativos Operantes
   const [itens, setItens] = useState([]);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,16 +14,13 @@ export const useLaudos = () => {
   const [unidadeSelecionada, setUnidadeSelecionada] = useState("");
   const [buscaSetor, setBuscaSetor] = useState("");
 
-  // Estados para a seção de Laudos Gerados esperando Decisão de Baixa
   const [laudosPendentes, setLaudosPendentes] = useState([]);
   const [loadingLaudos, setLoadingLaudos] = useState(false);
   const [processandoAcao, setProcessandoAcao] = useState(null);
 
-  // Estados dos Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState(null);
 
-  // Inicializa os dados essenciais da tela
   useEffect(() => {
     const inicializarPainel = async () => {
       await carregarUnidades();
@@ -32,29 +29,82 @@ export const useLaudos = () => {
     inicializarPainel();
   }, []);
 
-  // Função auxiliar para encontrar os setores de forma insensível a maiúsculas/minúsculas
-  const obterSetoresDaUnidade = (unidade) => {
-    if (!unidade) return null;
-    const chaveEncontrada = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
-      (key) => key.toLowerCase() === unidade.toLowerCase().trim()
-    );
-    return chaveEncontrada ? MAPA_SETORES_POR_UNIDADE[chaveEncontrada] : null;
+  const normalizarParaComparacao = (texto) => {
+    if (!texto) return "";
+    return texto
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[/\s._-]/g, "")
+      .trim();
   };
 
-  // Busca os laudos gerados com status "pendente"
+  const obterSetoresDaUnidade = (unidade) => {
+    if (!unidade || unidade === "Todas") return null;
+
+    const unidadeLimpa = unidade.toString().trim();
+    
+    const chaveEncontrada = Object.keys(MAPA_SETORES_POR_UNIDADE).find((k) => {
+      const kNorm = normalizarParaComparacao(k);
+      const uNorm = normalizarParaComparacao(unidadeLimpa);
+      return k.toLowerCase() === unidadeLimpa.toLowerCase() || kNorm === uNorm || kNorm.includes(uNorm) || uNorm.includes(kNorm);
+    });
+
+    if (chaveEncontrada && MAPA_SETORES_POR_UNIDADE[chaveEncontrada]) {
+      return MAPA_SETORES_POR_UNIDADE[chaveEncontrada];
+    }
+
+    const deParaUnidades = {
+      "Hospital Conde": "Hospital Conde",
+      "Santa Rita": "Upa Santa Rita",
+      "Upa Santa Rita": "Upa Santa Rita",
+      "UPA Santa Rita": "Upa Santa Rita",
+      "Inoã": "Upa Inoã",
+      "Upa Inoã": "Upa Inoã",
+      "UPA Inoã": "Upa Inoã",
+      "Upa Inoa": "Upa Inoã",
+      "upa inoa": "Upa Inoã",
+      "Barroco": "Samu Barroco",
+      "Samu Barroco": "Samu Barroco",
+      "Ponta Negra": "Samu Ponta Negra",
+      "Samu Ponta Negra": "Samu Ponta Negra",
+      "Centro": "Samu Centro",
+      "Samu Centro": "Samu Centro"
+    };
+
+    let chaveMapeada = deParaUnidades[unidadeLimpa] || deParaUnidades[unidade];
+    if (chaveMapeada && MAPA_SETORES_POR_UNIDADE[chaveMapeada]) {
+      return MAPA_SETORES_POR_UNIDADE[chaveMapeada];
+    }
+
+    const setoresUnicos = new Set();
+    itens.forEach((item) => {
+      const itemUnidadeNorm = normalizarParaComparacao(item.unidade || "");
+      const unidadeSelecionadaNorm = normalizarParaComparacao(unidade);
+      if (itemUnidadeNorm.includes(unidadeSelecionadaNorm) && item.setor && item.setor.trim() !== "") {
+        setoresUnicos.add(item.setor.trim());
+      }
+    });
+
+    const listaFallback = Array.from(setoresUnicos).sort();
+    return listaFallback.length > 0 ? listaFallback : null;
+  };
+
   const carregarLaudosPendentes = async () => {
     setLoadingLaudos(true);
     try {
-      const q = query(
-        collection(db, "laudos"),
-        where("status", "==", "pendente"),
-        limit(25)
-      );
-      const querySnapshot = await getDocs(q);
-      const listaLaudos = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      const resposta = await fetch(`${API_URL}/laudos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resposta.ok) throw new Error("Erro ao buscar laudos");
+
+      const listaCompleta = await resposta.json();
+      const listaLaudos = listaCompleta.filter(l => (l.status || "").toLowerCase() === "pendente").slice(0, 25);
       setLaudosPendentes(listaLaudos);
     } catch (error) {
       console.error("Erro ao carregar laudos pendentes:", error);
@@ -63,22 +113,38 @@ export const useLaudos = () => {
     }
   };
 
-  // Função para Aprovar a Baixa do Laudo e Atualizar o Ativo no Firebase
   const handleAprovarLaudo = async (laudoId, equipamentoId) => {
     setProcessandoAcao(laudoId);
     try {
-      const laudoRef = doc(db, "laudos", laudoId);
-      await updateDoc(laudoRef, {
-        status: "aprovado",
-        dataDecisao: serverTimestamp(),
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
+      const token = await currentUser.getIdToken();
+
+      // Atualiza o status do laudo
+      await fetch(`${API_URL}/laudos/${laudoId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: "aprovado",
+          dataDecisao: new Date().toISOString()
+        })
       });
 
       if (equipamentoId) {
-        const ativoRef = doc(db, "ativos", equipamentoId);
-        await updateDoc(ativoRef, {
-          status: "inutilizados",
-          dataBaixa: serverTimestamp(),
-          ultimaMovimentacao: serverTimestamp(),
+        await fetch(`${API_URL}/ativos/${equipamentoId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            status: "inutilizados",
+            dataBaixa: new Date().toISOString(),
+            ultimaMovimentacao: new Date().toISOString()
+          })
         });
       }
 
@@ -93,21 +159,36 @@ export const useLaudos = () => {
     }
   };
 
-  // Função para Cancelar/Rejeitar o Laudo e Restaurar o Ativo
   const handleCancelarLaudo = async (laudoId, equipamentoId) => {
     setProcessandoAcao(laudoId);
     try {
-      const laudoRef = doc(db, "laudos", laudoId);
-      await updateDoc(laudoRef, {
-        status: "cancelado",
-        dataDecisao: serverTimestamp(),
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
+      const token = await currentUser.getIdToken();
+
+      await fetch(`${API_URL}/laudos/${laudoId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: "cancelado",
+          dataDecisao: new Date().toISOString()
+        })
       });
 
       if (equipamentoId) {
-        const ativoRef = doc(db, "ativos", equipamentoId);
-        await updateDoc(ativoRef, {
-          status: "operante",
-          ultimaMovimentacao: serverTimestamp(),
+        await fetch(`${API_URL}/ativos/${equipamentoId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            status: "operante",
+            ultimaMovimentacao: new Date().toISOString()
+          })
         });
       }
 
@@ -122,17 +203,22 @@ export const useLaudos = () => {
     }
   };
 
-  // Carrega a listagem do select de unidades do banco
   const carregarUnidades = async () => {
     try {
-      const q = query(collection(db, "ativos"), limit(100));
-      const querySnapshot = await getDocs(q);
-      const dados = querySnapshot.docs.map((doc) => doc.data());
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      const resposta = await fetch(`${API_URL}/ativos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!resposta.ok) return;
+      const dados = await resposta.json();
 
       const listaUnidades = Array.from(
         new Set(
           dados
-            .map((item) => item.unidade?.trim())
+            .map((item) => (item.unidade || "").trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "pt", { sensitivity: "base" }));
@@ -143,32 +229,22 @@ export const useLaudos = () => {
     }
   };
 
-  // CORREÇÃO AQUI: Consulta otimizada híbrida para evitar erros de índice composto do Firestore
   const carregarDados = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
     setHasSearched(true);
 
     try {
-      let q = collection(db, "ativos");
-      const restricoes = [];
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
 
-      // Filtramos apenas por Unidade no Firestore (Garante performance sem quebrar por falta de índice composto)
-      if (unidadeSelecionada) {
-        restricoes.push(where("unidade", "==", unidadeSelecionada.trim()));
-      }
+      const resposta = await fetch(`${API_URL}/ativos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      // Trazemos uma quantidade razoável de registros para filtrar o resto na memória local
-      restricoes.push(limit(250));
+      if (!resposta.ok) throw new Error("Erro ao consultar equipamentos");
 
-      const queryOtimizada = query(q, ...restricoes);
-      const querySnapshot = await getDocs(queryOtimizada);
-
-      const dados = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      
+      const dados = await resposta.json();
       setItens(dados);
     } catch (error) {
       console.error(error);
@@ -191,26 +267,35 @@ export const useLaudos = () => {
     setModalAberto(true);
   };
 
-  // CORREÇÃO AQUI: Filtragem local unificada (Filtra Setor E Patrimônio/Nome dinamicamente na memória)
   const itensFiltrados = itens.filter((item) => {
-    // 1. Validar Filtro de Setor (Insensível a maiúsculas/minúsculas e espaços)
-    if (buscaSetor.trim()) {
-      const setorItem = item.setor ? String(item.setor).trim().toLowerCase() : "";
-      const setorBusca = buscaSetor.trim().toLowerCase();
-      if (setorItem !== setorBusca) return false;
+    const statusItemLower = String(item.status || "operante").toLowerCase().trim();
+    const statusBloqueados = ["inutilizados", "baixado", "descartado", "baixados", "inutilizado"];
+    if (statusBloqueados.includes(statusItemLower)) return false;
+
+    const termo = buscaPatrimonio.trim();
+    const patrimonioItemNorm = normalizarParaComparacao(item.patrimonio || "");
+    const nomeItemNorm = normalizarParaComparacao(item.nome || "");
+    const termoNorm = normalizarParaComparacao(termo);
+
+    const eBuscaExataPatrimonio = termo && patrimonioItemNorm.includes(termoNorm);
+
+    if (!eBuscaExataPatrimonio) {
+      if (unidadeSelecionada.trim() && unidadeSelecionada !== "Todas") {
+        const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
+        const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeSelecionada);
+        if (!unidadeItemNorm.includes(unidadeSelecionadaNorm)) return false;
+      }
+
+      if (buscaSetor.trim() && buscaSetor !== "Todos") {
+        const setorItemNorm = normalizarParaComparacao(item.setor || "");
+        const setorBuscaNorm = normalizarParaComparacao(buscaSetor);
+        if (!setorItemNorm.includes(setorBuscaNorm)) return false;
+      }
     }
 
-    // 2. Validar Filtro de Equipamento (Patrimônio ou Nome)
-    const termo = buscaPatrimonio.trim().toLowerCase();
     if (!termo) return true; 
 
-    if (!isNaN(termo)) {
-      // Se digitou número, procura no patrimônio
-      return item.patrimonio && String(item.patrimonio).toLowerCase().includes(termo);
-    }
-    
-    // Se digitou texto, procura no nome do equipamento
-    return item.nome && item.nome.toLowerCase().includes(termo);
+    return patrimonioItemNorm.includes(termoNorm) || nomeItemNorm.includes(termoNorm);
   });
 
   return {

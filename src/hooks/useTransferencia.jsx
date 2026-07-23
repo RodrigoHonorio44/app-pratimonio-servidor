@@ -1,19 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { db } from "../services/firebase";
-import {
-  collection,
-  addDoc,
-  query,
-  getDocs,
-  updateDoc,
-  doc,
-  serverTimestamp,
-  limit,
-} from "firebase/firestore";
+import { auth } from "../services/firebase";
 import { toast } from "react-toastify";
 import { abrirVisualizacaoTermo } from "../components/ImpressaoTransferencia";
-// IMPORTANTE: Importando o mapa que você enviou
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; 
+
+const API_URL = "http://IP_DA_SUA_VPS:3000/api";
 
 export const useTransferencia = () => {
   const [patrimonioBusca, setPatrimonioBusca] = useState("");
@@ -26,7 +17,6 @@ export const useTransferencia = () => {
   const [loading, setLoading] = useState(false);
   const [novoPatrimonioParaSP, setNovoPatrimonioParaSP] = useState("");
 
-  // CONTROLES DO DROPDOWN CUSTOMIZADO
   const [mostrarDropdown, setMostrarDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -45,9 +35,11 @@ export const useTransferencia = () => {
     pacienteTelefone: "",
     pacienteIdentidade: "",
     pacienteCpf: "",
+    quantidadeRetirada: 1,
   });
 
   const unidades = [
+    "Estoque Patrimônio",
     "Hospital Conde",
     "UPA INOÃ",
     "UPA SANTA RITA",
@@ -68,7 +60,6 @@ export const useTransferencia = () => {
       .trim();
   };
 
-  // Fecha o dropdown de setores se clicar fora dele
   useEffect(() => {
     const clicarFora = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -89,11 +80,9 @@ export const useTransferencia = () => {
     toast.info("Busca resetada");
   };
 
-  // RETORNO DE SETORES COM CUSTO ZERO: Filtrando a partir do seu arquivo estático
   const obterSetoresFiltrados = () => {
     if (!unidadeFiltro) return [];
 
-    // Encontra a chave correta no mapa ignorando maiúsculas/minúsculas
     const chaveUnidade = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
       (key) => normalizarParaComparacao(key) === normalizarParaComparacao(unidadeFiltro)
     );
@@ -108,13 +97,13 @@ export const useTransferencia = () => {
     );
   };
 
-  const ejecutarBusca = async (tipo) => {
+  const ejecutarBusca = async (tipo, valorForcadoSetor = null) => {
     let termoOriginal = "";
     if (tipo === "patrimonio") termoOriginal = patrimonioBusca;
-    else if (tipo === "setor") termoOriginal = setorBusca;
+    else if (tipo === "setor") termoOriginal = valorForcadoSetor || setorBusca;
     else termoOriginal = nomeBusca;
 
-    if (!termoOriginal.trim() && tipo !== "setor" && !unidadeFiltro) {
+    if (!termoOriginal.trim() && !unidadeFiltro && tipo !== "setor") {
       toast.warn("Por favor, selecione um filtro ou preencha um campo de busca.");
       return;
     }
@@ -122,36 +111,105 @@ export const useTransferencia = () => {
     setLoading(true);
     setMostrarDropdown(false);
     try {
-      const ativosRef = collection(db, "ativos");
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const unidadeFiltroNorm = normalizarParaComparacao(unidadeFiltro);
+      const ehOrigemResidencial = unidadeFiltroNorm.includes("residencia") || unidadeFiltroNorm.includes("paciente");
+
       let listaGeral = [];
 
-      // Mantemos a busca de ativos, mas sem varrer setores desnecessariamente
-      const qGeral = query(ativosRef, limit(2000));
-      const snapGeral = await getDocs(qGeral);
-      
-      listaGeral = snapGeral.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      if (tipo === "patrimonio" && termoOriginal.trim() !== "") {
+        const termoBuscaExato = termoOriginal.trim();
+        
+        const [resAtivos, resPac] = await Promise.all([
+          fetch(`${API_URL}/ativos?patrimonio=${encodeURIComponent(termoBuscaExato)}`, { headers }),
+          fetch(`${API_URL}/equipamento_com_paciente?patrimonio=${encodeURIComponent(termoBuscaExato)}`, { headers })
+        ]);
+
+        const dadosAtivos = resAtivos.ok ? await resAtivos.json() : [];
+        const dadosPac = resPac.ok ? await resPac.json() : [];
+
+        if (dadosAtivos.length > 0) {
+          listaGeral = dadosAtivos.map((item) => ({
+            ...item,
+            id: item.id || item._id,
+            _colecaoOrigem: "ativos",
+          }));
+        } else if (dadosPac.length > 0) {
+          listaGeral = dadosPac.map((item) => {
+            return {
+              id: item.equipamentoId || item.id || item._id,
+              _docPacienteId: item.id || item._id,
+              nome: item.equipamentoNome || item.nome,
+              patrimonio: item.patrimonio,
+              unidade: "Residência do Paciente",
+              setor: item.paciente?.nome ? `Residência do Paciente - ${item.paciente.nome}` : "Residência",
+              status: "em_uso_residencial",
+              _colecaoOrigem: "ativos",
+            };
+          });
+        }
+      } else {
+        if (ehOrigemResidencial) {
+          const resPacientes = await fetch(`${API_URL}/equipamento_com_paciente`, { headers });
+          const dadosPacientes = resPacientes.ok ? await resPacientes.json() : [];
+          listaGeral = dadosPacientes.map((item) => {
+            return {
+              id: item.equipamentoId || item.id || item._id,
+              _docPacienteId: item.id || item._id,
+              nome: item.equipamentoNome || item.nome,
+              patrimonio: item.patrimonio,
+              unidade: "Residência do Paciente",
+              setor: item.paciente?.nome ? `Residência do Paciente - ${item.paciente.nome}` : "Residência",
+              status: "em_uso_residencial",
+              _colecaoOrigem: "ativos",
+            };
+          });
+        } else {
+          const resGeral = await fetch(`${API_URL}/ativos`, { headers });
+          const dadosGeral = resGeral.ok ? await resGeral.json() : [];
+          listaGeral = dadosGeral.map((item) => ({
+            ...item,
+            id: item.id || item._id,
+            _colecaoOrigem: "ativos",
+          }));
+        }
+      }
 
       const termoNorm = normalizarParaComparacao(termoOriginal);
-      const unidadeFiltroNorm = normalizarParaComparacao(unidadeFiltro);
+      const setorBuscaNorm = normalizarParaComparacao(setorBusca);
 
       const filtrados = listaGeral.filter((item) => {
         const statusItemNorm = String(item.status || "ativo").toLowerCase().trim();
-        if (statusItemNorm !== "ativo" && statusItemNorm !== "em_uso_residencial") return false;
-
-        const itemUnidadeNorm = normalizarParaComparacao(item.unidade);
-        const itemPatrimonioNorm = normalizarParaComparacao(item.patrimonio);
-        const itemNomeNorm = normalizarParaComparacao(item.nome);
-        const itemSetorNorm = normalizarParaComparacao(item.setor);
-
-        if (unidadeFiltro && itemUnidadeNorm !== unidadeFiltroNorm)
+        if (
+          statusItemNorm !== "ativo" && 
+          statusItemNorm !== "em_uso_residencial" && 
+          statusItemNorm !== "operante"
+        ) {
           return false;
+        }
 
-        if (tipo === "patrimonio") {
-          return itemPatrimonioNorm === termoNorm;
-        } else if (tipo === "setor") {
+        const itemUnidadeNorm = normalizarParaComparacao(item.unidade || "");
+        const itemPatrimonioNorm = normalizarParaComparacao(item.patrimonio || "");
+        const itemNomeNorm = normalizarParaComparacao(item.nome || "");
+        const itemSetorNorm = normalizarParaComparacao(item.setor || "");
+
+        if (tipo === "patrimonio" && termoNorm !== "") {
+          return itemPatrimonioNorm.includes(termoNorm);
+        }
+
+        const matchUnidade = !unidadeFiltro || ehOrigemResidencial || itemUnidadeNorm.includes(unidadeFiltroNorm);
+        if (!matchUnidade) return false;
+
+        if (setorBusca && setorBusca.trim() !== "") {
+          const matchSetor = itemSetorNorm === setorBuscaNorm || itemSetorNorm.includes(setorBuscaNorm);
+          if (!matchSetor) return false;
+        }
+
+        if (tipo === "setor") {
+          if (!termoNorm) return true;
           return itemSetorNorm.includes(termoNorm);
         } else if (tipo === "nome") {
           return itemNomeNorm.includes(termoNorm);
@@ -163,7 +221,7 @@ export const useTransferencia = () => {
       setPaginaAtual(1);
       
       if (filtrados.length === 0) {
-        toast.error("Nenhum item ativo encontrado.");
+        toast.error("Nenhum item encontrado com os filtros informados.");
       }
     } catch (error) {
       console.error(error);
@@ -181,7 +239,7 @@ export const useTransferencia = () => {
 
   const lidarComVisualizacao = () => {
     const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
-    const isVindoDeResidencial = itemSelecionado?.status === "em_uso_residencial";
+    const isVindoDeResidencial = itemSelecionado?.status === "em_uso_residencial" || itemSelecionado?.unidade === "Residência do Paciente";
 
     if (!dadosSaida.novaUnidade || !dadosSaida.novoSetor || !dadosSaida.responsavelRecebimento) {
       toast.warn("Por favor, preencha todos os campos obrigatórios antes de visualizar.");
@@ -254,68 +312,160 @@ export const useTransferencia = () => {
     e.preventDefault();
     setLoading(true);
     const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
+    const destinoEhEstoque = normalizarParaComparacao(dadosSaida.novaUnidade).includes("estoque");
 
     try {
-      const ativoRef = doc(db, "ativos", itemSelecionado.id);
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Usuário não autenticado");
+      const token = await currentUser.getIdToken();
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      };
+
       const patrimonioFinal =
         normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" &&
         novoPatrimonioParaSP
-          ? novoPatrimonioParaSP.toLowerCase()
-          : itemSelecionado.patrimonio.toLowerCase();
+          ? novoPatrimonioParaSP
+          : itemSelecionado.patrimonio;
 
-      await updateDoc(ativoRef, {
-        unidade: dadosSaida.novaUnidade,
-        setor: dadosSaida.novoSetor.toLowerCase(),
+      // Se o item estava em uso residencial, removemos o vínculo do paciente
+      if (itemSelecionado.status === "em_uso_residencial" || itemSelecionado._docPacienteId) {
+        if (itemSelecionado._docPacienteId) {
+          await fetch(`${API_URL}/equipamento_com_paciente/${itemSelecionado._docPacienteId}`, {
+            method: "DELETE",
+            headers
+          });
+        } else {
+          const resPac = await fetch(`${API_URL}/equipamento_com_paciente`, { headers: { Authorization: `Bearer ${token}` } });
+          const listaPac = resPac.ok ? await resPac.json() : [];
+          const pacsEncontrados = listaPac.filter(p => p.equipamentoId === itemSelecionado.id);
+          for (const docP of pacsEncontrados) {
+            await fetch(`${API_URL}/equipamento_com_paciente/${docP.id || docP._id}`, {
+              method: "DELETE",
+              headers
+            });
+          }
+        }
+      }
+
+      // Atualiza o registro principal na coleção "ativos"
+      const resItem = await fetch(`${API_URL}/ativos/${itemSelecionado.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const itemExiste = resItem.ok;
+
+      const atualizacaoPayload = {
+        unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
+        setor: dadosSaida.novoSetor.toLowerCase().trim(),
         patrimonio: patrimonioFinal,
-        status: isResidencial ? "em_uso_residencial" : "ativo",
-        ultimaMovimentacao: serverTimestamp(),
-      });
+        status: "ativo",
+        ultimaMovimentacao: new Date().toISOString(),
+      };
 
+      if (itemExiste) {
+        await fetch(`${API_URL}/ativos/${itemSelecionado.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(atualizacaoPayload)
+        });
+      } else {
+        await fetch(`${API_URL}/ativos`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            nome: itemSelecionado.nome.toLowerCase().trim(),
+            patrimonio: patrimonioFinal,
+            unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
+            setor: dadosSaida.novoSetor.toLowerCase().trim(),
+            status: "ativo",
+            ultimaMovimentacao: new Date().toISOString(),
+          })
+        });
+      }
+
+      // Se o destino for o estoque, adiciona/registra também na coleção "estoque" para aparecer na Central do Estoque
+      if (destinoEhEstoque) {
+        const resEstoque = await fetch(`${API_URL}/estoque`, { headers: { Authorization: `Bearer ${token}` } });
+        const listaEstoque = resEstoque.ok ? await resEstoque.json() : [];
+        const estoqueExistente = listaEstoque.find(e => String(e.patrimonio).trim() === String(patrimonioFinal).trim());
+
+        const estoquePayload = {
+          nome: itemSelecionado.nome.toLowerCase().trim(),
+          patrimonio: patrimonioFinal,
+          unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
+          setor: dadosSaida.novoSetor.toLowerCase().trim(),
+          status: "ativo",
+          quantidade: 1,
+          ultimaMovimentacao: new Date().toISOString(),
+        };
+
+        if (estoqueExistente) {
+          await fetch(`${API_URL}/estoque/${estoqueExistente.id || estoqueExistente._id}`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(estoquePayload)
+          });
+        } else {
+          await fetch(`${API_URL}/estoque`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(estoquePayload)
+          });
+        }
+      }
+
+      // Registra o histórico da movimentação de saída
       const payloadSaida = {
         ativoId: itemSelecionado.id,
         patrimonio: patrimonioFinal,
-        nomeEquipamento: itemSelecionado.nome.toLowerCase(),
-        unidadeOrigem: itemSelecionado.unidade,
-        setorOrigem: itemSelecionado.setor.toLowerCase(),
-        unidadeDestino: dadosSaida.novaUnidade,
-        setorDestino: dadosSaida.novoSetor.toLowerCase(),
-        responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase(),
-        motivo: isResidencial ? "home care" : dadosSaida.motivo.toLowerCase(),
-        dataSaida: serverTimestamp(),
+        nomeEquipamento: itemSelecionado.nome.toLowerCase().trim(),
+        unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
+        setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
+        unidadeDestino: dadosSaida.novaUnidade.toLowerCase().trim(),
+        setorDestino: dadosSaida.novoSetor.toLowerCase().trim(),
+        responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase().trim(),
+        motivo: isResidencial ? "home care" : dadosSaida.motivo.toLowerCase().trim(),
+        quantidadeTransferida: Number(dadosSaida.quantidadeRetirada) || 1,
+        dataSaida: new Date().toISOString(),
       };
 
       if (isResidencial) {
         payloadSaida.pacienteDetails = {
-          endereco: dadosSaida.pacienteEndereco.toLowerCase(),
-          telefone: dadosSaida.pacienteTelefone,
-          identity: dadosSaida.pacienteIdentidade,
-          cpf: dadosSaida.pacienteCpf,
+          endereco: dadosSaida.pacienteEndereco.toLowerCase().trim(),
+          telefone: dadosSaida.pacienteTelefone.trim(),
+          identity: dadosSaida.pacienteIdentidade.trim(),
+          cpf: dadosSaida.pacienteCpf.trim(),
         };
-      }
 
-      await addDoc(collection(db, "saidaEquipamento"), payloadSaida);
-
-      if (isResidencial) {
-        await addDoc(collection(db, "equipamento_com_paciente"), {
-          equipamentoId: itemSelecionado.id,
-          equipamentoNome: itemSelecionado.nome.toLowerCase(),
-          patrimonio: patrimonioFinal,
-          unidadeOrigem: itemSelecionado.unidade,
-          setorOrigem: itemSelecionado.setor.toLowerCase(),
-          dataEntrega: serverTimestamp(),
-          statusVinculo: "ativo",
-          paciente: {
-            nome: dadosSaida.novoSetor.toLowerCase(),
-            endereco: dadosSaida.pacienteEndereco.toLowerCase(),
-            telefone: dadosSaida.pacienteTelefone,
-            identidade: dadosSaida.pacienteIdentidade,
-            cpf: dadosSaida.pacienteCpf,
-            responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase()
-          },
+        await fetch(`${API_URL}/equipamento_com_paciente`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            equipamentoId: itemSelecionado.id,
+            equipamentoNome: itemSelecionado.nome.toLowerCase().trim(),
+            patrimonio: patrimonioFinal,
+            unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
+            setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
+            dataEntrega: new Date().toISOString(),
+            statusVinculo: "ativo",
+            paciente: {
+              nome: dadosSaida.novoSetor.toLowerCase().trim(),
+              endereco: dadosSaida.pacienteEndereco.toLowerCase().trim(),
+              telefone: dadosSaida.pacienteTelefone.trim(),
+              identidade: dadosSaida.pacienteIdentidade.trim(),
+              cpf: dadosSaida.pacienteCpf.trim(),
+              responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase().trim()
+            }
+          })
         });
       }
 
-      toast.success("Transferência salva com sucesso no sistema!");
+      await fetch(`${API_URL}/saidaEquipamento`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payloadSaida)
+      });
+
+      toast.success("Transferência realizada com sucesso!");
       setShowModal(false);
       setTermoVisualizado(false);
       setItensEncontrados([]);
@@ -333,10 +483,11 @@ export const useTransferencia = () => {
         pacienteTelefone: "",
         pacienteIdentidade: "",
         pacienteCpf: "",
+        quantidadeRetirada: 1,
       });
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao salvar a transferência.");
+      toast.error("Erro ao concluir a transferência.");
     } finally {
       setLoading(false);
     }
