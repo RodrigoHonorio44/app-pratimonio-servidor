@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { db, auth } from "../services/firebase";
 import {
   collection,
-  addDoc,
   serverTimestamp,
   doc,
   getDoc,
@@ -93,24 +92,36 @@ const CadastroEquipamento = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const idToast = toast.loading("Registrando no estoque central...");
+    const idToast = toast.loading("Registrando no estoque central via API...");
 
     try {
-      // Alterado para salvar na coleção "estoque" com os dados normalizados em minúsculo
-      await addDoc(collection(db, "estoque"), {
-        nome: formData.nome.toLowerCase().trim(),
-        setor: formData.setor.toLowerCase().trim(),
-        observacoes: formData.observacoes.toLowerCase().trim(),
-        patrimonio: formData.patrimonio.toUpperCase().trim(),
-        unidade: formData.unidade,
-        estado: formData.estado.toLowerCase().trim(),
-        quantidade: Number(formData.quantidade),
-        tipo: "equipamento",
-        categoriaItem: formData.tipo,
-        status: "ativo",
-        criadoEm: serverTimestamp(),
-        cadastradoPor: nomeUsuario,
+      const token = await auth.currentUser?.getIdToken();
+
+      // Substitua pela URL real da sua API (ex: "http://localhost:3000/api/estoque" ou variável de ambiente)
+      const response = await fetch("http://localhost:3000/api/estoque", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { "Authorization": `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          nome: formData.nome.toLowerCase().trim(),
+          setor: formData.setor.toLowerCase().trim(),
+          observacoes: formData.observacoes.toLowerCase().trim(),
+          patrimonio: formData.patrimonio.toUpperCase().trim(),
+          unidade: formData.unidade,
+          estado: formData.estado.toLowerCase().trim(),
+          quantidade: Number(formData.quantidade),
+          tipo: "equipamento",
+          categoriaItem: formData.tipo,
+          status: "ativo",
+          cadastradoPor: nomeUsuario,
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error("Erro ao cadastrar item no estoque via API");
+      }
 
       toast.update(idToast, {
         render: "Item adicionado ao estoque com sucesso!",
@@ -124,7 +135,7 @@ const CadastroEquipamento = () => {
     } catch (error) {
       console.error("Erro ao salvar no estoque:", error);
       toast.update(idToast, {
-        render: "Erro ao salvar no banco de dados",
+        render: "Erro ao comunicar com o servidor da API",
         type: "error",
         isLoading: false,
         autoClose: 3000,

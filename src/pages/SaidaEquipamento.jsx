@@ -1,155 +1,29 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { FiTruck, FiSearch, FiArrowLeft, FiPackage, FiEdit3, FiX, FiMapPin, FiUser } from 'react-icons/fi';
+import { useSaidaEquipamento } from '../hooks/useSaidaEquipamento';
 
 const SaidaEquipamento = () => {
-    const [patrimonioBusca, setPatrimonioBusca] = useState('');
-    const [nomeBusca, setNomeBusca] = useState('');
-    const [itensEncontrados, setItensEncontrados] = useState([]);
-    const [itemSelecionado, setItemSelecionado] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [novoPatrimonioParaSP, setNovoPatrimonioParaSP] = useState('');
-
-    const [dadosSaida, setDadosSaida] = useState({
-        novaUnidade: '',
-        novoSetor: '',
-        motivo: 'Transferência',
-        responsavelRecebimento: ''
-    });
-
-    const unidades = ["Hospital Conde", "Upa de Inoã", "Upa de Santa Rita", "Samu Barroco", "Samu Ponta Negra"];
-
-    // Função centralizada para remover espaços, acentos e ignorar maiúsculas/minúsculas
-    const normalizarParaComparacao = (texto) => {
-        if (!texto) return "";
-        return texto
-            .toString()
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[/\s._-]/g, "")
-            .trim();
-    };
-
-    const executarBusca = async (tipo) => {
-        const termoOriginal = tipo === 'patrimonio' ? patrimonioBusca : nomeBusca;
-        if (!termoOriginal.trim()) {
-            toast.warn(`Digite um ${tipo === 'patrimonio' ? 'patrimônio' : 'nome ou setor'}.`);
-            return;
-        }
-
-        setLoading(true);
-        setItensEncontrados([]);
-
-        try {
-            // Busca simulada no localStorage (substitua pela chamada da sua API/Banco próprio)
-            const ativosSalvos = JSON.parse(localStorage.getItem('ativos') || '[]');
-            const termoNorm = normalizarParaComparacao(termoOriginal);
-
-            const filtrados = ativosSalvos.filter(item => {
-                const statusItemNorm = String(item.status || "ativo").toLowerCase().trim();
-                if (statusItemNorm !== "ativo") return false;
-
-                const itemPatrimonioNorm = normalizarParaComparacao(item.patrimonio);
-                const itemNomeNorm = normalizarParaComparacao(item.nome);
-                const itemSetorNorm = normalizarParaComparacao(item.setor);
-
-                if (tipo === 'patrimonio') {
-                    if (termoNorm === 'sp' || termoNorm === 'spatrimonio') {
-                        toast.info("Para itens S/P, use a busca por NOME ou SETOR.");
-                        return false;
-                    }
-                    return itemPatrimonioNorm === termoNorm;
-                } else {
-                    return (
-                        itemNomeNorm.includes(termoNorm) ||
-                        itemSetorNorm.includes(termoNorm) ||
-                        itemPatrimonioNorm === termoNorm
-                    );
-                }
-            });
-
-            if (filtrados.length > 0) {
-                setItensEncontrados(filtrados);
-            } else {
-                toast.error("Nenhum item ativo encontrado.");
-            }
-        } catch (error) {
-            console.error(error);
-            toast.error("Erro ao buscar.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const selecionarItemParaSaida = (item) => {
-        setItemSelecionado(item);
-        setShowModal(true);
-    };
-
-    const fecharModal = () => {
-        setShowModal(false);
-        setItemSelecionado(null);
-        setNovoPatrimonioParaSP('');
-    };
-
-    const handleSaida = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const patrimonioFinal = (normalizarParaComparacao(itemSelecionado.patrimonio) === 'sp' && novoPatrimonioParaSP)
-                ? novoPatrimonioParaSP
-                : itemSelecionado.patrimonio;
-
-            const dataAtual = new Date().toISOString();
-
-            // Atualiza no localStorage (Banco local / API própria)
-            const ativosSalvos = JSON.parse(localStorage.getItem('ativos') || '[]');
-            const ativosAtualizados = ativosSalvos.map(item => {
-                if (item.id === itemSelecionado.id) {
-                    return {
-                        ...item,
-                        unidade: dadosSaida.novaUnidade,
-                        setor: dadosSaida.novoSetor,
-                        patrimonio: patrimonioFinal,
-                        ultimaMovimentacao: dataAtual
-                    };
-                }
-                return item;
-            });
-            localStorage.setItem('ativos', JSON.stringify(ativosAtualizados));
-
-            // Registra histórico de saída
-            const saidasSalvas = JSON.parse(localStorage.getItem('saidaEquipamento') || '[]');
-            const novaSaida = {
-                id: Date.now().toString(),
-                ativoId: itemSelecionado.id,
-                patrimonio: patrimonioFinal,
-                nomeEquipamento: itemSelecionado.nome,
-                unidadeOrigem: itemSelecionado.unidade,
-                setorOrigem: itemSelecionado.setor,
-                unidadeDestino: dadosSaida.novaUnidade,
-                setorDestino: dadosSaida.novoSetor,
-                responsavelRecebimento: dadosSaida.responsavelRecebimento,
-                motivo: dadosSaida.motivo,
-                dataSaida: dataAtual
-            };
-            localStorage.setItem('saidaEquipamento', JSON.stringify([...saidasSalvas, novaSaida]));
-
-            toast.success("Transferência realizada com sucesso!");
-            fecharModal();
-            setItensEncontrados([]);
-            setPatrimonioBusca('');
-            setNomeBusca('');
-        } catch (error) {
-            console.error(error);
-            toast.error("Erro ao processar transferência.");
-        } finally {
-            setLoading(false);
-        }
-    };
+    const {
+        patrimonioBusca,
+        setPatrimonioBusca,
+        nomeBusca,
+        setNomeBusca,
+        itensEncontrados,
+        itemSelecionado,
+        showModal,
+        loading,
+        novoPatrimonioParaSP,
+        setNovoPatrimonioParaSP,
+        dadosSaida,
+        setDadosSaida,
+        unidades,
+        executarBusca,
+        selecionarItemParaSaida,
+        fecharModal,
+        handleSaida,
+        normalizarParaComparacao
+    } = useSaidaEquipamento();
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-950 flex flex-col">
@@ -182,6 +56,7 @@ const SaidaEquipamento = () => {
                                 placeholder="Ex: HMC-001"
                                 value={patrimonioBusca}
                                 onChange={(e) => setPatrimonioBusca(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && executarBusca('patrimonio')}
                             />
                             <button 
                                 type="button"
@@ -202,6 +77,7 @@ const SaidaEquipamento = () => {
                                 placeholder="Ex: Monitor, Maca, UTI..."
                                 value={nomeBusca}
                                 onChange={(e) => setNomeBusca(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && executarBusca('nome')}
                             />
                             <button 
                                 type="button"
@@ -218,7 +94,7 @@ const SaidaEquipamento = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {itensEncontrados.map(item => (
                         <div 
-                            key={item.id} 
+                            key={item.id || item._id} 
                             className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group relative overflow-hidden"
                             onClick={() => selecionarItemParaSaida(item)}
                         >
@@ -257,10 +133,8 @@ const SaidaEquipamento = () => {
             {/* MODAL */}
             {showModal && itemSelecionado && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    {/* Overlay */}
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={fecharModal}></div>
                     
-                    {/* Modal Content */}
                     <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <h3 className="text-xl font-black italic text-slate-800 uppercase tracking-tight">Confirmar Saída</h3>

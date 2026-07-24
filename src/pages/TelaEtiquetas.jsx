@@ -40,11 +40,11 @@ const TelaEtiquetas = () => {
       <main className="flex-grow p-4 md:p-8 max-w-7xl w-full mx-auto">
         <header className="mb-6 no-print">
           <button
-            onClick={() => navigate("/inventario")}
+            onClick={() => navigate("/")}
             className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group"
           >
             <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Voltar ao Inventário
+            Voltar à Dashboard
           </button>
           
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">

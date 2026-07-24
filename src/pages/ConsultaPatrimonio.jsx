@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../services/firebase";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
@@ -12,8 +10,11 @@ import {
   FileText,
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import api from "../services/api";
 
 export default function ConsultaPatrimonio() {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ export default function ConsultaPatrimonio() {
   const [unidadeSelecionada, setUnidadeSelecionada] = useState("TODAS");
   const [termoPesquisa, setTermoPesquisa] = useState("");
 
-  // Estados dos Filtros Efetivados (Só atualizam ao clicar em Buscar)
+  // Estados dos Filtros Efetivados
   const [filtrosAplicados, setFiltrosAplicados] = useState({
     unidade: "TODAS",
     termo: ""
@@ -33,32 +34,44 @@ export default function ConsultaPatrimonio() {
   // Estado para controlar quais linhas/setores estão expandidos
   const [linhasExpandidas, setLinhasExpandidas] = useState({});
 
-  // 1. ONSNAPSHOT MANTIDO: Conectado em tempo real
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "ativos"), (snapshot) => {
-      const lista = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          patrimonio: data.patrimonio || "",
-          nome: data.nome?.toLowerCase().trim() || "",
-          tipo: data.tipo?.toLowerCase().trim() || "",
-          modelo: data.modelo || "", 
-          potencia: data.potencia || "", 
-          setor: data.setor?.toLowerCase().trim() || "setor não informado",
-          unidade: data.unidade?.toLowerCase().trim() || "",
-          estado: data.estado || "Não informado",
-          status: data.status || "Inativo",
-          observacoes: data.observacoes || "",
-          quantidade: Number(data.quantidade) || 1,
-          criadoEm: data.criadoEm ? data.criadoEm.toDate() : null,
-        };
-      });
-      setAtivos(lista);
-      setLoading(false);
-    });
+  // Estado da Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 5; // Defina quantos grupos/linhas deseja exibir por página
 
-    return () => unsubscribe();
+  // 1. BUSCA NA API DO BACKEND USANDO O AXIOS
+  useEffect(() => {
+    const fetchAtivos = async () => {
+      try {
+        const response = await api.get("/ativos");
+        const data = response.data;
+        
+        const lista = data.map((item) => {
+          return {
+            id: item.id || item._id,
+            patrimonio: item.patrimonio || "",
+            nome: item.nome?.toLowerCase().trim() || "",
+            tipo: item.tipo?.toLowerCase().trim() || "",
+            modelo: item.modelo || "", 
+            potencia: item.potencia || "", 
+            setor: item.setor?.toLowerCase().trim() || "setor não informado",
+            unidade: item.unidade?.toLowerCase().trim() || "",
+            estado: item.estado || "Não informado",
+            status: item.status || "Inativo",
+            observacoes: item.observacoes || "",
+            quantidade: Number(item.quantidade) || 1,
+            criadoEm: item.criadoEm ? new Date(item.criadoEm) : null,
+          };
+        });
+
+        setAtivos(lista);
+      } catch (error) {
+        console.error("Erro na requisição dos ativos:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAtivos();
   }, []);
 
   // 2. EXTRAI AS UNIDADES ÚNICAS
@@ -74,15 +87,17 @@ export default function ConsultaPatrimonio() {
       unidade: unidadeSelecionada,
       termo: termoPesquisa
     });
-    setLinhasExpandidas({}); // Reseta os colapsos ao fazer nova busca
+    setLinhasExpandidas({});
+    setPaginaAtual(1); // Volta para a primeira página ao buscar
   };
 
-  // Reseta todos os filtros e esvazia a tela
+  // Reseta todos os filtros
   const handleLimpar = () => {
     setUnidadeSelecionada("TODAS");
     setTermoPesquisa("");
     setFiltrosAplicados({ unidade: "TODAS", termo: "" });
     setLinhasExpandidas({});
+    setPaginaAtual(1);
   };
 
   // Alternar colapso de uma linha
@@ -93,7 +108,7 @@ export default function ConsultaPatrimonio() {
     }));
   };
 
-  // 3. PROCESSA E AGRUPA BASEADO APENAS NOS FILTROS APLICADOS
+  // 3. PROCESSA E AGRUPA BASEADO NOS FILTROS
   const resultadoConsulta = useMemo(() => {
     const distribuicao = {};
     let totalGeral = 0;
@@ -139,13 +154,21 @@ export default function ConsultaPatrimonio() {
     };
   }, [ativos, filtrosAplicados]);
 
+  // 4. LÓGICA DE PAGINAÇÃO DOS RESULTADOS
+  const totalPaginas = Math.ceil(resultadoConsulta.linhas.length / itensPorPagina) || 1;
+  
+  const linhasPaginadas = useMemo(() => {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    return resultadoConsulta.linhas.slice(inicio, inicio + itensPorPagina);
+  }, [resultadoConsulta.linhas, paginaAtual]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest italic">
-            CONSOLIDANDO ATIVOS COM LEITURA ÚNICA...
+            CONSUMINDO DADOS DA API...
           </p>
         </div>
       </div>
@@ -170,7 +193,7 @@ export default function ConsultaPatrimonio() {
           </div>
         </div>
 
-        {/* INPUTS DE FILTRO COM FORM DE SUBMIT */}
+        {/* INPUTS DE FILTRO */}
         <form onSubmit={handleBuscar} className="bg-white border border-slate-200/80 rounded-4xl p-6 mb-8 shadow-xs space-y-4">
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">
@@ -209,7 +232,6 @@ export default function ConsultaPatrimonio() {
             </div>
           </div>
 
-          {/* BOTÕES DE CONTROLE */}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -259,13 +281,18 @@ export default function ConsultaPatrimonio() {
               </h3>
             </div>
 
-            {/* LISTA E GRUPOS COLAPSÁVEIS */}
+            {/* LISTA E GRUPOS COLAPSÁVEIS COM PAGINAÇÃO */}
             <div className="bg-white border border-slate-100 rounded-4xl p-6 shadow-xs">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-3 flex items-center gap-2">
-                <FileText size={14} className="text-blue-600" />
-                {resultadoConsulta.modo === "global" 
-                  ? "DISTRIBUIÇÃO POR UNIDADE HOSPITALAR" 
-                  : "LOCALIZAÇÃO DETALHADA POR SETOR / SALA"}
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <FileText size={14} className="text-blue-600" />
+                  {resultadoConsulta.modo === "global" 
+                    ? "DISTRIBUIÇÃO POR UNIDADE HOSPITALAR" 
+                    : "LOCALIZAÇÃO DETALHADA POR SETOR / SALA"}
+                </span>
+                <span className="text-slate-400 lowercase text-[9px]">
+                  exibindo página {paginaAtual} de {totalPaginas}
+                </span>
               </p>
 
               {resultadoConsulta.linhas.length === 0 ? (
@@ -274,7 +301,7 @@ export default function ConsultaPatrimonio() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {resultadoConsulta.linhas.map(([localizacao, container]) => {
+                  {linhasPaginadas.map(([localizacao, container]) => {
                     const aberto = !!linhasExpandidas[localizacao];
 
                     return (
@@ -302,7 +329,7 @@ export default function ConsultaPatrimonio() {
                           </div>
                         </div>
 
-                        {/* Bloco Detalhado - Abre somente se clicado */}
+                        {/* Bloco Detalhado */}
                         {aberto && (
                           <div className="p-4 bg-slate-50/50 border-t border-slate-100 overflow-x-auto">
                             <table className="w-full text-left border-collapse text-[11px]">
@@ -343,6 +370,32 @@ export default function ConsultaPatrimonio() {
                   })}
                 </div>
               )}
+
+              {/* CONTROLES DE PAGINAÇÃO */}
+              {totalPaginas > 1 && (
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                    disabled={paginaAtual === 1}
+                    className="flex items-center gap-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 font-black text-[11px] uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                    Página {paginaAtual} de {totalPaginas}
+                  </span>
+
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                    disabled={paginaAtual === totalPaginas}
+                    className="flex items-center gap-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 font-black text-[11px] uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    Próxima <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+
             </div>
           </>
         )}
