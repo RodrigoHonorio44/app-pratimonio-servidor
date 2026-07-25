@@ -2,10 +2,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../services/firebase";
 import api from "../services/api";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 
 export function useDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
   const [mesFiltro, setMesFiltro] = useState(() => {
     const hoje = new Date();
     const ano = hoje.getFullYear();
@@ -23,47 +24,16 @@ export function useDashboard() {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
+        // 1. Carrega os dados do usuário do Firestore
         const docRef = doc(db, "usuarios", currentUser.uid);
         const docSnap = await getDoc(docRef);
-        let dadosUsuario = null;
         if (docSnap.exists()) {
-          dadosUsuario = docSnap.data();
-          setUserData(dadosUsuario);
+          setUserData(docSnap.data());
         }
 
-        let listaChamados = [];
-        try {
-          const responseChamados = await api.get("/chamados");
-          if (Array.isArray(responseChamados.data) && responseChamados.data.length > 0) {
-            listaChamados = responseChamados.data;
-          }
-        } catch (apiError) {
-          console.warn("API de chamados indisponível, buscando diretamente do Firestore...", apiError);
-        }
-
-        if (listaChamados.length === 0) {
-          const chamadosSnapshot = await getDocs(collection(db, "chamados"));
-          listaChamados = chamadosSnapshot.docs.map(docSnapItem => ({
-            id: docSnapItem.id,
-            ...docSnapItem.data()
-          }));
-        }
-
-        const isRootUser = dadosUsuario?.role?.toLowerCase() === "root";
-        const isAdminUser = dadosUsuario?.cargo?.toUpperCase() === "ADMINISTRADOR" || dadosUsuario?.role?.toLowerCase() === "admin";
-        
-        if (!isRootUser && !isAdminUser && dadosUsuario) {
-          const equipeUsuario = (dadosUsuario.equipe || dadosUsuario.unidade || "").toLowerCase().trim();
-          if (equipeUsuario) {
-            listaChamados = listaChamados.filter(item => {
-              const eqItem = (item.equipe || item.unidade || item.departamento || "").toLowerCase().trim();
-              const criadoPorId = item.userId || item.criadoPorId || item.uid;
-              return eqItem === equipeUsuario || criadoPorId === currentUser.uid;
-            });
-          }
-        }
-
-        setChamadosBrutos(listaChamados);
+        // 2. Consome os chamados da API do seu backend
+        const responseChamados = await api.get("/chamados");
+        setChamadosBrutos(Array.isArray(responseChamados.data) ? responseChamados.data : []);
 
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
@@ -75,47 +45,27 @@ export function useDashboard() {
     loadData();
   }, []);
 
+  // Processamento das Estatísticas robusto contra ausência de campos de data
   const estatisticas = useMemo(() => {
     if (!Array.isArray(chamadosBrutos) || chamadosBrutos.length === 0) {
-      return { abertos: 0, fechados: 0, total: 0, pendentes: 0, taxaResolucao: 0 };
+      return { abertos: 0, fechados: 0, total: 0, pendentes: 0 };
     }
 
     const [anoAlvo, mesAlvo] = (mesFiltro || "").split("-");
 
     const chamadosFiltrados = chamadosBrutos.filter((chamado) => {
-      const dataCriacao = 
-        chamado.criadoEm || 
-        chamado.createdAt || 
-        chamado.criatedAt || 
-        chamado.data || 
-        chamado.timestamp || 
-        chamado.Finalizado_Em ||
-        chamado.dataCriacao;
+      const dataCriacao = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
       
-      if (!dataCriacao) return false; 
+      if (!dataCriacao) return true; 
 
       let dataObjeto;
-      
       if (typeof dataCriacao.toDate === "function") {
         dataObjeto = dataCriacao.toDate();
-      } else if (typeof dataCriacao === "object" && dataCriacao !== null) {
-        if ("seconds" in dataCriacao) {
-          dataObjeto = new Date(dataCriacao.seconds * 1000);
-        } else if ("_seconds" in dataCriacao) {
-          dataObjeto = new Date(dataCriacao._seconds * 1000);
-        } else {
-          dataObjeto = new Date(dataCriacao);
-        }
-      } else if (typeof dataCriacao === "string" && dataCriacao.includes("/")) {
-        const [dataPart] = dataCriacao.split(",");
-        const [d, m, a] = dataPart.trim().split("/");
-        const anoFull = a && a.length === 2 ? `20${a}` : a;
-        dataObjeto = new Date(Number(anoFull), Number(m) - 1, Number(d));
       } else {
         dataObjeto = new Date(dataCriacao);
       }
 
-      if (!dataObjeto || isNaN(dataObjeto.getTime())) return false; 
+      if (isNaN(dataObjeto.getTime())) return true; 
 
       const anoChamado = String(dataObjeto.getFullYear());
       const mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
@@ -138,15 +88,11 @@ export function useDashboard() {
       return st === "fechado" || st === "arquivado" || st === "baixado" || st === "finalizado" || st === "concluido";
     }).length;
 
-    const totalCalculado = chamadosFiltrados.length;
-    const taxaResolucao = totalCalculado > 0 ? Math.round((fechados / totalCalculado) * 100) : 0;
-
     return {
-      total: totalCalculado,
-      abertos,
+      total: chamadosFiltrados.length,
+      abertos: abertos > 0 ? abertos : chamadosFiltrados.length, 
       pendentes,
-      fechados,
-      taxaResolucao
+      fechados
     };
   }, [chamadosBrutos, mesFiltro]);
 

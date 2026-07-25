@@ -4,12 +4,13 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBRQCGj_7KHKyW5zjJOgSCAnlNqj93GVw0",
-  authDomain: "webchamados-d3d49.firebaseapp.com",
-  projectId: "webchamados-d3d49",
-  storageBucket: "webchamados-d3d49.firebasestorage.app",
-  messagingSenderId: "134652632772",
-  appId: "1:134652632772:web:54e21787e49269ec8c7391",
+  apiKey: "AIzaSyDLRDoEtkVp6aSOvyd_ftH1s4uAJ9Wqdl8",
+  authDomain: "patrimonio-servidor.firebaseapp.com",
+  projectId: "patrimonio-servidor",
+  storageBucket: "patrimonio-servidor.firebasestorage.app",
+  messagingSenderId: "790962701955",
+  appId: "1:790962701955:web:14a8c5d394bc1042567db6",
+  measurementId: "G-1M87GSYJFG"
 };
 
 // Inicialização
