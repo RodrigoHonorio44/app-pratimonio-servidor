@@ -2,7 +2,7 @@ import axios from 'axios';
 import { auth } from './firebase';
 
 const api = axios.create({
-  // Utiliza o mesmo domínio público configurado na Vercel para o servidor
+  // Utiliza o domínio público do servidor
   baseURL: 'https://hcp.rodhonsystem.com.br/api', 
 });
 
