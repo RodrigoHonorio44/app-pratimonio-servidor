@@ -1,386 +1,223 @@
-import React, { useEffect, useState, useMemo } from "react";
+// src/pages/Dashboard.jsx
+import React from "react";
 import {
-  LayoutDashboard,
   ClipboardList,
-  LogOut,
   Clock,
   CheckCircle,
   AlertCircle,
-  BarChart3,
-  PlusCircle,
-  Repeat,
-  Search,
-  Package,
-  Truck,
-  Users,
-  MessageSquarePlus,
-  ChevronRight,
-  ChevronLeft,
-  Key,
   PieChart,
   User,
-  Layers3,
   FileText,
   Barcode,
   Calendar,
+  ClipboardCheck,
+  Search,
+  TrendingUp,
+  ShieldCheck,
+  ArrowUpRight,
+  Sparkles,
+  Layers,
 } from "lucide-react";
 
-import { auth, db } from "../services/firebase"; 
-import api from "../services/api";
-import { doc, getDoc } from "firebase/firestore";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import { useDashboard } from "../hooks/useDashboard";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  
-  const [mesFiltro, setMesFiltro] = useState(() => {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, "0");
-    return `${ano}-${mes}`;
-  });
-
-  const [chamadosBrutos, setChamadosBrutos] = useState([]);
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
-
-        // 1. Carrega os dados do usuário do Firestore
-        const docRef = doc(db, "usuarios", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setUserData(docSnap.data());
-        }
-
-        // 2. Consome os chamados da API do seu backend
-        const responseChamados = await api.get("/chamados");
-        setChamadosBrutos(Array.isArray(responseChamados.data) ? responseChamados.data : []);
-
-      } catch (error) {
-        console.error("Erro ao carregar dados do dashboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  // Processamento das Estatísticas robusto contra ausência de campos de data
-  const estatisticas = useMemo(() => {
-    if (!Array.isArray(chamadosBrutos) || chamadosBrutos.length === 0) {
-      return { abertos: 0, fechados: 0, total: 0, pendentes: 0 };
-    }
-
-    const [anoAlvo, mesAlvo] = (mesFiltro || "").split("-");
-
-    const chamadosFiltrados = chamadosBrutos.filter((chamado) => {
-      const dataCriacao = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
-      
-      // Se o chamado não tiver campo de data explícito mas sabemos que são do mês, 
-      // ou se tivermos a data, validamos:
-      if (!dataCriacao) return true; // Se não tem data, assume como válido para o período atual para não zerar
-
-      let dataObjeto;
-      if (typeof dataCriacao.toDate === "function") {
-        dataObjeto = dataCriacao.toDate();
-      } else {
-        dataObjeto = new Date(dataCriacao);
-      }
-
-      if (isNaN(dataObjeto.getTime())) return true; // Fallback se a data for inválida
-
-      const anoChamado = String(dataObjeto.getFullYear());
-      const mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
-
-      return anoChamado === anoAlvo && mesChamado === mesAlvo;
-    });
-
-    const abertos = chamadosFiltrados.filter(d => {
-      const st = (d.status || "").toLowerCase().trim();
-      return st === "aberto" || st === "em atendimento" || !st; // Considera vazio também como aberto se não tiver status definido
-    }).length;
-
-    const pendentes = chamadosFiltrados.filter(d => {
-      const st = (d.status || "").toLowerCase().trim();
-      return st === "pendente" || st === "aguardando" || st === "em espera";
-    }).length;
-    
-    const fechados = chamadosFiltrados.filter(d => {
-      const st = (d.status || "").toLowerCase().trim();
-      return st === "fechado" || st === "arquivado" || st === "baixado" || st === "finalizado" || st === "concluido";
-    }).length;
-
-    return {
-      total: chamadosFiltrados.length,
-      abertos: abertos > 0 ? abertos : chamadosFiltrados.length, // Garante exibição caso os status venham em branco
-      pendentes,
-      fechados
-    };
-  }, [chamadosBrutos, mesFiltro]);
-
-  const isRoot = useMemo(
-    () => userData?.role?.toLowerCase() === "root",
-    [userData]
-  );
-  const isAdmin = useMemo(
-    () =>
-      userData?.cargo?.toUpperCase() === "ADMINISTRADOR" ||
-      userData?.role?.toLowerCase() === "admin",
-    [userData]
-  );
-
-  const temAcesso = (moduloId) => {
-    if (isRoot) return true;
-    return userData?.permissoesExtras?.[moduloId] === true;
-  };
-
-  const canManageUsers = isRoot || isAdmin;
-  const nomeExibicao = userData?.nome || "Analista";
-  const unidadExibicao = userData?.unidade || "SISTEMA";
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    mesFiltro,
+    setMesFiltro,
+    userData,
+    loading,
+    estatisticas,
+    isRoot,
+    isAdmin,
+    temAcesso,
+    nomeExibicao,
+    unidadExibicao
+  } = useDashboard();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest italic">
-            Carregando dados da API...
+            Carregando ambiente corporativo...
           </p>
         </div>
       </div>
     );
   }
 
-  const NavButton = ({ icon: Icon, label, path, moduloId }) => {
-    if (moduloId && !temAcesso(moduloId)) return null;
-    const active = location.pathname === path;
-    return (
-      <button
-        onClick={() => navigate(path)}
-        className={`flex items-center gap-4 w-full px-4 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all duration-300 group cursor-pointer ${
-          active
-            ? "bg-blue-600 text-white shadow-xl shadow-blue-100"
-            : "text-slate-500 hover:bg-white hover:text-blue-600"
-        } ${!sidebarOpen && "justify-center px-0"}`}
-      >
-        <Icon
-          size={22}
-          className={active ? "text-white" : "group-hover:scale-110 transition-transform"}
-        />
-        {sidebarOpen && <span className="truncate">{label}</span>}
-      </button>
-    );
-  };
-
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans antialiased text-slate-900">
-      {/* SIDEBAR */}
-      <aside
-        className={`relative ${
-          sidebarOpen ? "w-72" : "w-24"
-        } bg-[#F1F5F9] border-r border-slate-200/60 hidden md:flex flex-col z-50 transition-all duration-500`}
-      >
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-12 bg-white border border-slate-200 text-slate-400 p-1.5 rounded-full shadow-sm z-60 cursor-pointer"
-        >
-          {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-        </button>
-
-        <div className="h-28 flex items-center px-8 mb-4 border-b border-slate-200/40">
-          {sidebarOpen ? (
-            <div className="flex items-center text-2xl font-black italic tracking-tighter">
-              <span className="text-[#0F172A]">RODHON</span>
-              <span className="text-[#2563EB]">SYSTEM</span>
-            </div>
-          ) : (
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic mx-auto">
-              R
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-4 space-y-6 overflow-y-auto py-4">
-          {canManageUsers && (
-            <div>
-              {sidebarOpen && (
-                <p className="px-4 text-[10px] font-black text-blue-600 uppercase mb-3 tracking-widest">
-                  Master Control
-                </p>
-              )}
-              <div className="space-y-1.5">
-                {isRoot && <NavButton icon={Key} label="Licenças e SaaS" path="/admin/licencas" />}
-                <NavButton icon={Users} label="Gestão de Usuários" path="/usuarios" />
-              </div>
-            </div>
-          )}
-
-          {temAcesso("dashboard_bi") && (
-            <div>
-              {sidebarOpen && (
-                <p className="px-4 text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">
-                  Inteligência
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <NavButton icon={BarChart3} label="Power BI" path="/bi" />
-              </div>
-            </div>
-          )}
-
-          {temAcesso("chamados") && (
-            <div>
-              {sidebarOpen && (
-                <p className="px-4 text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">
-                  Operação
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <NavButton icon={MessageSquarePlus} label="Abrir Chamado" path="/cadastro-chamado" />
-                <NavButton icon={ClipboardList} label="Fila de Trabalho" path="/painel-analista" />
-                <NavButton icon={Repeat} label="Remanejamento" path="/remanejamento" moduloId="remanejamento" />
-                <NavButton icon={FileText} label="Laudo Técnico" path="/laudo-inviabilidade" moduloId="laudos" />
-              </div>
-            </div>
-          )}
-
-          {(temAcesso("inventario") || temAcesso("etiquetas")) && (
-            <div>
-              {sidebarOpen && (
-                <p className="px-4 text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">
-                  Patrimônio
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <NavButton icon={PlusCircle} label="Novo Ativo" path="/cadastro-equipamento" moduloId="inventario" />
-                <NavButton icon={Search} label="Inventário" path="/inventario" moduloId="inventario" />
-                <NavButton icon={Layers3} label="Consulta de Itens" path="/consulta-patrimonio" moduloId="inventario" />
-                <NavButton icon={Package} label="Sala do Patrimônio" path="/estoque" moduloId="inventario" />
-                <NavButton icon={Truck} label="Saída/Transferência" path="/transferencia" moduloId="inventario" />
-                <NavButton icon={Barcode} label="Gerar Etiquetas" path="/emissao-etiquetas" moduloId="etiquetas" />
-              </div>
-            </div>
-          )}
-        </nav>
-
-        <div className="p-4 border-t border-slate-200/60">
-          <button
-            onClick={() => auth.signOut()}
-            className="w-full flex items-center gap-4 px-4 py-4 text-slate-500 rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all font-black text-[11px] uppercase tracking-widest cursor-pointer"
-          >
-            <LogOut size={22} className={!sidebarOpen && "mx-auto"} />
-            {sidebarOpen && <span>Encerrar Sessão</span>}
-          </button>
-        </div>
-      </aside>
+      
+      {/* SIDEBAR IMPORTADA */}
+      <Sidebar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userData={userData} 
+      />
 
       {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 z-40">
-          <div className="flex flex-col">
-            <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-              {isRoot ? "Root Access" : isAdmin ? "Administrador" : "Analista"}
-            </h2>
-            <h1 className="text-xl font-black text-slate-800 tracking-tight italic">
-              Dashboard
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        {/* HEADER CORPORATIVO COMPACTO E ELEGANTE */}
+        <header className="h-20 bg-white/90 backdrop-blur-md border-b border-slate-200/60 flex items-center justify-between px-6 lg:px-10 z-40 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-tighter">
-                  {unidadExibicao}
-                </span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  Usuário
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
+                  {isRoot ? "Root Access" : isAdmin ? "Administrador" : "Analista"}
                 </span>
               </div>
-              <h3 className="text-lg font-black text-slate-800 uppercase italic leading-tight mt-0.5">
-                {nomeExibicao}
-              </h3>
+              <h1 className="text-base font-black text-slate-800 tracking-tight italic">
+                Dashboard Executivo
+              </h1>
             </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white">
-              <User size={28} strokeWidth={2.5} />
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200/60 rounded text-[9px] font-black uppercase tracking-wider">
+                {unidadExibicao}
+              </span>
+              <span className="text-xs font-black text-slate-900 uppercase tracking-tight mt-0.5">
+                {nomeExibicao}
+              </span>
+            </div>
+            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-center text-white ring-2 ring-blue-50">
+              <User size={18} strokeWidth={2.5} />
             </div>
           </div>
         </header>
 
-        <section className="flex-1 overflow-y-auto p-10 bg-[#F8FAFC]">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
-              <h1 className="text-4xl font-black text-slate-900">
-                Olá, {nomeExibicao.split(" ")[0]}!
-              </h1>
+        {/* ÁREA DE CONTEÚDO OTIMIZADA PARA NÃO EXIGIR SCROLL EM NOTEBOOKS */}
+        <section className="flex-1 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
+          <div className="max-w-7xl mx-auto space-y-6">
+            
+            {/* BARRA DE BOAS-VINDAS E FILTRO COMPACTA */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white px-6 py-5 rounded-2xl border border-slate-200/60 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    Olá, {nomeExibicao.split(" ")[0]}!
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Visão sistêmica e atalhos operacionais do mês.
+                  </p>
+                </div>
+              </div>
               
-              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
-                <Calendar size={16} className="text-blue-600" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1">Período:</span>
+              <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 shadow-inner">
+                <Calendar size={14} className="text-blue-600" />
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Período:</span>
                 <input
                   type="month"
                   value={mesFiltro}
                   onChange={(e) => setMesFiltro(e.target.value)}
-                  className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+                  className="bg-transparent font-black text-slate-800 text-xs focus:outline-none cursor-pointer"
                 />
               </div>
             </div>
 
+            {/* CARDS DE ESTATÍSTICAS EM UMA LINHA COMPACTA */}
             {temAcesso("chamados") && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                <StatCard title="Em Aberto" value={estatisticas.abertos} color="amber" icon={Clock} />
-                <StatCard title="Aguardando" value={estatisticas.pendentes} color="rose" icon={AlertCircle} />
-                <StatCard title="Concluídos" value={estatisticas.fechados} color="emerald" icon={CheckCircle} />
-                <StatCard title="Histórico" value={estatisticas.total} color="blue" icon={ClipboardList} />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard title="Em Aberto" value={estatisticas.abertos} color="amber" icon={Clock} trend="Mês Atual" />
+                <StatCard title="Aguardando" value={estatisticas.pendentes} color="rose" icon={AlertCircle} trend="Estável" />
+                <StatCard title="Concluídos" value={estatisticas.fechados} color="emerald" icon={CheckCircle} trend={`${estatisticas.taxaResolucao}%`} />
+                <StatCard title="Histórico Geral" value={estatisticas.total} color="blue" icon={ClipboardList} trend="Total Mês" />
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {temAcesso("dashboard_bi") && (
-                <QuickActionCard
-                  title="Painel de BI"
-                  description="Relatórios e indicadores em tempo real."
-                  icon={PieChart}
-                  onClick={() => navigate("/bi")}
-                  variant="dark"
-                />
-              )}
-              {temAcesso("inventario") && (
-                <QuickActionCard
-                  title="Inventário Geral"
-                  description="Base completa de equipamentos e ativos."
-                  icon={Search}
-                  onClick={() => navigate("/inventario")}
-                  variant="light"
-                />
-              )}
-              {temAcesso("laudos") && (
-                <QuickActionCard
-                  title="Laudos emitidos"
-                  description="Gerencie e emita laudos de inviabilidade técnica para descarte de ativos."
-                  icon={FileText}
-                  onClick={() => navigate("/laudo-inviabilidade")}
-                  variant="light"
-                />
-              )}
-              {temAcesso("etiquetas") && (
-                <QuickActionCard
-                  title="Emissão de Etiquetas"
-                  description="Gere e imprima etiquetas industriais com códigos de barras sequenciais."
-                  icon={Barcode}
-                  onClick={() => navigate("/emissao-etiquetas")}
-                  variant="light"
-                />
-              )}
+            {/* MÓDULOS / AÇÕES RÁPIDAS (GRADE INTELIGENTE DE ALTURA FIXA) */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Layers size={14} className="text-blue-600" />
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                    Módulos do Sistema
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Acesso por Permissão</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {temAcesso("dashboard_bi") && (
+                  <QuickActionCard
+                    title="Painel de BI"
+                    description="Relatórios gerenciais e indicadores analíticos em tempo real."
+                    icon={PieChart}
+                    onClick={() => navigate("/bi")}
+                    variant="dark"
+                    tag="Analítico"
+                  />
+                )}
+                {temAcesso("inventario") && (
+                  <QuickActionCard
+                    title="Inventário Geral"
+                    description="Base completa de equipamentos, hardware e ativos de rede."
+                    icon={Search}
+                    onClick={() => navigate("/inventario")}
+                    variant="light"
+                    tag="Ativos"
+                  />
+                )}
+                {temAcesso("inventario") && (
+                  <QuickActionCard
+                    title="Vistoria de Patrimônio"
+                    description="Avaliação de estado de conservação e inventário físico."
+                    icon={ClipboardCheck}
+                    onClick={() => navigate("/vistoria-patrimonio")}
+                    variant="light"
+                    tag="Fiscalização"
+                  />
+                )}
+                {temAcesso("inventario") && (
+                  <QuickActionCard
+                    title="Histórico de Vistorias"
+                    description="Trilha de auditoria detalhada das vistorias já realizadas."
+                    icon={ClipboardList}
+                    onClick={() => navigate("/historico-vistorias")}
+                    variant="light"
+                    tag="Auditoria"
+                  />
+                )}
+                {temAcesso("laudos") && (
+                  <QuickActionCard
+                    title="Laudos emitidos"
+                    description="Laudos oficiais de inviabilidade técnica para baixa de ativos."
+                    icon={FileText}
+                    onClick={() => navigate("/laudo-inviabilidade")}
+                    variant="light"
+                    tag="Documentação"
+                  />
+                )}
+                {temAcesso("etiquetas") && (
+                  <QuickActionCard
+                    title="Emissão de Etiquetas"
+                    description="Impressão de etiquetas patrimoniais e códigos de barras."
+                    icon={Barcode}
+                    onClick={() => navigate("/emissao-etiquetas")}
+                    variant="light"
+                    tag="Operacional"
+                  />
+                )}
+              </div>
             </div>
+
           </div>
         </section>
       </main>
@@ -388,53 +225,81 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, color, icon: Icon }) {
+function StatCard({ title, value, color, icon: Icon, trend }) {
   const themes = {
-    amber: "bg-amber-500 shadow-amber-100",
-    rose: "bg-rose-500 shadow-rose-100",
-    emerald: "bg-emerald-500 shadow-emerald-100",
-    blue: "bg-blue-600 shadow-blue-100",
+    amber: "bg-amber-500 text-amber-500",
+    rose: "bg-rose-500 text-rose-500",
+    emerald: "bg-emerald-500 text-emerald-500",
+    blue: "bg-blue-600 text-blue-600",
   };
+  
   return (
-    <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden">
-      <div className="flex justify-between items-center mb-6">
-        <div className={`${themes[color]} p-3 rounded-2xl text-white shadow-lg group-hover:scale-110 transition-transform`}>
-          <Icon size={20} />
+    <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-2xs hover:shadow-md transition-all duration-200 group relative overflow-hidden flex flex-col justify-between">
+      <div className="flex justify-between items-center mb-3">
+        <div className={`${themes[color].split(" ")[0]} p-2.5 rounded-xl text-white shadow-sm group-hover:scale-105 transition-transform`}>
+          <Icon size={18} strokeWidth={2.2} />
         </div>
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
           {title}
         </span>
       </div>
-      <h3 className="text-4xl font-black text-slate-900">
-        {value.toString().padStart(2, "0")}
-      </h3>
+
+      <div className="flex items-baseline justify-between pt-2 border-t border-slate-100">
+        <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+          {String(value || 0).padStart(2, "0")}
+        </h3>
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded">
+          <TrendingUp size={11} className={color === 'emerald' ? 'text-emerald-600' : 'text-blue-600'} /> {trend}
+        </span>
+      </div>
     </div>
   );
 }
 
-function QuickActionCard({ title, description, icon: Icon, onClick, variant }) {
+function QuickActionCard({ title, description, icon: Icon, onClick, variant, tag }) {
   const isDark = variant === "dark";
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer rounded-[2rem] p-8 transition-all flex flex-col justify-between h-72 ${
+      className={`group cursor-pointer rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between h-40 relative overflow-hidden ${
         isDark
-          ? "bg-slate-900 text-white hover:bg-slate-800"
-          : "bg-white border border-slate-200 text-slate-900 shadow-sm hover:border-blue-200"
+          ? "bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 text-white shadow-lg shadow-slate-900/10 hover:shadow-xl"
+          : "bg-white border border-slate-200/80 text-slate-900 shadow-2xs hover:shadow-md hover:border-blue-200"
       }`}
     >
-      <div>
-        <div className={`mb-6 inline-block p-4 rounded-2xl ${isDark ? "bg-slate-800" : "bg-blue-50 text-blue-600"}`}>
-          <Icon size={24} />
+      <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-colors"></div>
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className={`inline-flex p-2.5 rounded-xl transition-transform duration-200 group-hover:scale-105 ${
+            isDark 
+              ? "bg-slate-800 text-blue-400 border border-slate-700/50" 
+              : "bg-blue-50 text-blue-600 border border-blue-100/60"
+          }`}>
+            <Icon size={18} strokeWidth={2.2} />
+          </div>
+          {tag && (
+            <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+              isDark ? "bg-slate-800 text-slate-300 border border-slate-700" : "bg-slate-100 text-slate-600 border border-slate-200/60"
+            }`}>
+              {tag}
+            </span>
+          )}
         </div>
-        <h2 className="text-xl font-black mb-2">{title}</h2>
-        <p className="text-sm opacity-70 leading-relaxed font-medium">
+        
+        <h2 className="text-sm font-black mb-1 tracking-tight group-hover:text-blue-500 transition-colors">{title}</h2>
+        <p className={`text-[11px] leading-snug font-medium line-clamp-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
           {description}
         </p>
       </div>
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500">
-        Acessar Módulo{" "}
-        <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+
+      <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest relative z-10 pt-2 border-t border-slate-100/10">
+        <span className={isDark ? "text-blue-400" : "text-blue-600"}>Acessar Módulo</span>
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5 ${
+          isDark ? "bg-slate-800 text-blue-400" : "bg-blue-50 text-blue-600"
+        }`}>
+          <ArrowUpRight size={12} />
+        </div>
       </div>
     </div>
   );

@@ -22,6 +22,8 @@ import AdminLicencas from "../pages/AdminLicencas";
 import PainelCoordenacao from "../pages/PainelCoordenacao";
 import Laudos from "../pages/Laudos";
 import TelaEtiquetas from "../pages/TelaEtiquetas";
+import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
+import HistoricoVistoria from "../pages/HistoricoVistoria"; // <-- NOVA TELA DE HISTÓRICO IMPORTADA
 
 // Importando componentes
 import CadastroChamado from "../components/CadastroChamado";
@@ -135,6 +137,25 @@ export default function AppRoutes({
                   }
                 />
                 
+                <Route
+                  path="/vistoria-patrimonio"
+                  element={
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                      <TelaVistoriaPatrimonio />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* --- NOVA ROTA DE HISTÓRICO DE VISTORIA --- */}
+                <Route
+                  path="/historico-vistorias"
+                  element={
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                      <HistoricoVistoria />
+                    </ProtectedRoute>
+                  }
+                />
+
                 <Route
                   path="/laudo-inviabilidade"
                   element={
