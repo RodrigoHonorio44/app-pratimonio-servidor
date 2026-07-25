@@ -2,8 +2,8 @@ import axios from 'axios';
 import { auth } from './firebase';
 
 const api = axios.create({
-  // Use o domínio público HTTPS do seu túnel do Cloudflare
-  baseURL: 'https://api.rodhonsystem.com.br/api', 
+  // Utiliza o mesmo domínio público configurado na Vercel para o servidor
+  baseURL: 'https://hcp.rodhonsystem.com.br/api', 
 });
 
 api.interceptors.request.use(async (config) => {
