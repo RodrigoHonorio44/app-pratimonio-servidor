@@ -136,13 +136,15 @@ export const usePainelAnalista = () => {
     };
   }, []);
 
-  // Carrega os dados do usuário logado via API do servidor
+  // Carrega os dados do usuário logado via API do servidor com token automático via interceptor
   useEffect(() => {
     if (!user) return;
     const fetchUserData = async () => {
       try {
         const response = await api.get(`/usuarios/${user.uid}`);
-        if (response.data) setUserData(response.data);
+        if (response.data && typeof response.data !== "string") {
+          setUserData(response.data);
+        }
       } catch (error) {
         console.error("erro ao buscar dados do usuário:", error);
       }
@@ -157,8 +159,15 @@ export const usePainelAnalista = () => {
       setLoading(true);
       try {
         const response = await api.get("/chamados");
-        setChamados(Array.isArray(response.data) ? response.data : []);
+        const dadosBrutos = response.data;
+
+        if (typeof dadosBrutos === "string" && dadosBrutos.includes("<!DOCTYPE html>")) {
+          throw new Error("A API retornou HTML em vez de JSON.");
+        }
+
+        setChamados(Array.isArray(dadosBrutos) ? dadosBrutos : (dadosBrutos?.chamados || []));
       } catch (error) {
+        console.error("Erro ao carregar chamados:", error);
         toast.error("erro ao carregar chamados do servidor.");
         setChamados([]);
       } finally {
