@@ -157,9 +157,10 @@ export const usePainelAnalista = () => {
       setLoading(true);
       try {
         const response = await api.get("/chamados");
-        setChamados(response.data || []);
+        setChamados(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         toast.error("erro ao carregar chamados do servidor.");
+        setChamados([]);
       } finally {
         setLoading(false);
       }
@@ -190,9 +191,8 @@ export const usePainelAnalista = () => {
 
       await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
-      // Atualiza o estado local para refletir na tela imediatamente
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
       );
 
       toast.info(
@@ -222,7 +222,7 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
       );
 
       toast.warning("chamado devolvido para a fila.");
@@ -251,7 +251,7 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       setMostrarModal(false);
@@ -281,7 +281,7 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       setMostrarModal(false);
@@ -305,7 +305,7 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       toast.success("atendimento retomado!");
@@ -353,7 +353,7 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, novosDados);
 
       setChamados((prev) =>
-        prev.map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
       toast.update(idToast, {
@@ -375,13 +375,14 @@ export const usePainelAnalista = () => {
   };
 
   const chamadosFiltrados = useMemo(() => {
+    const listaSegura = Array.isArray(chamados) ? chamados : [];
     const busca = termoBusca.toLowerCase().trim();
     const isAdminOuRoot = ["root", "admin"].includes(
       userData?.role?.toLowerCase()
     );
     const equipeUsuario = userData?.equipe?.toLowerCase().trim();
 
-    return chamados.filter((c) => {
+    return listaSegura.filter((c) => {
       if (!isAdminOuRoot) {
         const equipeChamado = c.equipe?.toLowerCase().trim();
         if (!equipeUsuario || equipeChamado !== equipeUsuario) {

@@ -2,10 +2,8 @@ import axios from 'axios';
 import { auth } from './firebase';
 
 const api = axios.create({
-  // Utiliza o domínio público do servidor
-  baseURL: 'https://hcp.rodhonsystem.com.br/api', 
-  // Puxa automaticamente do .env.development ou .env.production
-  baseURL: import.meta.env.VITE_API_URL || 'https://hcp.rodhonsystem.com.br/api',
+  // Se houver uma variável de ambiente definida, usa ela; caso contrário, define o fallback ideal
+  baseURL: import.meta.env.VITE_API_URL || 'http://192.168.0.232:3000/api',
   withCredentials: true,
 });
 
