@@ -70,7 +70,12 @@ export const useInventario = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const todosOsDados = resposta.data;
+      // Validação segura para evitar quebra de layout/tela em branco caso o retorno mude de formato
+      const dadosBrutos = resposta.data;
+      const todosOsDados = Array.isArray(dadosBrutos) 
+        ? dadosBrutos 
+        : (dadosBrutos?.ativos || dadosBrutos?.dados || []);
+
       setItens(todosOsDados);
 
       if (todosOsDados.length > 0) {
@@ -81,6 +86,7 @@ export const useInventario = () => {
     } catch (error) {
       console.error("Erro ao carregar:", error);
       toast.error("Erro ao consultar dados.");
+      setItens([]); // Fallback seguro em caso de erro na requisição
     } finally {
       setLoading(false);
     }
@@ -111,7 +117,9 @@ export const useInventario = () => {
       listaSetores = [...MAPA_SETORES_POR_UNIDADE[chaveUnidade]];
     } else {
       const setoresUnicos = new Set();
-      itens.forEach((item) => {
+      // Garantia extra para iterar de forma segura com array
+      const listaSegura = Array.isArray(itens) ? itens : [];
+      listaSegura.forEach((item) => {
         if (item.setor && item.setor.trim() !== "") {
           setoresUnicos.add(item.setor.trim());
         }
@@ -131,7 +139,9 @@ export const useInventario = () => {
     return listaSetores;
   };
 
-  const itensFiltrados = itens.filter((item) => {
+  // Assegura que o .filter seja executado sobre um array válido
+  const listaItensSegura = Array.isArray(itens) ? itens : [];
+  const itensFiltrados = listaItensSegura.filter((item) => {
     const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
     const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeFiltro);
     const matchUnidade =

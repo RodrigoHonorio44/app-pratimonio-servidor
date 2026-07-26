@@ -2,8 +2,8 @@ import axios from 'axios';
 import { auth } from './firebase';
 
 const api = axios.create({
-  // Se houver uma variável de ambiente definida, usa ela; caso contrário, define o fallback ideal
-  baseURL: import.meta.env.VITE_API_URL || 'http://192.168.0.232:3000/api',
+  // Se não houver variável de ambiente, usa '/api' (caminho relativo)
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   withCredentials: true,
 });
 
