@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { auth } from "../services/firebase";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -62,16 +63,15 @@ export const useInventario = () => {
     setPaginaAtual(1);
 
     try {
-      // Chamada simplificada aproveitando o interceptor do api.js
-      const resposta = await api.get("/ativos");
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
 
+      const resposta = await api.get("/ativos", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Validação segura para evitar quebra de layout/tela em branco caso o retorno mude de formato
       const dadosBrutos = resposta.data;
-
-      // Proteção caso o servidor retorne o HTML do index por falha de rota
-      if (typeof dadosBrutos === "string" && dadosBrutos.includes("<!DOCTYPE html>")) {
-        throw new Error("A API retornou um documento HTML em vez de dados JSON.");
-      }
-
       const todosOsDados = Array.isArray(dadosBrutos) 
         ? dadosBrutos 
         : (dadosBrutos?.ativos || dadosBrutos?.dados || []);
@@ -84,9 +84,9 @@ export const useInventario = () => {
         toast.info("Nenhum item encontrado no banco.");
       }
     } catch (error) {
-      console.error("Erro ao carregar dados dos ativos:", error);
+      console.error("Erro ao carregar:", error);
       toast.error("Erro ao consultar dados.");
-      setItens([]);
+      setItens([]); // Fallback seguro em caso de erro na requisição
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,6 @@ export const useInventario = () => {
     setBuscaPatrimonio("");
     setUnidadeFiltro("Todas");
     setSetorFiltro("Todos");
-    setStatusFiltro("Todos");
     setItens([]);
     setHasSearched(false);
   };
@@ -118,6 +117,7 @@ export const useInventario = () => {
       listaSetores = [...MAPA_SETORES_POR_UNIDADE[chaveUnidade]];
     } else {
       const setoresUnicos = new Set();
+      // Garantia extra para iterar de forma segura com array
       const listaSegura = Array.isArray(itens) ? itens : [];
       listaSegura.forEach((item) => {
         if (item.setor && item.setor.trim() !== "") {
@@ -139,6 +139,7 @@ export const useInventario = () => {
     return listaSetores;
   };
 
+  // Assegura que o .filter seja executado sobre um array válido
   const listaItensSegura = Array.isArray(itens) ? itens : [];
   const itensFiltrados = listaItensSegura.filter((item) => {
     const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");

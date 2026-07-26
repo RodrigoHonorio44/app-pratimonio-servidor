@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { auth } from "../services/firebase";
+import { auth, db } from "../services/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import api from "../services/api";
 import { toast } from "react-toastify";
 
@@ -20,7 +21,7 @@ export const usePainelAnalista = () => {
 
   // CONTROLE DO MODAL UNIFICADO
   const [mostrarModal, setMostrarModal] = useState(false);
-  const [tipoModal, setTipoModal] = useState(""); // "visualizar", "finalizar" ou "pausar"
+  const [tipoModal, setTipoModal] = useState(""); 
   const [chamadoSelecionado, setChamadoSelecionado] = useState(null);
 
   // ESTADOS DOS CAMPOS DOS MODAIS
@@ -51,7 +52,6 @@ export const usePainelAnalista = () => {
   const formatarDataHora = (timestamp) => {
     if (!timestamp) return "n/a";
     
-    // Se for um objeto do Firebase Firestore com seconds
     if (typeof timestamp === "object" && timestamp.seconds) {
       return new Date(timestamp.seconds * 1000).toLocaleString("pt-BR");
     }
@@ -136,7 +136,7 @@ export const usePainelAnalista = () => {
     };
   }, []);
 
-  // Carrega os dados do usuário logado via API do servidor com token automático via interceptor
+  // Busca Usuário tentando a API primeiro e recorrendo ao Firestore como fallback
   useEffect(() => {
     if (!user) return;
     const fetchUserData = async () => {
@@ -144,9 +144,20 @@ export const usePainelAnalista = () => {
         const response = await api.get(`/usuarios/${user.uid}`);
         if (response.data && typeof response.data !== "string") {
           setUserData(response.data);
+          return;
         }
       } catch (error) {
-        console.error("erro ao buscar dados do usuário:", error);
+        console.warn("Usuário não encontrado na API Node. Buscando do Firestore...", error);
+      }
+
+      try {
+        const docRef = doc(db, "usuarios", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserData(docSnap.data());
+        }
+      } catch (err) {
+        console.error("Erro ao buscar usuário no Firestore:", err);
       }
     };
     fetchUserData();
@@ -168,7 +179,7 @@ export const usePainelAnalista = () => {
         setChamados(Array.isArray(dadosBrutos) ? dadosBrutos : (dadosBrutos?.chamados || []));
       } catch (error) {
         console.error("Erro ao carregar chamados:", error);
-        toast.error("erro ao carregar chamados do servidor.");
+        toast.error("Erro ao carregar chamados do servidor.");
         setChamados([]);
       } finally {
         setLoading(false);
@@ -386,15 +397,16 @@ export const usePainelAnalista = () => {
   const chamadosFiltrados = useMemo(() => {
     const listaSegura = Array.isArray(chamados) ? chamados : [];
     const busca = termoBusca.toLowerCase().trim();
-    const isAdminOuRoot = ["root", "admin"].includes(
-      userData?.role?.toLowerCase()
-    );
+    
+    // Regras de permissão flexibilizadas para evitar ocultar chamados por divergência de string
+    const roleUser = (userData?.role || userData?.cargo || "").toLowerCase();
+    const isAdminOuRoot = ["root", "admin", "administrador"].includes(roleUser) || !userData;
     const equipeUsuario = userData?.equipe?.toLowerCase().trim();
 
     return listaSegura.filter((c) => {
-      if (!isAdminOuRoot) {
+      if (!isAdminOuRoot && equipeUsuario) {
         const equipeChamado = c.equipe?.toLowerCase().trim();
-        if (!equipeUsuario || equipeChamado !== equipeUsuario) {
+        if (equipeChamado && equipeChamado !== equipeUsuario) {
           return false;
         }
       }
