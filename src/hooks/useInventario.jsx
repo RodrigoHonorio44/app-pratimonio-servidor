@@ -92,6 +92,60 @@ export const useInventario = () => {
     }
   };
 
+  /**
+   * Função para processar a Baixa Definitiva do Patrimônio via API
+   */
+  const confirmarBaixaPatrimonio = async (equipamentoParaBaixar, destinoArmazenamento) => {
+    const itemTarget = equipamentoParaBaixar || equipamentoSelecionado;
+
+    if (!itemTarget) {
+      toast.error("Nenhum equipamento selecionado para baixa.");
+      return;
+    }
+
+    // Procura o ID correto do ativo (prevenindo passar ID de OS)
+    const idAtivo = itemTarget.idAtivo || itemTarget.ativoId || itemTarget.id || itemTarget._id;
+
+    if (!idAtivo) {
+      toast.error("ID do patrimônio não localizado.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      // Atualiza diretamente na sua API REST salvando como 'inutilizado'
+      await api.put(
+        `/ativos/${idAtivo}`,
+        {
+          status: "inutilizado",
+          dataBaixa: new Date().toISOString(),
+          destinoArmazenamento: destinoArmazenamento || itemTarget.destino || "Armazenamento Central",
+          motivoBaixa: "Baixa Definitiva de Bem Patrimonial"
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      toast.success("Baixa do patrimônio realizada com sucesso!");
+      setModalAberto(false);
+      
+      // Recarrega os dados do inventário para refletir o novo status
+      await carregarDados();
+
+    } catch (error) {
+      console.error("Erro ao efetuar baixa via API:", error);
+      toast.error(
+        error.response?.data?.message || "Erro ao dar baixa no patrimônio."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const limparFiltros = () => {
     setBuscaPatrimonio("");
     setUnidadeFiltro("Todas");
@@ -117,7 +171,6 @@ export const useInventario = () => {
       listaSetores = [...MAPA_SETORES_POR_UNIDADE[chaveUnidade]];
     } else {
       const setoresUnicos = new Set();
-      // Garantia extra para iterar de forma segura com array
       const listaSegura = Array.isArray(itens) ? itens : [];
       listaSegura.forEach((item) => {
         if (item.setor && item.setor.trim() !== "") {
@@ -139,7 +192,6 @@ export const useInventario = () => {
     return listaSetores;
   };
 
-  // Assegura que o .filter seja executado sobre um array válido
   const listaItensSegura = Array.isArray(itens) ? itens : [];
   const itensFiltrados = listaItensSegura.filter((item) => {
     const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
@@ -277,6 +329,7 @@ export const useInventario = () => {
     itensExibidos,
     formatarDataBR,
     carregarDados,
+    confirmarBaixaPatrimonio, // <-- Exportada para ser chamada no botão do Modal de Termo
     limparFiltros,
     obterSetoresDisponiveis,
     exportarExcelCompleto,
