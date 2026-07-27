@@ -25,10 +25,20 @@ export function useHistoricoVistoria() {
     try {
       setLoading(true);
       const response = await api.get("/vistorias");
-      setVistorias(Array.isArray(response.data) ? response.data : []);
+
+      if (Array.isArray(response.data)) {
+        // Garantir que todo registro tenha um 'id' mapeado (seja _id do Mongo ou id)
+        const formatadas = response.data.map((item) => ({
+          ...item,
+          id: item.id || item._id,
+        }));
+        setVistorias(formatadas);
+      } else {
+        setVistorias([]);
+      }
     } catch (error) {
       console.error("Erro ao carregar histórico de vistorias:", error);
-      // Mock temporário para demonstração caso a API não retorne dados ainda
+      // Fallback/Mock temporário caso a API não retorne nada ou ocorra falha na conexão
       setVistorias([
         {
           id: "vist_01",
@@ -37,8 +47,13 @@ export function useHistoricoVistoria() {
           dataHora: "2026-06-10T14:30:00",
           responsavel: "Rodrigo Honório",
           itens: [
-            { patrimonio: "PAT-00124", descricao: "Mesa de escritório em MDF", estado: "Ruim", observacao: "Tampo riscado e pés frouxos" }
-          ]
+            {
+              patrimonio: "PAT-00124",
+              descricao: "Mesa de escritório em MDF",
+              estado: "Ruim",
+              observacao: "Tampo riscado e pés frouxos",
+            },
+          ],
         },
         {
           id: "vist_02",
@@ -47,9 +62,14 @@ export function useHistoricoVistoria() {
           dataHora: "2026-06-12T09:15:00",
           responsavel: "Rodrigo Honório",
           itens: [
-            { patrimonio: "PAT-00892", descricao: "Cadeira giratória longarina", estado: "Ruim", observacao: "Braço quebrável e sem regulagem de altura" }
-          ]
-        }
+            {
+              patrimonio: "PAT-00892",
+              descricao: "Cadeira giratória longarina",
+              estado: "Ruim",
+              observacao: "Braço quebrável e sem regulagem de altura",
+            },
+          ],
+        },
       ]);
     } finally {
       setLoading(false);
@@ -59,14 +79,18 @@ export function useHistoricoVistoria() {
   // Filtragem avançada das vistorias
   const vistoriasFiltradas = useMemo(() => {
     return vistorias.filter((v) => {
+      const unidadeStr = typeof v.unidade === "string" ? v.unidade : v.unidade?.nome || "";
+      const setorStr = typeof v.setor === "string" ? v.setor : v.setor?.nome || "";
+
       const matchUnidade = filtroUnidade
-        ? v.unidade?.toLowerCase().includes(filtroUnidade.toLowerCase())
-        : true;
-      const matchSetor = filtroSetor
-        ? v.setor?.toLowerCase().includes(filtroSetor.toLowerCase())
+        ? unidadeStr.toLowerCase().includes(filtroUnidade.toLowerCase())
         : true;
 
-      const dataVistoria = v.dataHora ? v.dataHora.split("T")[0] : "";
+      const matchSetor = filtroSetor
+        ? setorStr.toLowerCase().includes(filtroSetor.toLowerCase())
+        : true;
+
+      const dataVistoria = v.dataHora ? String(v.dataHora).split("T")[0] : "";
       const matchInicio = filtroDataInicio ? dataVistoria >= filtroDataInicio : true;
       const matchFim = filtroDataFim ? dataVistoria <= filtroDataFim : true;
 
@@ -81,7 +105,7 @@ export function useHistoricoVistoria() {
   };
 
   const selecionarTodas = () => {
-    if (selecionadas.length === vistoriasFiltradas.length) {
+    if (selecionadas.length === vistoriasFiltradas.length && vistoriasFiltradas.length > 0) {
       setSelecionadas([]);
     } else {
       setSelecionadas(vistoriasFiltradas.map((v) => v.id));
@@ -109,5 +133,6 @@ export function useHistoricoVistoria() {
     vistoriaAtiva,
     setVistoriaAtiva,
     gerarRelatorioImpressao,
+    recarregarVistorias: carregarVistorias, // Exposto caso precise recarregar manualmente
   };
 }
