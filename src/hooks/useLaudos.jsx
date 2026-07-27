@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
+import { auth } from "../services/firebase";
 import { toast } from "react-toastify";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; 
+import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
 
 export const useLaudos = () => {
   const [itens, setItens] = useState([]);
@@ -91,69 +92,119 @@ export const useLaudos = () => {
     return listaSetores.length > 0 ? listaSetores : null;
   };
 
+  // Carrega laudos em aberto/pendentes via API
   const carregarLaudosPendentes = async () => {
     setLoadingLaudos(true);
     try {
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
       const response = await api.get("/laudos", {
-        params: { status: "pendente", limit: 25 }
+        params: { status: "pendente", limit: 50 },
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const listaLaudos = Array.isArray(response.data) ? response.data : (response.data.docs || []);
+
+      const dados = response.data;
+      const listaLaudos = Array.isArray(dados) 
+        ? dados 
+        : (dados?.laudos || dados?.docs || []);
+
       setLaudosPendentes(listaLaudos);
     } catch (error) {
       console.error("Erro ao carregar laudos pendentes:", error);
+      setLaudosPendentes([]);
     } finally {
       setLoadingLaudos(false);
     }
   };
 
-  const handleAprovarLaudo = async (laudoId, equipamentoId) => {
+  // Aprova o laudo e move o ativo para 'inutilizado'
+  const handleAprovarLaudo = async (laudoParam, equipamentoParam) => {
+    const laudoId = typeof laudoParam === "object" ? (laudoParam._id || laudoParam.id) : laudoParam;
+    const laudoObj = typeof laudoParam === "object" ? laudoParam : laudosPendentes.find(l => (l._id || l.id) === laudoId);
+
+    const equipamentoId = equipamentoParam || laudoObj?.equipamentoId || laudoObj?.ativoId || laudoObj?.idAtivo;
+
     setProcessandoAcao(laudoId);
     try {
-      await api.put(`/laudos/${laudoId}`, {
-        status: "aprovado",
-        dataDecisao: new Date().toISOString(),
-      });
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+      const headers = { Authorization: `Bearer ${token}` };
 
+      // 1. Atualiza status do laudo para aprovado
+      await api.put(
+        `/laudos/${laudoId}`,
+        {
+          status: "aprovado",
+          dataDecisao: new Date().toISOString(),
+        },
+        { headers }
+      );
+
+      // 2. Atualiza o status do equipamento no cadastro de ativos para 'inutilizado'
       if (equipamentoId) {
-        await api.put(`/ativos/${equipamentoId}`, {
-          status: "inutilizados",
-          dataBaixa: new Date().toISOString(),
-          ultimaMovimentacao: new Date().toISOString(),
-        });
+        await api.put(
+          `/ativos/${equipamentoId}`,
+          {
+            status: "inutilizado",
+            dataBaixa: new Date().toISOString(),
+            ultimaMovimentacao: new Date().toISOString(),
+            motivoBaixa: laudoObj?.justificativaLaudo || "Laudo técnico de inviabilidade aprovado"
+          },
+          { headers }
+        );
       }
 
-      toast.success("Laudo aprovado e ativo movido para Inutilizados! 🎉");
+      toast.success("Laudo aprovado e ativo movido para Inutilizados!");
       await carregarLaudosPendentes();
       if (hasSearched) carregarDados();
     } catch (error) {
       console.error("Erro ao aprovar laudo:", error);
-      toast.error("Erro ao aprovar o laudo.");
+      toast.error(error.response?.data?.message || "Erro ao aprovar o laudo no sistema.");
     } finally {
       setProcessandoAcao(null);
     }
   };
 
-  const handleCancelarLaudo = async (laudoId, equipamentoId) => {
+  // Cancela o laudo e garante que o ativo permanece/retorna como 'operante'
+  const handleCancelarLaudo = async (laudoParam, equipamentoParam) => {
+    const laudoId = typeof laudoParam === "object" ? (laudoParam._id || laudoParam.id) : laudoParam;
+    const laudoObj = typeof laudoParam === "object" ? laudoParam : laudosPendentes.find(l => (l._id || l.id) === laudoId);
+
+    const equipamentoId = equipamentoParam || laudoObj?.equipamentoId || laudoObj?.ativoId || laudoObj?.idAtivo;
+
     setProcessandoAcao(laudoId);
     try {
-      await api.put(`/laudos/${laudoId}`, {
-        status: "cancelado",
-        dataDecisao: new Date().toISOString(),
-      });
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+      const headers = { Authorization: `Bearer ${token}` };
+
+      await api.put(
+        `/laudos/${laudoId}`,
+        {
+          status: "cancelado",
+          dataDecisao: new Date().toISOString(),
+        },
+        { headers }
+      );
 
       if (equipamentoId) {
-        await api.put(`/ativos/${equipamentoId}`, {
-          status: "operante",
-          ultimaMovimentacao: new Date().toISOString(),
-        });
+        await api.put(
+          `/ativos/${equipamentoId}`,
+          {
+            status: "operante",
+            ultimaMovimentacao: new Date().toISOString(),
+          },
+          { headers }
+        );
       }
 
-      toast.info("Laudo técnico cancelado e ativo restaurado para operante.");
+      toast.info("Laudo técnico cancelado e ativo mantido como operante.");
       await carregarLaudosPendentes();
       if (hasSearched) carregarDados();
     } catch (error) {
       console.error("Erro ao cancelar laudo:", error);
-      toast.error("Erro ao cancelar o laudo.");
+      toast.error(error.response?.data?.message || "Erro ao cancelar o laudo.");
     } finally {
       setProcessandoAcao(null);
     }
@@ -161,11 +212,15 @@ export const useLaudos = () => {
 
   const carregarUnidadesEAtivosIniciais = async () => {
     try {
-      const response = await api.get("/ativos", {
-        params: { limit: 1000 }
-      });
-      const dados = Array.isArray(response.data) ? response.data : (response.data.docs || []);
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
 
+      const response = await api.get("/ativos", {
+        params: { limit: 1000 },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const dados = Array.isArray(response.data) ? response.data : (response.data?.ativos || response.data?.docs || []);
       const mapaUnicas = new Map();
 
       dados.forEach((item) => {
@@ -198,9 +253,14 @@ export const useLaudos = () => {
     setHasSearched(true);
 
     try {
-      const response = await api.get("/ativos");
-      const todosOsDados = Array.isArray(response.data) ? response.data : (response.data.docs || []);
-      
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : "";
+
+      const response = await api.get("/ativos", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const todosOsDados = Array.isArray(response.data) ? response.data : (response.data?.ativos || response.data?.docs || []);
       setItens(todosOsDados);
 
       if (todosOsDados.length > 0) {
