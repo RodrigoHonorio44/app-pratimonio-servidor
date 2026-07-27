@@ -92,7 +92,7 @@ export const useLaudos = () => {
     return listaSetores.length > 0 ? listaSetores : null;
   };
 
-  // Carrega laudos em aberto/pendentes via API
+  // Carrega laudos em aberto/pendentes via API garantindo o filtro de status no frontend
   const carregarLaudosPendentes = async () => {
     setLoadingLaudos(true);
     try {
@@ -109,7 +109,13 @@ export const useLaudos = () => {
         ? dados 
         : (dados?.laudos || dados?.docs || []);
 
-      setLaudosPendentes(listaLaudos);
+      // FILTRO EXTRA: Garante que apenas laudos pendentes entrem no estado
+      const apenasPendentes = listaLaudos.filter((l) => {
+        const st = String(l.status || "").toLowerCase().trim();
+        return st === "pendente" || st === "aguardando";
+      });
+
+      setLaudosPendentes(apenasPendentes);
     } catch (error) {
       console.error("Erro ao carregar laudos pendentes:", error);
       setLaudosPendentes([]);
@@ -156,7 +162,10 @@ export const useLaudos = () => {
       }
 
       toast.success("Laudo aprovado e ativo movido para Inutilizados!");
-      await carregarLaudosPendentes();
+
+      // Remove imediatamente da tabela de pendentes
+      setLaudosPendentes((prev) => prev.filter((item) => (item._id || item.id) !== laudoId));
+
       if (hasSearched) carregarDados();
     } catch (error) {
       console.error("Erro ao aprovar laudo:", error);
@@ -200,7 +209,10 @@ export const useLaudos = () => {
       }
 
       toast.info("Laudo técnico cancelado e ativo mantido como operante.");
-      await carregarLaudosPendentes();
+
+      // Remove imediatamente o laudo cancelado do estado da tela
+      setLaudosPendentes((prev) => prev.filter((item) => (item._id || item.id) !== laudoId));
+
       if (hasSearched) carregarDados();
     } catch (error) {
       console.error("Erro ao cancelar laudo:", error);

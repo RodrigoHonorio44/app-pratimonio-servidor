@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../services/firebase";
-import { doc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { auth } from "../services/firebase";
+import api from "../services/api"; // Usa a mesma instância do Axios configurada no projeto
 import { toast } from "react-toastify";
 import { 
   X, 
@@ -25,7 +25,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
   const [loadingHistorico, setLoadingHistorico] = useState(false);
 
   useEffect(() => {
-    if (isOpen && equipamento?.patrimonio) {
+    if (isOpen && equipamento) {
       buscarHistoricoChamados();
     }
   }, [isOpen, equipamento]);
@@ -38,31 +38,64 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
     onClose();
   };
 
+  // Função para obter token Firebase atualizado
+  const getAuthHeader = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const token = await user.getIdToken();
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
+  };
+
+  // Busca histórico de chamados flexível (por patrimônio ou por ID do equipamento)
   const buscarHistoricoChamados = async () => {
     setLoadingHistorico(true);
     try {
-      const patrimonioLimpo = String(equipamento.patrimonio).trim().toLowerCase();
+      const headers = await getAuthHeader();
       
-      const q = query(
-        collection(db, "chamados"), 
-        where("patrimonio", "==", patrimonioLimpo)
-      );
+      // Normaliza o patrimônio atual do equipamento (ex: "17158" ou "017158")
+      const patrimonioAtual = equipamento.patrimonio 
+        ? String(equipamento.patrimonio).trim().toLowerCase().replace(/^0+/, "") 
+        : "";
       
-      const querySnapshot = await getDocs(q);
-      const listaOS = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const idAtivoAtual = String(
+        equipamento.idAtivo || equipamento.ativoId || equipamento.id || equipamento._id || ""
+      ).trim();
+
+      // Busca todos os chamados utilizando a base da API já configurada no projeto
+      const resposta = await api.get("/chamados", { headers });
+      const dados = resposta.data;
+
+      const listaChamados = Array.isArray(dados) 
+        ? dados 
+        : (dados?.chamados || dados?.dados || []);
       
-      setHistoricoManutencoes(listaOS);
+      // Filtro flexível: verifica se o chamado pertence ao patrimônio ou ao ID do equipamento
+      const chamadosDoAtivo = listaChamados.filter((ch) => {
+        const patChamado = ch.patrimonio || ch.patrimonioId || ch.codigoPatrimonio || "";
+        const patChamadoLimpo = String(patChamado).trim().toLowerCase().replace(/^0+/, "");
+        
+        const equipIdChamado = String(
+          ch.equipamentoId || ch.ativoId || ch.idEquipamento || ""
+        ).trim();
+
+        const matchPatrimonio = patrimonioAtual !== "" && patChamadoLimpo === patrimonioAtual;
+        const matchId = idAtivoAtual !== "" && equipIdChamado === idAtivoAtual;
+
+        return matchPatrimonio || matchId;
+      });
+
+      setHistoricoManutencoes(chamadosDoAtivo);
     } catch (error) {
       console.error("Erro ao buscar histórico de chamados:", error);
-      toast.error("Erro ao carregar histórico de manutenções.");
+      toast.error("Não foi possível carregar o histórico de manutenções.");
     } finally {
       setLoadingHistorico(false);
     }
   };
 
+  // Grava o laudo e atualiza o estado do ativo usando 'api'
   const emitirLaudoDefinitivo = async () => {
     if (!diagnosticoTecnico.trim() || !justificativaSubstituicao.trim()) {
       toast.error("Por favor, preencha todos os campos do laudo técnico.");
@@ -71,45 +104,62 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
 
     setProcessando(true);
     try {
-      const historicoTratado = historicoManutencoes.map(os => ({
-        id: os.id,
-        numeroOs: os.numeroOs || os.id.substring(0, 6),
-        dataAbertura: os.dataAbertura || "n/i",
-        defeito: (os.descricaoDefeito || os.descricaoProblema || "").toLowerCase().trim(),
-        solucao: (os.solucaoTecnica || "").toLowerCase().trim()
-      }));
+      const headers = await getAuthHeader();
+      const idAtivo = equipamento.idAtivo || equipamento.ativoId || equipamento.id || equipamento._id;
 
-      const laudosRef = collection(db, "laudos");
-      await addDoc(laudosRef, {
-        equipamentoId: equipamento.id,
-        nomeEquipamento: equipamento.nome.toLowerCase().trim(),
-        patrimonio: equipamento.patrimonio ? equipamento.patrimonio.toString().toLowerCase().trim() : "s/p",
-        unidade: equipamento.unidade.toLowerCase().trim(),
-        setor: equipamento.setor.toLowerCase().trim(),
-        diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
-        justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
-        status: "pendente", 
-        dataEmissao: serverTimestamp(),
-        ultimaMovimentacao: serverTimestamp(),
-        totalManutencoesAnteriores: historicoManutencoes.length,
-        historicoAnexo: historicoTratado
+      if (!idAtivo) {
+        toast.error("ID do equipamento não encontrado para atualização.");
+        return;
+      }
+
+      const historicoTratado = historicoManutencoes.map((os) => {
+        const osId = os.id || os._id;
+        return {
+          id: osId,
+          numeroOs: os.numeroOs || (osId ? String(osId).substring(0, 6) : "s/n"),
+          dataAbertura: os.dataAbertura || "n/i",
+          defeito: (os.descricaoDefeito || os.descricaoProblema || "").toLowerCase().trim(),
+          solucao: (os.solucaoTecnica || "").toLowerCase().trim()
+        };
       });
 
-      const ativoRef = doc(db, "ativos", equipamento.id);
-      await updateDoc(ativoRef, {
+      // 1. Cadastra o laudo na rota POST /laudos
+      const payloadLaudo = {
+        equipamentoId: idAtivo,
+        nomeEquipamento: (equipamento.nome || "").toLowerCase().trim(),
+        patrimonio: equipamento.patrimonio ? String(equipamento.patrimonio).toLowerCase().trim() : "s/p",
+        unidade: (equipamento.unidade || "").toLowerCase().trim(),
+        setor: (equipamento.setor || "").toLowerCase().trim(),
+        diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
+        justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
+        status: "pendente",
+        totalManutencoesAnteriores: historicoManutencoes.length,
+        historicoAnexo: historicoTratado
+      };
+
+      await api.post("/laudos", payloadLaudo, { headers });
+
+      // 2. Atualiza o status do ativo na rota PUT /ativos/:id
+      const payloadAtivo = {
         status: "laudo pendente",
         diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
         justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
-        dataLaudoTecnico: serverTimestamp(),
-        ultimaMovimentacao: serverTimestamp()
-      });
+        dataLaudoTecnico: new Date().toISOString(),
+        ultimaMovimentacao: new Date().toISOString()
+      };
+
+      await api.put(`/ativos/${idAtivo}`, payloadAtivo, { headers });
 
       toast.success("Laudo técnico emitido com sucesso! Aguardando homologação final.");
       fecharELimpar();
       if (onAtualizar) onAtualizar();
     } catch (error) {
-      console.error("Erro ao processar laudo duplo:", error);
-      toast.error("Erro ao registrar o laudo técnico.");
+      console.error("Erro ao emitir laudo:", error);
+      toast.error(
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        "Erro ao registrar o laudo técnico."
+      );
     } finally {
       setProcessando(false);
     }
@@ -146,22 +196,25 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
               </div>
             ) : (
               <div className="space-y-3 overflow-y-auto pr-1 flex-grow max-h-[50vh] md:max-h-none">
-                {historicoManutencoes.map((os) => (
-                  <div key={os.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500 text-xs">
-                    <div className="flex justify-between font-black text-slate-400 text-[9px] uppercase mb-1">
-                      <span>OS #{os.numeroOs || os.id.substring(0, 6)}</span>
-                      <span className="font-mono">{os.dataAbertura || "Data N/I"}</span>
-                    </div>
-                    <p className="font-bold text-slate-800 uppercase mb-1">
-                      <span className="text-slate-400 font-medium">Reclamação:</span> {os.descricaoDefeito || os.descricaoProblema}
-                    </p>
-                    {os.solucaoTecnica && (
-                      <p className="bg-emerald-50/60 text-emerald-800 p-2 rounded-lg font-medium mt-1 uppercase text-[11px] border border-emerald-100/40">
-                        <span className="font-black">Ação Aplicada:</span> {os.solucaoTecnica}
+                {historicoManutencoes.map((os) => {
+                  const keyId = os.id || os._id;
+                  return (
+                    <div key={keyId} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500 text-xs">
+                      <div className="flex justify-between font-black text-slate-400 text-[9px] uppercase mb-1">
+                        <span>OS #{os.numeroOs || String(keyId).substring(0, 6)}</span>
+                        <span className="font-mono">{os.dataAbertura || "Data N/I"}</span>
+                      </div>
+                      <p className="font-bold text-slate-800 uppercase mb-1">
+                        <span className="text-slate-400 font-medium">Reclamação:</span> {os.descricaoDefeito || os.descricaoProblema}
                       </p>
-                    )}
-                  </div>
-                ))}
+                      {os.solucaoTecnica && (
+                        <p className="bg-emerald-50/60 text-emerald-800 p-2 rounded-lg font-medium mt-1 uppercase text-[11px] border border-emerald-100/40">
+                          <span className="font-black">Ação Aplicada:</span> {os.solucaoTecnica}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -265,7 +318,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
               <button
                 onClick={emitirLaudoDefinitivo}
                 disabled={processando}
-                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-1 shadow-md uppercase tracking-wider cursor-pointer"
+                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-1 shadow-md uppercase tracking-wider disabled:opacity-50 cursor-pointer"
               >
                 <CheckCircle size={14} /> {processando ? "Salvando..." : "Homologar Laudo"}
               </button>

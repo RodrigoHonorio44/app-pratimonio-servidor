@@ -64,7 +64,7 @@ const Laudos = () => {
         {/* Bloco de Filtros Inteligentes Reorganizado */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-end">
           
-          {/* 1º Filtro: Unidade Atual (Agora na Esquerda) */}
+          {/* 1º Filtro: Unidade Atual */}
           <div className="w-full md:w-56">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
               <MapPin size={12} className="text-blue-500" /> Unidade Atual
@@ -86,7 +86,7 @@ const Laudos = () => {
             </select>
           </div>
 
-          {/* 2º Filtro: Setor Comercial / Técnico (Centralizado) */}
+          {/* 2º Filtro: Setor Comercial / Técnico */}
           <div className="w-full md:w-56">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
               <Layers size={12} className="text-blue-500" /> Setor Comercial / Técnico
@@ -115,7 +115,7 @@ const Laudos = () => {
             )}
           </div>
 
-          {/* 3º Filtro: Buscar Equipamento (Ocupando o espaço restante na Direita) */}
+          {/* 3º Filtro: Buscar Equipamento */}
           <div className="flex-grow w-full md:w-auto">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
               Buscar Equipamento (Patrimônio ou Nome)
@@ -179,7 +179,7 @@ const Laudos = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {itensFiltrados.map((item) => (
-                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                    <tr key={item.id || item._id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="p-4 font-black text-blue-600">#{item.patrimonio || "S/P"}</td>
                       <td className="p-4 font-bold text-slate-700 uppercase text-xs">{item.nome}</td>
                       <td className="p-4 text-xs font-bold text-slate-500">
@@ -235,47 +235,52 @@ const Laudos = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {laudosPendentes.map((laudo) => (
-                    <tr key={laudo.id} className="hover:bg-amber-50/20 transition-colors">
-                      <td className="p-4 font-mono font-bold text-slate-700 uppercase">#{laudo.patrimonio || "S/P"}</td>
-                      <td className="p-4 font-bold text-slate-800 uppercase text-xs">{laudo.nomeEquipamento}</td>
-                      <td className="p-4 text-xs font-medium text-slate-500">
-                        <span className="capitalize font-bold">{laudo.unidade}</span> <br />
-                        <span className="uppercase text-[10px] opacity-70">{laudo.setor}</span>
-                      </td>
-                      <td className="p-4 text-xs italic text-slate-600 max-w-xs truncate">
-                        {laudo.diagnosticoDefeito}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="bg-amber-100 text-amber-800 font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-amber-200">
-                          {laudo.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            disabled={processandoAcao !== null}
-                            onClick={() => handleAprovarLaudo(laudo.id, laudo.equipamentoId)}
-                            className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-100 flex items-center gap-1 disabled:opacity-50"
-                            title="Aprovar e Dar Baixa"
-                          >
-                            <CheckCircle size={14} />
-                            <span className="hidden lg:inline">Aprovar</span>
-                          </button>
+                  {laudosPendentes.map((laudo) => {
+                    const idLaudo = laudo.id || laudo._id;
+                    const idAtivo = laudo.equipamentoId || laudo.ativoId || laudo.idAtivo;
 
-                          <button
-                            disabled={processandoAcao !== null}
-                            onClick={() => handleCancelarLaudo(laudo.id, laudo.equipamentoId)}
-                            className="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-rose-100 flex items-center gap-1 disabled:opacity-50"
-                            title="Cancelar Laudo"
-                          >
-                            <XCircle size={14} />
-                            <span className="hidden lg:inline">Cancelar</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                    return (
+                      <tr key={idLaudo} className="hover:bg-amber-50/20 transition-colors">
+                        <td className="p-4 font-mono font-bold text-slate-700 uppercase">#{laudo.patrimonio || "S/P"}</td>
+                        <td className="p-4 font-bold text-slate-800 uppercase text-xs">{laudo.nomeEquipamento}</td>
+                        <td className="p-4 text-xs font-medium text-slate-500">
+                          <span className="capitalize font-bold">{laudo.unidade}</span> <br />
+                          <span className="uppercase text-[10px] opacity-70">{laudo.setor}</span>
+                        </td>
+                        <td className="p-4 text-xs italic text-slate-600 max-w-xs truncate">
+                          {laudo.diagnosticoDefeito}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="bg-amber-100 text-amber-800 font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-amber-200">
+                            {laudo.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              disabled={processandoAcao !== null}
+                              onClick={() => handleAprovarLaudo(idLaudo, idAtivo, laudo)}
+                              className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-100 flex items-center gap-1 disabled:opacity-50"
+                              title="Aprovar e Dar Baixa"
+                            >
+                              <CheckCircle size={14} />
+                              <span className="hidden lg:inline">Aprovar</span>
+                            </button>
+
+                            <button
+                              disabled={processandoAcao !== null}
+                              onClick={() => handleCancelarLaudo(idLaudo, idAtivo, laudo)}
+                              className="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-rose-100 flex items-center gap-1 disabled:opacity-50"
+                              title="Cancelar Laudo"
+                            >
+                              <XCircle size={14} />
+                              <span className="hidden lg:inline">Cancelar</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
