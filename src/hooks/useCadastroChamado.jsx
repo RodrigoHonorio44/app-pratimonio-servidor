@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { auth } from "../services/firebase";
+import { auth, db } from "../services/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import api from "../services/api";
 import { toast } from "react-hot-toast";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
@@ -62,7 +63,7 @@ export const useCadastroChamado = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const ativos = resposta.data;
+      const ativos = Array.isArray(resposta.data) ? resposta.data : [];
       
       const ativoEncontrado = ativos.find(a => 
         String(a.patrimonio || "").toLowerCase() === tagOriginal.toLowerCase() ||
@@ -89,7 +90,7 @@ export const useCadastroChamado = () => {
 
   const handleNovoChamado = async (e) => {
     e.preventDefault();
-    if (!unidade || !equipe) return;
+    if (!unidade || !equipe) return toast.error("Selecione a unidade e a equipe.");
     setLoading(true);
 
     const novaOs = `${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -100,25 +101,32 @@ export const useCadastroChamado = () => {
 
       const token = await currentUser.getIdToken();
       const uidExibicao = currentUser.uid;
-      let nomeParaSalvar = currentUser.email.split("@")[0].toLowerCase();
 
+      // Default inicial com fallback para o e-mail ou displayName
+      let nomeParaSalvar = currentUser.displayName || currentUser.email?.split("@")[0] || "Usuário";
+
+      // 1ª Tentativa: Busca o nome do usuário pela API REST
       try {
         const userRes = await api.get(`/usuarios/${uidExibicao}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (userRes.status === 200) {
-          const userData = userRes.data;
-          if (userData && userData.nome) {
-            const partesNome = userData.nome.trim().split(/\s+/);
-            nomeParaSalvar = partesNome.length > 1 
-              ? `${partesNome[0]} ${partesNome[partesNome.length - 1]}`.toLowerCase() 
-              : partesNome[0].toLowerCase();
-          }
+        
+        if (userRes.data && userRes.data.nome) {
+          nomeParaSalvar = userRes.data.nome.trim();
         }
       } catch (err) {
-        console.warn("Não foi possível buscar dados complementares do usuário, usando email.", err);
+        // 2ª Tentativa: Fallback direto no Firestore se a API falhar
+        try {
+          const userDocSnap = await getDoc(doc(db, "usuarios", uidExibicao));
+          if (userDocSnap.exists() && userDocSnap.data().nome) {
+            nomeParaSalvar = userDocSnap.data().nome.trim();
+          }
+        } catch (fsErr) {
+          console.warn("Não foi possível buscar nome do usuário no Firestore.", fsErr);
+        }
       }
 
+      // Envio da abertura da OS
       await api.post("/chamados", {
         equipe: equipe.toLowerCase(),
         equipamento: equipamento.toLowerCase(),
@@ -129,7 +137,11 @@ export const useCadastroChamado = () => {
         prioridade: prioridade.toLowerCase(),
         criadoEm: new Date().toISOString(),
         emailSolicitante: currentUser.email.toLowerCase(),
+        
+        // ✅ Preenche tanto 'solicitante' quanto 'nome' preservando o nome real do usuário
+        solicitante: nomeParaSalvar, 
         nome: nomeParaSalvar,
+        
         numeroOs: novaOs,
         status: "aberto",
         userId: uidExibicao,

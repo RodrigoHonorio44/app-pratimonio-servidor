@@ -7,6 +7,24 @@ import { toast } from "react-toastify";
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbyGgcYmM7oXjpx0li898F2RCy5M4a6os5Ti9s9t5J6h9BbgO0W8PpOfrQ3TxqIOCNNVpg/exec";
 
+// ✅ Helper para formatar e-mails e strings para exibição legível
+export const obterNomeExibicao = (valor) => {
+  if (!valor || typeof valor !== "string") return "";
+
+  const textoLimpo = valor.trim();
+  if (!textoLimpo) return "";
+
+  if (textoLimpo.includes("@")) {
+    const prefixo = textoLimpo.split("@")[0];
+    return prefixo.replace(/[._-]/g, " ").toUpperCase();
+  }
+
+  return textoLimpo
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
 export const usePainelAnalista = () => {
   const [chamados, setChamados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,13 +58,16 @@ export const usePainelAnalista = () => {
     []
   );
 
+  // ✅ Obtém o nome formatado do analista logado
   const analistaNome = useMemo(() => {
-    return (
-      userData?.nome ||
-      user?.displayName ||
-      user?.email?.split("@")[0] ||
-      "analista"
-    );
+    if (userData?.nome) {
+      const partes = userData.nome.trim().split(/\s+/);
+      const nomeCurto = partes.length > 1 ? `${partes[0]} ${partes[partes.length - 1]}` : partes[0];
+      return obterNomeExibicao(nomeCurto);
+    }
+    if (user?.displayName) return obterNomeExibicao(user.displayName);
+    if (user?.email) return obterNomeExibicao(user.email.split("@")[0]);
+    return "Analista";
   }, [userData, user]);
 
   const formatarDataHora = (timestamp) => {
@@ -163,7 +184,7 @@ export const usePainelAnalista = () => {
     fetchUserData();
   }, [user]);
 
-  // Carrega os chamados via API do servidor
+  // Carrega os chamados via API e formata exibição de nomes
   useEffect(() => {
     if (!user) return;
     const carregarChamados = async () => {
@@ -176,7 +197,21 @@ export const usePainelAnalista = () => {
           throw new Error("A API retornou HTML em vez de JSON.");
         }
 
-        setChamados(Array.isArray(dadosBrutos) ? dadosBrutos : (dadosBrutos?.chamados || []));
+        const listaBruta = Array.isArray(dadosBrutos) ? dadosBrutos : (dadosBrutos?.chamados || []);
+
+        // Mapeia e formata os nomes dos solicitantes e técnicos
+        const listaTratada = listaBruta.map((item) => {
+          const nomeSolicitanteBruto = item.solicitante || item.nome || item.emailSolicitante || "Não informado";
+          const nomeTecnicoBruto = item.tecnicoResponsavel || item.tecnico;
+
+          return {
+            ...item,
+            solicitanteExibicao: obterNomeExibicao(nomeSolicitanteBruto),
+            tecnicoExibicao: nomeTecnicoBruto ? obterNomeExibicao(nomeTecnicoBruto) : "Aguardando Atendimento",
+          };
+        });
+
+        setChamados(listaTratada);
       } catch (error) {
         console.error("Erro ao carregar chamados:", error);
         toast.error("Erro ao carregar chamados do servidor.");
@@ -201,18 +236,26 @@ export const usePainelAnalista = () => {
     try {
       const dadosAtualizacao = {
         status: "em atendimento",
-        tecnicoResponsavel: analistaNome.toLowerCase(),
+        tecnicoResponsavel: analistaNome, // Salva o nome tratado do analista
         tecnicoId: user.uid,
         iniciadoEm: new Date().toISOString(),
         logSeguranca: jaTemTecnico
-          ? `override realizado por admin: ${analistaNome.toLowerCase()}`
+          ? `override realizado por admin: ${analistaNome}`
           : null,
       };
 
       await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
       setChamados((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => 
+          (c.id === chamadoId || c._id === chamadoId) 
+            ? { 
+                ...c, 
+                ...dadosAtualizacao, 
+                tecnicoExibicao: analistaNome 
+              } 
+            : c
+        )
       );
 
       toast.info(
@@ -242,7 +285,15 @@ export const usePainelAnalista = () => {
       await api.put(`/chamados/${chamadoId}`, dadosAtualizacao);
 
       setChamados((prev) =>
-        (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...dadosAtualizacao } : c))
+        (Array.isArray(prev) ? prev : []).map((c) => 
+          (c.id === chamadoId || c._id === chamadoId) 
+            ? { 
+                ...c, 
+                ...dadosAtualizacao, 
+                tecnicoExibicao: "Aguardando Atendimento" 
+              } 
+            : c
+        )
       );
 
       toast.warning("chamado devolvido para a fila.");
@@ -274,11 +325,7 @@ export const usePainelAnalista = () => {
         (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
-      setMostrarModal(false);
-      setTipoModal("");
-      setParecerTecnico("");
-      setPatrimonio("");
-      setEquipamento("");
+      fecharModalUnificado();
       toast.success("os finalizada com sucesso!");
     } catch (err) {
       toast.error("erro ao finalizar.");
@@ -304,10 +351,7 @@ export const usePainelAnalista = () => {
         (Array.isArray(prev) ? prev : []).map((c) => ((c.id === chamadoId || c._id === chamadoId) ? { ...c, ...novosDados } : c))
       );
 
-      setMostrarModal(false);
-      setTipoModal("");
-      setMotivoPausa("");
-      setDetalhePausa("");
+      fecharModalUnificado();
       toast.warning("sla pausado.");
     } catch (err) {
       toast.error("erro ao pausar.");
@@ -353,7 +397,8 @@ export const usePainelAnalista = () => {
             Descricao: item.problema || item.descricao || "sem descrição",
             Parecer_Tecnico: item.feedbackAnalista || "sem parecer",
             Equipe: item.equipe || "",
-            Finalizado_Por: item.tecnicoResponsavel || analistaNome,
+            Finalizado_Por: item.tecnicoExibicao !== "Aguardando Atendimento" ? item.tecnicoExibicao : analistaNome,
+            Solicitante: item.solicitanteExibicao,
             Data: formatarDataHora(item.criatedAt || item.criadoEm || item.createdAt || item.data),
             Finalizado_Em: formatarDataHora(item.finalizadoEm),
           },
@@ -398,7 +443,6 @@ export const usePainelAnalista = () => {
     const listaSegura = Array.isArray(chamados) ? chamados : [];
     const busca = termoBusca.toLowerCase().trim();
     
-    // Regras de permissão flexibilizadas para evitar ocultar chamados por divergência de string
     const roleUser = (userData?.role || userData?.cargo || "").toLowerCase();
     const isAdminOuRoot = ["root", "admin", "administrador"].includes(roleUser) || !userData;
     const equipeUsuario = userData?.equipe?.toLowerCase().trim();
@@ -413,7 +457,8 @@ export const usePainelAnalista = () => {
 
       const matchesBusca =
         c.numeroOs?.toString().includes(busca) ||
-        c.nome?.toLowerCase().includes(busca) ||
+        c.solicitanteExibicao?.toLowerCase().includes(busca) ||
+        c.tecnicoExibicao?.toLowerCase().includes(busca) ||
         c.unidade?.toLowerCase().includes(busca) ||
         c.patrimonio?.toLowerCase().includes(busca) ||
         c.equipamento?.toLowerCase().includes(busca) ||
@@ -484,6 +529,7 @@ export const usePainelAnalista = () => {
     enviandoPlanilha,
     isRemaneja,
     analistaNome,
+    obterNomeExibicao,
     formatarDataHora,
     executarBusca,
     limparBusca,

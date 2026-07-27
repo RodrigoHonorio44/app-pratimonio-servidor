@@ -23,7 +23,7 @@ import {
   FiAlertCircle,
   FiLock,
   FiUser,
-  FiClock, 
+  FiClock,
 } from "react-icons/fi";
 
 const PainelAnalista = () => {
@@ -158,32 +158,32 @@ const PainelAnalista = () => {
         </div>
 
         <div className="no-print bg-white rounded-4xl shadow-xl border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[1000px] text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     OS / Entrada
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Detalhes
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Equipamento
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Equipe
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Prioridade
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     SLA
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Técnico / Status
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-3 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Ações
                   </th>
                 </tr>
@@ -237,19 +237,19 @@ const PainelAnalista = () => {
                           rem ? "bg-orange-50/30" : ""
                         } hover:bg-slate-50 transition-colors`}
                       >
-                        <td className="p-5">
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <span
-                            className={`font-black text-lg ${
+                            className={`font-black text-base ${
                               rem ? "text-orange-600" : "text-blue-600"
                             }`}
                           >
                             #{item.numeroOs || item.id}
                           </span>
-                          <span className="text-xs text-slate-400 block">
+                          <span className="text-[11px] text-slate-400 block">
                             {renderizarDataSegura(item)}
                           </span>
                         </td>
-                        <td className="p-5">
+                        <td className="px-3 py-4">
                           <div className="font-bold text-slate-700 uppercase text-xs">
                             {item.nome}
                           </div>
@@ -264,38 +264,38 @@ const PainelAnalista = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="p-5 text-center">
-                          <span className="text-xs font-extrabold uppercase text-slate-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 tracking-wide max-w-[180px] inline-block truncate">
+                        <td className="px-3 py-4 text-center">
+                          <span className="text-xs font-extrabold uppercase text-slate-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 tracking-wide max-w-[160px] inline-block truncate">
                             {item.equipamento || "Não Informado"}
                           </span>
                         </td>
-                        <td className="p-5 text-center">
-                          <span className="text-xs font-bold uppercase text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                        <td className="px-3 py-4 text-center">
+                          <span className="text-xs font-bold uppercase text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
                             {item.equipe || "Não Definida"}
                           </span>
                         </td>
-                        <td className="p-5 text-center">
+                        <td className="px-3 py-4 text-center whitespace-nowrap">
                           <div
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-[10px] uppercase transition-all ${estiloPrio}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] uppercase transition-all ${estiloPrio}`}
                           >
                             <FiAlertCircle size={12} /> {prio}
                           </div>
                         </td>
                         
                         {/* COLUNA DO SLA CONTROLADA POR STATUS */}
-                        <td className="p-5 text-center">
+                        <td className="px-3 py-4 text-center whitespace-nowrap">
                           {status === "pendente" ? (
-                            <div className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg border border-amber-200 text-[10px] font-black uppercase animate-pulse">
+                            <div className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-lg border border-amber-200 text-[10px] font-black uppercase animate-pulse">
                               <FiPauseCircle size={12} className="text-amber-500" />
                               <span>Pausado</span>
                             </div>
                           ) : status === "fechado" || status === "arquivado" ? (
-                            <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-400 px-2.5 py-1 rounded-lg border border-slate-200 text-[10px] font-bold uppercase">
+                            <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-400 px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold uppercase">
                               <FiCheck size={12} />
                               <span>Finalizado</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 text-[10px] font-bold uppercase">
+                            <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold uppercase">
                               <FiClock size={12} className="text-blue-500" />
                               <span>
                                 {item.sla || item.prazo || item.tempoRestante || item.slaHoras || (() => {
@@ -309,7 +309,7 @@ const PainelAnalista = () => {
                           )}
                         </td>
 
-                        <td className="p-5 text-center">
+                        <td className="px-3 py-4 text-center whitespace-nowrap">
                           <div className="flex flex-col items-center gap-1">
                             {item.tecnicoResponsavel && (
                               <div
@@ -322,7 +322,7 @@ const PainelAnalista = () => {
                               </div>
                             )}
                             <span
-                              className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${
+                              className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
                                 statusStyles[status] || ""
                               }`}
                             >
@@ -330,14 +330,14 @@ const PainelAnalista = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="p-5">
-                          <div className="flex gap-2 justify-center items-center">
+                        <td className="px-3 py-4 whitespace-nowrap shrink-0">
+                          <div className="flex gap-1.5 justify-center items-center">
                             <button
                               onClick={() => abrirModalUnificado("visualizar", item)}
-                              className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:text-blue-600 transition-colors"
+                              className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:text-blue-600 transition-colors"
                               title="Ver Detalhes"
                             >
-                              <FiEye size={18} />
+                              <FiEye size={16} />
                             </button>
 
                             <button
@@ -345,19 +345,19 @@ const PainelAnalista = () => {
                                 setChamadoSelecionado(item);
                                 setTimeout(() => window.print(), 100);
                               }}
-                              className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:text-orange-600 transition-colors"
+                              className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:text-orange-600 transition-colors"
                               title="Imprimir OS"
                             >
-                              <FiPrinter size={18} />
+                              <FiPrinter size={16} />
                             </button>
 
                             {estaBloqueado ? (
                               <div
-                                className="flex items-center gap-2 bg-slate-100 text-slate-400 px-4 py-2 rounded-xl cursor-not-allowed border border-slate-200"
+                                className="flex items-center gap-1 bg-slate-100 text-slate-400 px-3 py-1.5 rounded-xl cursor-not-allowed border border-slate-200"
                                 title={`Bloqueado: ${item.tecnicoResponsavel} está atendendo.`}
                               >
-                                <FiLock size={14} />
-                                <span className="text-[10px] font-black uppercase">
+                                <FiLock size={12} />
+                                <span className="text-[9px] font-black uppercase">
                                   Ocupado
                                 </span>
                               </div>
@@ -366,7 +366,7 @@ const PainelAnalista = () => {
                                 {status === "aberto" && (
                                   <button
                                     onClick={() => handleAssumirChamado(item)}
-                                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase text-white shadow-md transition-transform active:scale-95 ${
+                                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase text-white shadow-md transition-transform active:scale-95 ${
                                       rem ? "bg-orange-500" : "bg-blue-600"
                                     }`}
                                   >
@@ -377,7 +377,7 @@ const PainelAnalista = () => {
                                 {isOcupado && isAdminOuRoot && (
                                   <button
                                     onClick={() => handleAssumirChamado(item)}
-                                    className="px-5 py-2 rounded-xl text-[10px] font-black uppercase text-white bg-red-600 shadow-md hover:bg-red-700 transition-all"
+                                    className="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase text-white bg-red-600 shadow-md hover:bg-red-700 transition-all"
                                   >
                                     Assumir
                                   </button>
@@ -386,9 +386,9 @@ const PainelAnalista = () => {
                                 {status === "pendente" && isDono && (
                                   <button
                                     onClick={() => handleRetomarChamado(item)}
-                                    className="bg-amber-500 text-white p-2.5 rounded-xl hover:bg-amber-600 shadow-md"
+                                    className="bg-amber-500 text-white p-2 rounded-xl hover:bg-amber-600 shadow-md"
                                   >
-                                    <FiPlayCircle size={20} />
+                                    <FiPlayCircle size={18} />
                                   </button>
                                 )}
 
@@ -396,17 +396,17 @@ const PainelAnalista = () => {
                                   <div className="flex gap-1">
                                     <button
                                       onClick={() => abrirModalUnificado("finalizar", item)}
-                                      className="bg-emerald-500 text-white p-2.5 rounded-xl hover:bg-emerald-600 shadow-md"
+                                      className="bg-emerald-500 text-white p-2 rounded-xl hover:bg-emerald-600 shadow-md"
                                       title="Finalizar OS"
                                     >
-                                      <FiCheck size={18} />
+                                      <FiCheck size={16} />
                                     </button>
                                     <button
                                       onClick={() => abrirModalUnificado("pausar", item)}
-                                      className="bg-amber-500 text-white p-2.5 rounded-xl hover:bg-amber-600 shadow-md"
+                                      className="bg-amber-500 text-white p-2 rounded-xl hover:bg-amber-600 shadow-md"
                                       title="Pausar Atendimento"
                                     >
-                                      <FiPauseCircle size={18} />
+                                      <FiPauseCircle size={16} />
                                     </button>
                                   </div>
                                 )}
@@ -419,10 +419,10 @@ const PainelAnalista = () => {
                                   status === "pendente"))) && (
                               <button
                                 onClick={() => handleDevolverChamado(item)}
-                                className="p-2.5 bg-slate-200 text-slate-500 rounded-xl hover:bg-orange-500 hover:text-white transition-colors"
+                                className="p-2 bg-slate-200 text-slate-500 rounded-xl hover:bg-orange-500 hover:text-white transition-colors"
                                 title="Devolver para fila"
                               >
-                                <FiRotateCcw size={18} />
+                                <FiRotateCcw size={16} />
                               </button>
                             )}
 
@@ -430,7 +430,7 @@ const PainelAnalista = () => {
                               <button
                                 onClick={() => handleEnviarParaPlanilha(item)}
                                 disabled={enviandoPlanilha === item.id}
-                                className={`p-2.5 text-white rounded-xl shadow-lg transition-all ${
+                                className={`p-2 text-white rounded-xl shadow-lg transition-all ${
                                   enviandoPlanilha === item.id
                                     ? "bg-slate-400 cursor-not-allowed"
                                     : "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
@@ -438,9 +438,9 @@ const PainelAnalista = () => {
                                 title="Arquivar OS"
                               >
                                 {enviandoPlanilha === item.id ? (
-                                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 ) : (
-                                  <FiDownload size={20} />
+                                  <FiDownload size={18} />
                                 )}
                               </button>
                             )}
