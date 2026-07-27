@@ -27,18 +27,37 @@ export function useHistoricoVistoria() {
       const response = await api.get("/vistorias");
 
       if (Array.isArray(response.data)) {
-        // Garantir que todo registro tenha um 'id' mapeado (seja _id do Mongo ou id)
-        const formatadas = response.data.map((item) => ({
-          ...item,
-          id: item.id || item._id,
-        }));
+        // Trata e padroniza os campos para evitar problemas no componente de tela
+        const formatadas = response.data.map((item) => {
+          const unidadeNome = typeof item.unidade === "object" ? item.unidade?.nome : item.unidade;
+          const setorNome = typeof item.setor === "object" ? item.setor?.nome : item.setor;
+          const listaItens = item.itensAvaliados || item.itens || [];
+
+          return {
+            ...item,
+            id: item.id || item._id,
+            unidade: unidadeNome || "Unidade Não Informada",
+            setor: setorNome || "Setor Não Informado",
+            dataHora: item.dataHoraInicio || item.dataHora,
+            itensAvaliados: listaItens.map((it) => ({
+              ...it,
+              equipamento: it.equipamento || it.descricao || it.nome,
+              estadoConservacao: it.estadoConservacao || it.estado || "bom",
+              foto: it.foto || it.fotoUrl || null,
+            })),
+          };
+        });
+
+        // Ordena por data mais recente primeiro
+        formatadas.sort((a, b) => new Date(b.dataHora || 0) - new Date(a.dataHora || 0));
+
         setVistorias(formatadas);
       } else {
         setVistorias([]);
       }
     } catch (error) {
       console.error("Erro ao carregar histórico de vistorias:", error);
-      // Fallback/Mock temporário caso a API não retorne nada ou ocorra falha na conexão
+      // Fallback/Mock temporário para demonstração e testes locais
       setVistorias([
         {
           id: "vist_01",
@@ -46,12 +65,20 @@ export function useHistoricoVistoria() {
           setor: "UPG",
           dataHora: "2026-06-10T14:30:00",
           responsavel: "Rodrigo Honório",
-          itens: [
+          itensAvaliados: [
             {
               patrimonio: "PAT-00124",
-              descricao: "Mesa de escritório em MDF",
-              estado: "Ruim",
+              equipamento: "Mesa de escritório em MDF",
+              estadoConservacao: "ocioso",
               observacao: "Tampo riscado e pés frouxos",
+              foto: "https://via.placeholder.com/300?text=Foto+Avaria+1",
+            },
+            {
+              patrimonio: "PAT-00125",
+              equipamento: "Monitor 24 polegadas",
+              estadoConservacao: "bom",
+              observacao: "Funcionando perfeitamente",
+              foto: null,
             },
           ],
         },
@@ -61,12 +88,13 @@ export function useHistoricoVistoria() {
           setor: "Pediatria",
           dataHora: "2026-06-12T09:15:00",
           responsavel: "Rodrigo Honório",
-          itens: [
+          itensAvaliados: [
             {
               patrimonio: "PAT-00892",
-              descricao: "Cadeira giratória longarina",
-              estado: "Ruim",
-              observacao: "Braço quebrável e sem regulagem de altura",
+              equipamento: "Cadeira giratória longarina",
+              estadoConservacao: "irrecuperavel",
+              observacao: "Braço quebrado e sem regulagem de altura",
+              foto: "https://via.placeholder.com/300?text=Foto+Avaria+2",
             },
           ],
         },
@@ -79,8 +107,8 @@ export function useHistoricoVistoria() {
   // Filtragem avançada das vistorias
   const vistoriasFiltradas = useMemo(() => {
     return vistorias.filter((v) => {
-      const unidadeStr = typeof v.unidade === "string" ? v.unidade : v.unidade?.nome || "";
-      const setorStr = typeof v.setor === "string" ? v.setor : v.setor?.nome || "";
+      const unidadeStr = String(v.unidade || "");
+      const setorStr = String(v.setor || "");
 
       const matchUnidade = filtroUnidade
         ? unidadeStr.toLowerCase().includes(filtroUnidade.toLowerCase())
@@ -133,6 +161,6 @@ export function useHistoricoVistoria() {
     vistoriaAtiva,
     setVistoriaAtiva,
     gerarRelatorioImpressao,
-    recarregarVistorias: carregarVistorias, // Exposto caso precise recarregar manualmente
+    recarregarVistorias: carregarVistorias,
   };
 }

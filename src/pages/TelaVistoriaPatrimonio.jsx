@@ -4,7 +4,7 @@ import {
   Search, Plus, Trash2, Printer, Check, PackagePlus, Clock, RotateCcw, Camera, Image as ImageIcon
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import imageCompression from "browser-image-compression"; // Importação para compressão
+import imageCompression from "browser-image-compression";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
@@ -23,8 +23,8 @@ const TelaVistoriaPatrimonio = () => {
   const {
     unidadeSelecionada,
     setUnidadeSelecionada,
-    setorSelecionado,
     setSetorSelecionado,
+    setorSelecionado,
     ativosDoSetor = [],
     loadingAtivos,
     loading,
@@ -40,7 +40,7 @@ const TelaVistoriaPatrimonio = () => {
   const [itemEmEdicao, setItemEmEdicao] = useState(null);
   const [estadoModal, setEstadoModal] = useState("bom");
   const [obsModal, setObsModal] = useState("");
-  const [fotoModal, setFotoModal] = useState(null); // Estado para guardar a foto compactada
+  const [fotoModal, setFotoModal] = useState(null); // Estado para guardar a foto compactada em Base64
   const [compactandoFoto, setCompactandoFoto] = useState(false);
 
   // Cadastro de item manual
@@ -61,7 +61,7 @@ const TelaVistoriaPatrimonio = () => {
     setFotoModal(null);
   };
 
-  // Funcao para compactar a imagem no navegador
+  // Função para compactar a imagem no navegador antes do envio
   const handleCapturarFoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -77,7 +77,6 @@ const TelaVistoriaPatrimonio = () => {
     try {
       const arquivoCompactado = await imageCompression(file, opcoesCompressao);
       
-      // Converter para Base64 leve para incluir diretamente no JSON salvo em 'vistorias'
       const reader = new FileReader();
       reader.readAsDataURL(arquivoCompactado);
       reader.onloadend = () => {
@@ -434,24 +433,6 @@ const TelaVistoriaPatrimonio = () => {
                   </div>
                 </div>
 
-                {/* UPLOAD DE FOTO DURANTE A AVALIAÇÃO DO ITEM */}
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Foto da Avaria (Opcional)</label>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
-                      <Camera size={16} className="text-blue-600" />
-                      <span>{compactandoFoto ? "Processando..." : "Anexar Foto"}</span>
-                      <input type="file" accept="image/*" capture="environment" onChange={handleCapturarFoto} className="hidden" />
-                    </label>
-                    {fotoModal && (
-                      <div className="relative">
-                        <img src={fotoModal} alt="Preview Avaria" className="w-10 h-10 object-cover rounded-lg border border-slate-300" />
-                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px]">✕</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 <textarea
                   rows={2}
                   placeholder="Observações técnicas ou motivo do estado..."
@@ -460,11 +441,29 @@ const TelaVistoriaPatrimonio = () => {
                   onChange={(e) => setObsModal(e.target.value)}
                 />
 
+                {/* UPLOAD DE FOTO DURANTE A AVALIAÇÃO DO ITEM */}
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Foto da Avaria / Item (Opcional)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
+                      <Camera size={16} className="text-blue-600" />
+                      <span>{compactandoFoto ? "Processando Foto..." : "Tirar / Escolher Foto"}</span>
+                      <input type="file" accept="image/*" capture="environment" onChange={handleCapturarFoto} className="hidden" />
+                    </label>
+                    {fotoModal && (
+                      <div className="relative group">
+                        <img src={fotoModal} alt="Preview Avaria" className="w-10 h-10 object-cover rounded-lg border border-slate-300" />
+                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px]">✕</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   disabled={compactandoFoto}
                   onClick={handleAdicionarAoLote}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
                 >
                   <CheckCircle2 size={16} /> Confirmar Avaliação do Item
                 </button>
@@ -514,7 +513,7 @@ const TelaVistoriaPatrimonio = () => {
               )}
             </div>
 
-            {/* SALVA DIRETAMENTE NA SUA COLEÇÃO DE VISTORIAS JÁ EXISTENTE */}
+            {/* BOTAO PARA SALVAR NA COLEÇÃO DE VISTORIAS */}
             <button
               type="button"
               disabled={loading || itensAvaliados.length === 0 || !unidadeSelecionada || !setorSelecionado}

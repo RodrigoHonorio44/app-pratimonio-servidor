@@ -21,7 +21,7 @@ export const useTelaVistoriaPatrimonio = () => {
       .trim();
   };
 
-  // Funcao para resetar/limpar as selecoes de pesquisa
+  // Função para resetar/limpar as seleções de pesquisa
   const limparFiltros = () => {
     setUnidadeSelecionada("");
     setSetorSelecionado("");
@@ -53,7 +53,7 @@ export const useTelaVistoriaPatrimonio = () => {
           ? dadosBrutos
           : dadosBrutos?.ativos || dadosBrutos?.dados || [];
 
-        // Filtra os ativos em memoria combinando Unidade e Setor selecionados
+        // Filtra os ativos em memória combinando Unidade e Setor selecionados
         const filtrados = todosOsDados.filter((item) => {
           const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
           const unidadeSelNorm = normalizarParaComparacao(unidadeSelecionada);
@@ -107,6 +107,7 @@ export const useTelaVistoriaPatrimonio = () => {
           equipamento: item.equipamento || item.nome,
           estadoConservacao: item.estado,
           observacao: item.observacao || "",
+          foto: item.foto || null,
           avaliadoEm: item.dataHora,
         })),
         createdAt: new Date().toISOString(),

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   History,
   Calendar,
@@ -9,9 +9,21 @@ import {
   Square,
   AlertTriangle,
   ArrowLeft,
+  Image as ImageIcon,
+  CheckCircle2,
+  RefreshCw,
+  XCircle,
+  Maximize2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useHistoricoVistoria } from "../hooks/useHistoricoVistoria";
+
+const OPCOES_ESTADO = {
+  bom: { label: "Bom", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  ocioso: { label: "Ocioso", color: "text-amber-700 bg-amber-50 border-amber-200" },
+  recuperavel: { label: "Recuperável", color: "text-blue-700 bg-blue-50 border-blue-200" },
+  irrecuperavel: { label: "Irrecuperável", color: "text-rose-700 bg-rose-50 border-rose-200" },
+};
 
 export default function HistoricoVistoria() {
   const navigate = useNavigate();
@@ -33,6 +45,9 @@ export default function HistoricoVistoria() {
     setVistoriaAtiva,
     gerarRelatorioImpressao,
   } = useHistoricoVistoria();
+
+  // Estado para o zoom da imagem (lightbox)
+  const [fotoExpandida, setFotoExpandida] = useState(null);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans antialiased text-slate-900">
@@ -161,7 +176,11 @@ export default function HistoricoVistoria() {
             <div className="divide-y divide-slate-100">
               {vistoriasFiltradas.map((v) => {
                 const isSelected = selecionadas.includes(v.id);
-                const dataFormatada = v.dataHora ? new Date(v.dataHora).toLocaleString("pt-BR") : "Data não informada";
+                const dataFormatada = v.dataHoraInicio || v.dataHora 
+                  ? new Date(v.dataHoraInicio || v.dataHora).toLocaleString("pt-BR") 
+                  : "Data não informada";
+
+                const listaItens = v.itensAvaliados || v.itens || [];
 
                 return (
                   <div
@@ -190,16 +209,19 @@ export default function HistoricoVistoria() {
                         <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
                           <Calendar size={14} className="text-slate-400" />
                           {dataFormatada}
-                          <span className="text-xs font-medium text-slate-400 ml-2">({v.responsavel})</span>
+                          {v.responsavel && (
+                            <span className="text-xs font-medium text-slate-400 ml-2">({v.responsavel})</span>
+                          )}
                         </h3>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                      <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                        <AlertTriangle size={14} />
-                        {v.itens?.length || 0} item(ns) irregular(es)
+                      <span className="px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                        <CheckSquare size={14} className="text-blue-600" />
+                        {listaItens.length} item(ns) avaliado(s)
                       </span>
+
                       <button
                         onClick={() => setVistoriaAtiva(v)}
                         className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:border-blue-600 hover:text-blue-600 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm"
@@ -218,7 +240,7 @@ export default function HistoricoVistoria() {
       {/* MODAL DE DETALHES DA VISTORIA */}
       {vistoriaAtiva && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] max-w-2xl w-full p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] max-w-3xl w-full p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
@@ -228,7 +250,8 @@ export default function HistoricoVistoria() {
                   {vistoriaAtiva.unidade} - {vistoriaAtiva.setor}
                 </h2>
                 <p className="text-xs font-bold text-slate-400 mt-1">
-                  Realizado em: {new Date(vistoriaAtiva.dataHora).toLocaleString("pt-BR")} por {vistoriaAtiva.responsavel}
+                  Realizado em: {new Date(vistoriaAtiva.dataHoraInicio || vistoriaAtiva.dataHora).toLocaleString("pt-BR")} 
+                  {vistoriaAtiva.responsavel && ` por ${vistoriaAtiva.responsavel}`}
                 </p>
               </div>
               <button
@@ -241,39 +264,86 @@ export default function HistoricoVistoria() {
 
             <div className="space-y-4 mb-8">
               <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                Itens Identificados com Problema:
+                Itens Avaliados nesta Vistoria:
               </h4>
-              {vistoriaAtiva.itens?.map((item, index) => (
-                <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-blue-600 uppercase tracking-wider">
-                      Patrimônio: {item.patrimonio}
-                    </span>
-                    <span className="px-2.5 py-0.5 bg-rose-100 text-rose-700 rounded-md text-[10px] font-black uppercase">
-                      Estado: {item.estado}
-                    </span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-800">{item.descricao}</p>
-                  {item.observacao && (
-                    <p className="text-xs text-slate-500 italic bg-white p-2.5 rounded-xl border border-slate-100">
-                      Obs: {item.observacao}
-                    </p>
-                  )}
-                </div>
-              ))}
+
+              {((vistoriaAtiva.itensAvaliados || vistoriaAtiva.itens) || []).length === 0 ? (
+                <p className="text-slate-400 text-xs italic">Nenhum item registrado nesta vistoria.</p>
+              ) : (
+                ((vistoriaAtiva.itensAvaliados || vistoriaAtiva.itens) || []).map((item, index) => {
+                  const estadoChave = (item.estadoConservacao || item.estado || "bom").toLowerCase();
+                  const infoEstado = OPCOES_ESTADO[estadoChave] || { label: estadoChave, color: "bg-slate-100 text-slate-700 border-slate-200" };
+                  const fotoItem = item.foto || item.fotoUrl;
+
+                  return (
+                    <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        {fotoItem ? (
+                          <div className="relative group cursor-pointer flex-shrink-0" onClick={() => setFotoExpandida(fotoItem)}>
+                            <img
+                              src={fotoItem}
+                              alt="Foto da avaria"
+                              className="w-16 h-16 object-cover rounded-xl border border-slate-300 shadow-sm transition-transform group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/30 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <Maximize2 size={16} className="text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 bg-slate-200/60 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 flex-shrink-0">
+                            <ImageIcon size={20} />
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                              #{item.patrimonio || "S/P"}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase border ${infoEstado.color}`}>
+                              Estado: {infoEstado.label}
+                            </span>
+                          </div>
+                          <p className="text-sm font-extrabold text-slate-800 uppercase">
+                            {item.equipamento || item.descricao || item.nome || "Equipamento"}
+                          </p>
+                          {item.observacao && (
+                            <p className="text-xs text-slate-600 italic bg-white p-2 rounded-lg border border-slate-200/80">
+                              Obs: "{item.observacao}"
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  gerarRelatorioImpressao([vistoriaAtiva.id]);
-                }}
+                onClick={() => gerarRelatorioImpressao([vistoriaAtiva.id])}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
               >
                 <Printer size={16} />
                 Imprimir Relatório desta Vistoria
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LIGHTBOX PARA VISUALIZAR FOTO AMPLIADA */}
+      {fotoExpandida && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setFotoExpandida(null)}>
+          <div className="relative max-w-4xl max-h-[90vh] bg-transparent">
+            <button
+              onClick={() => setFotoExpandida(null)}
+              className="absolute -top-10 right-0 text-white font-bold text-sm bg-slate-800/80 hover:bg-slate-700 px-3 py-1 rounded-full cursor-pointer"
+            >
+              Fechar ✕
+            </button>
+            <img src={fotoExpandida} alt="Foto Expandida" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-slate-700" />
           </div>
         </div>
       )}
