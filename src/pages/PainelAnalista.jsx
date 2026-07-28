@@ -251,7 +251,7 @@ const PainelAnalista = () => {
                         </td>
                         <td className="px-3 py-4">
                           <div className="font-bold text-slate-700 uppercase text-xs">
-                            {item.nome}
+                            {item.solicitanteExibicao || item.nome}
                           </div>
                           <div className="text-[10px] font-black uppercase text-slate-400">
                             {item.unidade} |{" "}

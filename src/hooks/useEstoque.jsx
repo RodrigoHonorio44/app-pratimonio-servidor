@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { auth } from "../services/firebase";
-import api from "../services/api"; // Importa a instância centralizada do axios
+import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -65,7 +65,7 @@ export const useEstoque = () => {
       const resposta = await api.get("/estoque");
       const listaCompleta = Array.isArray(resposta.data) ? resposta.data : [];
       
-      // Filtra apenas os itens ativos no frontend ou mantém conforme regra
+      // Filtra estritamente apenas os ativos (igual ao código antigo do Firebase)
       const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase() === "ativo");
       setItensEstoque(lista);
     } catch (error) {
@@ -138,11 +138,15 @@ export const useEstoque = () => {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
 
-      // Processa cada item do lote enviando para a API backend usando a instância do axios
       for (const item of loteSaida) {
-        const qtdSolicitada = item.quantidadeMovimentada;
+        const qtdSolicitada = Number(item.quantidadeMovimentada);
+        const qtdAtual = Number(item.quantidade || 1);
 
-        // Cria o registro na coleção saidaEquipamento
+        if (qtdSolicitada > qtdAtual) {
+          throw new Error(`Estoque insuficiente para ${item.nome}!`);
+        }
+
+        // 1. Registra a saída do equipamento na API
         await api.post("/saidaEquipamento", {
           estoqueId: item.id,
           patrimonio: item.patrimonioMapeado,
@@ -157,7 +161,7 @@ export const useEstoque = () => {
           dataSaida: new Date().toISOString()
         });
 
-        // Se não for bem durável, cria também na coleção de ativos
+        // 2. Se não for bem durável, cria o registro nos ativos
         if (item.categoriaItem !== "Bem durável") {
           await api.post("/ativos", {
             nome: (item.nome || "").trim(),
@@ -173,6 +177,22 @@ export const useEstoque = () => {
             setor: dadosSaida.novoSetor.trim(),
             status: "Ativo",
             ultimaMovimentacao: new Date().toISOString()
+          });
+        }
+
+        // 3. Atualiza o estoque decrementando ou zerando (igualzinho à lógica antiga)
+        if (qtdSolicitada < qtdAtual) {
+          await api.put(`/estoque/${item.id}`, {
+            ...item,
+            quantidade: qtdAtual - qtdSolicitada,
+            ultimaMovimentacao: new Date().toISOString(),
+          });
+        } else {
+          await api.put(`/estoque/${item.id}`, {
+            ...item,
+            status: "movimentado", // Some da tela pois a listagem filtra por "ativo"
+            quantidade: 0,
+            ultimaMovimentacao: new Date().toISOString(),
           });
         }
       }
