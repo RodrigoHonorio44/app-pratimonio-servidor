@@ -31,7 +31,7 @@ const CadastroEquipamento = () => {
     nome: "",
     tipo: "Mobiliário",
     quantidade: 1,
-    setor: "Estoque Patrimônio", // Setor fixo e automático conforme solicitado
+    setor: "estoque patrimonio",
     unidade: "",
     estado: "Novo",
     observacoes: "",
@@ -98,12 +98,11 @@ const CadastroEquipamento = () => {
     try {
       const token = await auth.currentUser?.getIdToken();
 
-      // Utilizando o serviço centralizado 'api' (igual ao hook useInventario)
       const response = await api.post(
         "/estoque",
         {
           nome: formData.nome.toLowerCase().trim(),
-          setor: formData.setor.toLowerCase().trim(),
+          setor: "estoque patrimonio",
           observacoes: formData.observacoes.toLowerCase().trim(),
           patrimonio: formData.patrimonio.toUpperCase().trim(),
           unidade: formData.unidade,
@@ -128,7 +127,6 @@ const CadastroEquipamento = () => {
         autoClose: 3000,
       });
 
-      // Limpa os campos variáveis mantendo o setor fixo
       setFormData({ ...formData, patrimonio: "", nome: "", observacoes: "" });
     } catch (error) {
       console.error("Erro ao salvar no estoque:", error);
@@ -244,7 +242,7 @@ const CadastroEquipamento = () => {
               </label>
               <div className="bg-slate-100 border border-slate-200 p-3 rounded-xl flex items-center gap-2 text-slate-600 text-sm font-medium">
                 <FiMapPin className="text-blue-500" />
-                <span>Setor Fixo: <strong>Estoque Patrimônio</strong></span>
+                <span>Setor Fixo: <strong>estoque patrimonio</strong></span>
               </div>
             </div>
           </div>
