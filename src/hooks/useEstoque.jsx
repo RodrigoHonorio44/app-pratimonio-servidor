@@ -59,13 +59,24 @@ export const useEstoque = () => {
     { value: "Empréstimo Temporário", label: "Empréstimo Temporário" },
   ];
 
+  // Função auxiliar interna para obter os headers com o Bearer Token do Firebase
+  const obterHeadersAuth = async () => {
+    const currentUser = auth.currentUser;
+    const token = currentUser ? await currentUser.getIdToken() : "";
+    return {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  };
+
   const carregarEstoque = async () => {
     setLoading(true);
     try {
-      const resposta = await api.get("/estoque");
+      const config = await obterHeadersAuth();
+      const resposta = await api.get("/estoque", config);
       const listaCompleta = Array.isArray(resposta.data) ? resposta.data : [];
       
-      // Filtra apenas os itens ativos no frontend ou mantém conforme regra
       const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase() === "ativo");
       setItensEstoque(lista);
     } catch (error) {
@@ -138,7 +149,9 @@ export const useEstoque = () => {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
 
-      // Processa cada item do lote enviando para a API backend usando a instância do axios
+      const config = await obterHeadersAuth();
+
+      // Processa cada item do lote enviando para a API backend utilizando o token injetado
       for (const item of loteSaida) {
         const qtdSolicitada = item.quantidadeMovimentada;
 
@@ -155,7 +168,7 @@ export const useEstoque = () => {
           responsavelRecebimento: responsavelFinal,
           motivo: dadosSaida.motivo,
           dataSaida: new Date().toISOString()
-        });
+        }, config);
 
         // Se não for bem durável, cria também na coleção de ativos
         if (item.categoriaItem !== "Bem durável") {
@@ -173,7 +186,7 @@ export const useEstoque = () => {
             setor: dadosSaida.novoSetor.trim(),
             status: "Ativo",
             ultimaMovimentacao: new Date().toISOString()
-          });
+          }, config);
         }
       }
 
