@@ -80,7 +80,7 @@ export const useTelaVistoriaPatrimonio = () => {
   }, [unidadeSelecionada, setorSelecionado]);
 
   // 2. GRAVA A VISTORIA FINALIZADA VIA API AXIOS
-  const handleFinalizarVistoriaLote = async ({ unidade, setor, dataHora, itens }) => {
+  const handleFinalizarVistoriaLote = async ({ unidade, setor, dataHora, itens, onSuccess }) => {
     if (!unidade || !setor) {
       alert("Por favor, selecione a unidade e o setor.");
       return;
@@ -120,6 +120,10 @@ export const useTelaVistoriaPatrimonio = () => {
       });
 
       alert("Vistoria gravada com sucesso!");
+
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
 
       // Dispara a janela de impressão do relatório
       window.print();

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { 
   ArrowLeft, ClipboardCheck, CheckCircle2, AlertTriangle, RefreshCw, XCircle, 
-  Search, Plus, Trash2, Printer, Check, PackagePlus, Clock, RotateCcw, Camera, Image as ImageIcon
+  Search, Plus, Trash2, Printer, Check, PackagePlus, Clock, RotateCcw, Camera, Edit3
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
@@ -36,11 +36,15 @@ const TelaVistoriaPatrimonio = () => {
   const [busca, setBusca] = useState("");
   const [itensAvaliados, setItensAvaliados] = useState([]);
 
+  // Estado para permitir setor manual
+  const [setorManualMode, setSetorManualMode] = useState(false);
+  const [inputSetorManual, setInputSetorManual] = useState("");
+
   // Item selecionado para avaliação
   const [itemEmEdicao, setItemEmEdicao] = useState(null);
   const [estadoModal, setEstadoModal] = useState("bom");
   const [obsModal, setObsModal] = useState("");
-  const [fotoModal, setFotoModal] = useState(null); // Estado para guardar a foto compactada em Base64
+  const [fotoModal, setFotoModal] = useState(null);
   const [compactandoFoto, setCompactandoFoto] = useState(false);
 
   // Cadastro de item manual
@@ -59,9 +63,10 @@ const TelaVistoriaPatrimonio = () => {
     setItemEmEdicao(null);
     setModoManual(false);
     setFotoModal(null);
+    setSetorManualMode(false);
+    setInputSetorManual("");
   };
 
-  // Função para compactar a imagem no navegador antes do envio
   const handleCapturarFoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -69,8 +74,8 @@ const TelaVistoriaPatrimonio = () => {
     setCompactandoFoto(true);
 
     const opcoesCompressao = {
-      maxSizeMB: 0.15, // Reduz para no máximo ~150KB
-      maxWidthOrHeight: 1024, // Limita resolução máxima
+      maxSizeMB: 0.15,
+      maxWidthOrHeight: 1024,
       useWebWorker: true,
     };
 
@@ -115,7 +120,7 @@ const TelaVistoriaPatrimonio = () => {
       equipamento: itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "Equipamento",
       estado: estadoModal,
       observacao: obsModal.trim(),
-      foto: fotoModal, // Inclui a foto no item
+      foto: fotoModal,
       dataHora: new Date().toLocaleString("pt-BR")
     };
 
@@ -177,7 +182,7 @@ const TelaVistoriaPatrimonio = () => {
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 mb-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider">Filtros da Vistoria</span>
-            {(unidadeSelecionada || setorSelecionado || busca) && (
+            {(unidadeSelecionada || setorSelecionado || busca || inputSetorManual) && (
               <button
                 type="button"
                 onClick={handleLimparTudo}
@@ -197,6 +202,8 @@ const TelaVistoriaPatrimonio = () => {
                 onChange={(e) => { 
                   setUnidadeSelecionada(e.target.value); 
                   setSetorSelecionado(""); 
+                  setInputSetorManual("");
+                  setSetorManualMode(false);
                   setItensAvaliados([]);
                 }}
               >
@@ -206,24 +213,57 @@ const TelaVistoriaPatrimonio = () => {
             </div>
 
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">2. Setor Interno</label>
-              <select 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-                value={setorSelecionado} 
-                onChange={(e) => {
-                  setSetorSelecionado(e.target.value);
-                  setItensAvaliados([]);
-                }}
-                disabled={!unidadeSelecionada}
-              >
-                <option value="">Selecione o Setor...</option>
-                {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || []).map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Setor Interno</label>
+                {unidadeSelecionada && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetorManualMode(!setorManualMode);
+                      setSetorSelecionado("");
+                      setInputSetorManual("");
+                      setItensAvaliados([]);
+                    }}
+                    className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 size={12} />
+                    {setorManualMode ? "Selecionar da lista" : "Digitar setor manual"}
+                  </button>
+                )}
+              </div>
+
+              {setorManualMode ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Digite o nome do novo setor..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={inputSetorManual}
+                    onChange={(e) => {
+                      setInputSetorManual(e.target.value);
+                      setSetorSelecionado(e.target.value);
+                    }}
+                  />
+                </div>
+              ) : (
+                <select 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                  value={setorSelecionado} 
+                  onChange={(e) => {
+                    setSetorSelecionado(e.target.value);
+                    setItensAvaliados([]);
+                  }}
+                  disabled={!unidadeSelecionada}
+                >
+                  <option value="">Selecione o Setor...</option>
+                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || []).map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
             </div>
           </div>
         </div>
 
-        {/* LAYOUT PRINCIPAL */}
+        {/* RESTANTE DO LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* COLUNA ESQUERDA: LISTA DE ATIVOS DO BANCO */}
@@ -256,7 +296,7 @@ const TelaVistoriaPatrimonio = () => {
               )}
             </div>
 
-            {/* FORMULÁRIO DE ITEM MANUAL COM UPLOAD DE FOTO */}
+            {/* FORMULÁRIO DE ITEM MANUAL */}
             {modoManual && (
               <form onSubmit={handleAdicionarManual} className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-center">
@@ -298,7 +338,6 @@ const TelaVistoriaPatrimonio = () => {
                   </div>
                 </div>
 
-                {/* CAMPO DE UPLOAD DE FOTO DA AVARIA */}
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Anexar Foto da Avaria / Item (Opcional)</label>
                   <div className="flex items-center gap-3">
@@ -329,7 +368,7 @@ const TelaVistoriaPatrimonio = () => {
               </form>
             )}
 
-            {/* LISTA DOS ATIVOS OBTIDOS DE /api/ativos */}
+            {/* LISTA DOS ATIVOS */}
             {!setorSelecionado ? (
               <div className="p-8 text-center text-slate-400 text-sm font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
                 Selecione a Unidade e o Setor acima para carregar a lista de patrimônios.
@@ -401,7 +440,7 @@ const TelaVistoriaPatrimonio = () => {
               </span>
             </div>
 
-            {/* AVALIAÇÃO DO ITEM SELECIONADO DA LISTA */}
+            {/* AVALIAÇÃO DO ITEM SELECIONADO */}
             {itemEmEdicao && (
               <div className="p-4 bg-slate-50 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start">
@@ -441,7 +480,6 @@ const TelaVistoriaPatrimonio = () => {
                   onChange={(e) => setObsModal(e.target.value)}
                 />
 
-                {/* UPLOAD DE FOTO DURANTE A AVALIAÇÃO DO ITEM */}
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Foto da Avaria / Item (Opcional)</label>
                   <div className="flex items-center gap-3">
@@ -470,7 +508,7 @@ const TelaVistoriaPatrimonio = () => {
               </div>
             )}
 
-            {/* LISTA DOS ITENS AVALIADOS NO LOTE ATUAL */}
+            {/* LISTA DOS ITENS AVALIADOS */}
             <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
               {itensAvaliados.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
@@ -513,7 +551,7 @@ const TelaVistoriaPatrimonio = () => {
               )}
             </div>
 
-            {/* BOTAO PARA SALVAR NA COLEÇÃO DE VISTORIAS */}
+            {/* BOTAO PARA FINALIZAR */}
             <button
               type="button"
               disabled={loading || itensAvaliados.length === 0 || !unidadeSelecionada || !setorSelecionado}
@@ -521,7 +559,11 @@ const TelaVistoriaPatrimonio = () => {
                 unidade: unidadeSelecionada,
                 setor: setorSelecionado,
                 dataHora: dataHoraVistoria,
-                itens: itensAvaliados
+                itens: itensAvaliados,
+                onSuccess: () => {
+                  setItensAvaliados([]);
+                  limparFiltros();
+                }
               })}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-100 cursor-pointer text-sm"
             >
