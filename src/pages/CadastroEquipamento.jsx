@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../services/firebase";
+import api from "../services/api";
 import {
   collection,
   serverTimestamp,
@@ -30,7 +31,7 @@ const CadastroEquipamento = () => {
     nome: "",
     tipo: "Mobiliário",
     quantidade: 1,
-    setor: "",
+    setor: "Estoque Patrimônio", // Setor fixo e automático conforme solicitado
     unidade: "",
     estado: "Novo",
     observacoes: "",
@@ -97,14 +98,10 @@ const CadastroEquipamento = () => {
     try {
       const token = await auth.currentUser?.getIdToken();
 
-      // Substitua pela URL real da sua API (ex: "http://localhost:3000/api/estoque" ou variável de ambiente)
-      const response = await fetch("http://localhost:3000/api/estoque", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { "Authorization": `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
+      // Utilizando o serviço centralizado 'api' (igual ao hook useInventario)
+      const response = await api.post(
+        "/estoque",
+        {
           nome: formData.nome.toLowerCase().trim(),
           setor: formData.setor.toLowerCase().trim(),
           observacoes: formData.observacoes.toLowerCase().trim(),
@@ -116,12 +113,13 @@ const CadastroEquipamento = () => {
           categoriaItem: formData.tipo,
           status: "ativo",
           cadastradoPor: nomeUsuario,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao cadastrar item no estoque via API");
-      }
+        },
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
 
       toast.update(idToast, {
         render: "Item adicionado ao estoque com sucesso!",
@@ -130,12 +128,12 @@ const CadastroEquipamento = () => {
         autoClose: 3000,
       });
 
-      // Limpa os campos variáveis
+      // Limpa os campos variáveis mantendo o setor fixo
       setFormData({ ...formData, patrimonio: "", nome: "", observacoes: "" });
     } catch (error) {
       console.error("Erro ao salvar no estoque:", error);
       toast.update(idToast, {
-        render: "Erro ao comunicar com o servidor da API",
+        render: error.response?.data?.message || "Erro ao comunicar com o servidor da API",
         type: "error",
         isLoading: false,
         autoClose: 3000,
@@ -207,7 +205,7 @@ const CadastroEquipamento = () => {
                 className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition-all cursor-pointer"
                 value={formData.unidade}
                 onChange={(e) =>
-                  setFormData({ ...formData, unidadedestino: e.target.value, unidade: e.target.value })
+                  setFormData({ ...formData, unidade: e.target.value })
                 }
               >
                 <option value="">Selecione a Unidade...</option>
@@ -240,20 +238,14 @@ const CadastroEquipamento = () => {
                 <option value="Ferramenta">Ferramenta</option>
               </select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col justify-end">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700 ml-1">
                 <FiMapPin className="text-blue-500" /> Setor / Sala
               </label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Sala Patrimonio"
-                className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition-all"
-                value={formData.setor}
-                onChange={(e) =>
-                  setFormData({ ...formData, setor: e.target.value })
-                }
-              />
+              <div className="bg-slate-100 border border-slate-200 p-3 rounded-xl flex items-center gap-2 text-slate-600 text-sm font-medium">
+                <FiMapPin className="text-blue-500" />
+                <span>Setor Fixo: <strong>Estoque Patrimônio</strong></span>
+              </div>
             </div>
           </div>
 
