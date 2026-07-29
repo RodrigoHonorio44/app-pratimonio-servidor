@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useEstoque } from "../hooks/useEstoque";
 import {
   Box,
@@ -33,7 +33,7 @@ const Estoque = () => {
     dadosSaida,
     setDadosSaida,
     unidades,
-    setoresPorUnidade, // Alimentar o select de setores dinamicamente
+    setoresPorUnidade,
     motivosSaida,
     isEstoque,
     carregarEstoque,
@@ -44,7 +44,17 @@ const Estoque = () => {
   } = useEstoque();
 
   // Estado local para controlar se o usuário optou por digitar o setor manualmente
-  const [digitarSetorManual, setDigitarSetorManual] = React.useState(false);
+  const [digitarSetorManual, setDigitarSetorManual] = useState(false);
+
+  // Estados para paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10;
+
+  // Lógica de paginação utilizando diretamente a lista completa de itens do estoque
+  const indiceUltimoItem = paginaAtual * itensPorPagina;
+  const indicePrimeiroItem = indiceUltimoItem - itensPorPagina;
+  const itensPaginados = itensEstoque.slice(indicePrimeiroItem, indiceUltimoItem);
+  const totalPaginas = Math.ceil(itensEstoque.length / itensPorPagina);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans print:bg-white print:p-0">
@@ -81,15 +91,19 @@ const Estoque = () => {
           {/* Tabela Principal de Itens em Estoque */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Disponíveis no Estoque</h2>
               </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-4">Equipamento</th>
+                      {/* Substituído o cabeçalho "Equipamento" por "Tipo de Item" conforme solicitado */}
+                      <th className="p-4">Tipo de Item</th>
                       <th className="p-4">Patrimônio Base</th>
+                      <th className="p-4">Detalhe / Nome</th>
+                      <th className="p-4">Conservação</th>
                       <th className="p-4">Qtd. Disp.</th>
                       <th className="p-4">Ação</th>
                     </tr>
@@ -97,15 +111,34 @@ const Estoque = () => {
                   <tbody className="divide-y divide-slate-50">
                     {loading ? (
                       <tr>
-                        <td colSpan="4" className="p-10 text-center text-slate-400 font-bold">Carregando...</td>
+                        <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">Carregando...</td>
+                      </tr>
+                    ) : itensPaginados.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">Nenhum item encontrado no estoque.</td>
                       </tr>
                     ) : (
-                      itensEstoque.map((item) => (
+                      itensPaginados.map((item) => (
                         <tr key={item.id} className="hover:bg-blue-50/40 transition-colors">
-                          <td className="p-4 font-bold text-slate-700">{item.nome}</td>
+                          {/* Exibindo a categoria/tipo (Mobiliário, Bem durável, Refrigeração, Informática, Equipamento Médico, Ferramenta) no lugar principal */}
+                          <td className="p-4 font-bold text-blue-600 uppercase text-xs">
+                            {item.tipoItem || item.tipo || item.categoria || "Não informado"}
+                          </td>
                           <td className="p-4">
                             <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-mono text-xs font-bold">
                               {item.patrimonio || "S/P"}
+                            </span>
+                          </td>
+                          <td className="p-4 text-xs font-bold text-slate-700 uppercase">
+                            {item.nome}
+                          </td>
+                          <td className="p-4 text-xs">
+                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                              String(item.estadoConservacao || item.conservacao || item.estado || "").toLowerCase() === 'novo'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {item.estadoConservacao || item.conservacao || item.estado || "Não informado"}
                             </span>
                           </td>
                           <td className="p-4 font-black text-slate-600">{item.quantidade || 1}</td>
@@ -127,6 +160,31 @@ const Estoque = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Controles de Paginação */}
+              {totalPaginas > 1 && (
+                <div className="p-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">
+                    Página {paginaAtual} de {totalPaginas} (Total: {itensEstoque.length} itens)
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                      disabled={paginaAtual === 1}
+                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                      disabled={paginaAtual === totalPaginas}
+                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -147,11 +205,11 @@ const Estoque = () => {
                     value={dadosSaida.novaUnidade}
                     onChange={(e) => {
                       const selecionado = e.target.value;
-                      setDigitarSetorManual(false); // Reseta o modo manual ao mudar de unidade
+                      setDigitarSetorManual(false);
                       setDadosSaida({ 
                         ...dadosSaida, 
                         novaUnidade: selecionado,
-                        novoSetor: "" // Reseta o setor para obrigar a nova seleção
+                        novoSetor: "" 
                       });
                     }}
                   >
@@ -279,7 +337,7 @@ const Estoque = () => {
                       {loteSaida.map((item, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                           <div>
-                            <p className="text-xs font-bold text-slate-700"> {item.nome}</p>
+                            <p className="text-xs font-bold text-slate-700">{item.nome}</p>
                             <p className="text-[10px] font-mono font-bold text-blue-600">Pat: {item.patrimonioMapeado}</p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -468,7 +526,7 @@ const Estoque = () => {
                   <div className="space-y-1">
                     <div className="border-t border-slate-400 w-full mx-auto pt-2"></div>
                     <p className="font-bold text-slate-700">Responsável pelo Envio</p>
-                    <p className="text-[10px] text-slate-400 uppercase">Setor de Patrimônio</p>
+                    <p className="text-[10px] text-slate-400 uppercase">Setor de Patrimônio / Estoque</p>
                   </div>
                   <div className="space-y-1">
                     <div className="border-t border-slate-400 w-full mx-auto pt-2"></div>

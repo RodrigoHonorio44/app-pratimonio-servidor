@@ -109,7 +109,7 @@ const CadastroEquipamento = () => {
           estado: formData.estado.toLowerCase().trim(),
           quantidade: Number(formData.quantidade),
           tipo: "equipamento",
-          categoriaItem: formData.tipo,
+          tipoItem: formData.tipo, // Salva corretamente na chave esperada pela listagem de estoque
           status: "ativo",
           cadastradoPor: nomeUsuario,
         },
