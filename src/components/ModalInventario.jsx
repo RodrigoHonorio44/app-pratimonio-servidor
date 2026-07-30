@@ -46,14 +46,14 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
-      // Atualiza o Ativo via API Node/Express Backend
+      // Atualiza o Ativo via API Node/Express Backend salvando data e hora completas
       await api.put(
         `/ativos/${idAtivo}`,
         {
           status: "inutilizado", // Grava 'inutilizado' para bater com seus relatórios e filtros
           localArmazenamentoAcervo: localArmazenamento.trim(),
           destino: localArmazenamento.trim(),
-          dataBaixa: new Date().toISOString(),
+          dataBaixa: new Date().toISOString(), // Salvando data e hora completas com o ISO string
           observacoes: `Baixa Definitiva realizada. Destino: ${localArmazenamento.trim()}`
         },
         {
@@ -216,7 +216,7 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
               <div className="col-span-1 sm:col-span-2 border-t border-slate-200 pt-2 capitalize text-red-700">
                 <strong>Destino / Local de Armazenamento:</strong> {localArmazenamento}
               </div>
-              <div><strong>Data de Emissão:</strong> {new Date().toLocaleDateString("pt-BR")}</div>
+              <div><strong>Data e Hora de Emissão:</strong> {new Date().toLocaleString("pt-BR")}</div>
               <div><strong>Status do Processo:</strong> Em Homologação</div>
             </div>
 

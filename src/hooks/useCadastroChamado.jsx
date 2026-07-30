@@ -135,7 +135,10 @@ export const useCadastroChamado = () => {
         descricao: descricao.toLowerCase(),
         unidade: unidade.toLowerCase(),
         prioridade: prioridade.toLowerCase(),
-        criadoEm: new Date().toISOString(),
+        criadoEm: new Date(),
+        iniciadoEm: null,
+        finalizadoEm: null,
+        arquivadoEm: null,
         emailSolicitante: currentUser.email.toLowerCase(),
         
         // ✅ Preenche tanto 'solicitante' quanto 'nome' preservando o nome real do usuário

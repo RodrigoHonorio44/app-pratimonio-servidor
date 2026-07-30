@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { FiX, FiPrinter, FiCheckCircle } from "react-icons/fi";
+import { MAPA_SETORES_POR_UNIDADE } from "./constants/setores"; 
 
 const ModalTransferencia = ({
   isOpen,
@@ -17,12 +18,16 @@ const ModalTransferencia = ({
   unidades,
   normalizarParaComparacao
 }) => {
+  // Estado local para controlar se o usuário escolheu digitar o setor manualmente
+  const [modoSetorManual, setModoSetorManual] = useState(false);
+
   if (!isOpen || !itemSelecionado) return null;
 
   const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
   const isEstoque = dadosSaida.novaUnidade === "Estoque Central";
 
-  // Máscaras aplicadas estritamente com base em números
+  const listaSetoresDisponiveis = MAPA_SETORES_POR_UNIDADE[dadosSaida.novaUnidade] || [];
+
   const aplicarMascaraTelefone = (valor) => {
     const digitos = valor.replace(/\D/g, "");
     if (digitos.length <= 11) {
@@ -100,18 +105,19 @@ const ModalTransferencia = ({
               className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 cursor-pointer disabled:bg-slate-100"
               onChange={(e) => {
                 const selecionado = e.target.value;
+                setModoSetorManual(false); // Reseta o modo manual ao trocar de unidade
                 setDadosSaida({
                   ...dadosSaida,
                   novaUnidade: selecionado,
-                  // Sugere automaticamente "equipamento usado" se o destino for o estoque
                   novoSetor: selecionado === "Estoque Central" ? "equipamento usado" : "", 
                 });
               }}
             >
               <option value="">Selecione...</option>
               <option value="Estoque Central">Estoque Central</option>
+              <option value="Residência do Paciente">Residência do Paciente</option>
               {unidades
-                .filter((u) => u !== "Estoque Central")
+                .filter((u) => u !== "Estoque Central" && u !== "Residência do Paciente" && !u.toLowerCase().includes("patrimônio"))
                 .map((u) => (
                   <option key={u} value={u}>
                     {u}
@@ -149,7 +155,7 @@ const ModalTransferencia = ({
                   disabled={termoVisualizado}
                   placeholder="Rua, número, bairro..."
                   className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
-                  value={dadosSaida.pacienteEndereco}
+                  value={dadosSaida.pacienteEndereco || ""}
                   onChange={(e) =>
                     setDadosSaida({ ...dadosSaida, pacienteEndereco: e.target.value })
                   }
@@ -167,7 +173,7 @@ const ModalTransferencia = ({
                     disabled={termoVisualizado}
                     placeholder="(00) 00000-0000"
                     className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
-                    value={dadosSaida.pacienteTelefone}
+                    value={dadosSaida.pacienteTelefone || ""}
                     onChange={(e) =>
                       setDadosSaida({
                         ...dadosSaida,
@@ -186,7 +192,7 @@ const ModalTransferencia = ({
                     disabled={termoVisualizado}
                     placeholder="Apenas números"
                     className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
-                    value={dadosSaida.pacienteIdentidade}
+                    value={dadosSaida.pacienteIdentidade || ""}
                     onChange={(e) =>
                       setDadosSaida({
                         ...dadosSaida,
@@ -207,7 +213,7 @@ const ModalTransferencia = ({
                   disabled={termoVisualizado}
                   placeholder="Apenas números"
                   className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
-                  value={dadosSaida.pacienteCpf}
+                  value={dadosSaida.pacienteCpf || ""}
                   onChange={(e) =>
                     setDadosSaida({
                       ...dadosSaida,
@@ -219,20 +225,54 @@ const ModalTransferencia = ({
             </div>
           ) : (
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">
-                {isEstoque ? "Classificação no Estoque" : "Novo Setor"}
-              </label>
-              <input
-                type="text"
-                required
-                disabled={termoVisualizado}
-                placeholder={isEstoque ? "Ex: equipamento usado, reserva" : "Digite o setor"}
-                value={dadosSaida.novoSetor}
-                className="w-full border p-2 rounded-lg outline-blue-500 text-slate-700 disabled:bg-slate-100"
-                onChange={(e) =>
-                  setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
-                }
-              />
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">
+                  {isEstoque ? "Classificação no Estoque" : "Novo Setor"}
+                </label>
+                {!isEstoque && listaSetoresDisponiveis.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoSetorManual(!modoSetorManual);
+                      setDadosSaida({ ...dadosSaida, novoSetor: "" });
+                    }}
+                    className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {modoSetorManual ? "← Voltar para lista" : "Não encontrou o setor?"}
+                  </button>
+                )}
+              </div>
+
+              {isEstoque || modoSetorManual || listaSetoresDisponiveis.length === 0 ? (
+                <input
+                  type="text"
+                  required
+                  disabled={termoVisualizado}
+                  placeholder={isEstoque ? "Ex: equipamento usado, reserva" : "Digite o nome do setor"}
+                  value={dadosSaida.novoSetor}
+                  className="w-full border p-2 rounded-lg outline-blue-500 text-slate-700 disabled:bg-slate-100 bg-white"
+                  onChange={(e) =>
+                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
+                  }
+                />
+              ) : (
+                <select
+                  required
+                  disabled={termoVisualizado}
+                  value={dadosSaida.novoSetor}
+                  className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 cursor-pointer disabled:bg-slate-100"
+                  onChange={(e) =>
+                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
+                  }
+                >
+                  <option value="">Selecione o setor...</option>
+                  {listaSetoresDisponiveis.map((setor) => (
+                    <option key={setor} value={setor}>
+                      {setor}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -247,7 +287,7 @@ const ModalTransferencia = ({
               required
               disabled={termoVisualizado}
               value={dadosSaida.responsavelRecebimento}
-              className="w-full border p-2 rounded-lg outline-blue-500 text-slate-700 disabled:bg-slate-100"
+              className="w-full border p-2 rounded-lg outline-blue-500 text-slate-700 disabled:bg-slate-100 bg-white"
               onChange={(e) =>
                 setDadosSaida({
                   ...dadosSaida,
