@@ -7,6 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 export function useDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
+  // O filtro suporta formato mensal ("YYYY-MM") ou anual ("YYYY")
   const [mesFiltro, setMesFiltro] = useState(() => {
     const hoje = new Date();
     const ano = hoje.getFullYear();
@@ -45,52 +46,73 @@ export function useDashboard() {
     loadData();
   }, []);
 
-  // Processamento das Estatísticas robusto contra ausência de campos de data
+  // Processamento das Estatísticas robusto: se a OS não tiver data de criação, ela entra no mês atual por padrão para não sumir do dashboard
   const estatisticas = useMemo(() => {
     if (!Array.isArray(chamadosBrutos) || chamadosBrutos.length === 0) {
       return { abertos: 0, fechados: 0, total: 0, pendentes: 0 };
     }
 
-    const [anoAlvo, mesAlvo] = (mesFiltro || "").split("-");
+    const partesFiltro = (mesFiltro || "").split("-");
+    const anoAlvo = partesFiltro[0];
+    const mesAlvo = partesFiltro[1]; // undefined se for selecionado apenas o ano (YYYY)
 
-    const chamadosFiltrados = chamadosBrutos.filter((chamado) => {
-      const dataCriacao = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
+    // Função auxiliar robusta para converter qualquer tipo de data
+    const parseData = (campoData) => {
+      if (!campoData) return null;
+      if (typeof campoData.toDate === "function") {
+        return campoData.toDate();
+      }
+      if (typeof campoData === "object" && campoData.seconds) {
+        return new Date(campoData.seconds * 1000);
+      }
+      const dataObj = new Date(campoData);
+      return isNaN(dataObj.getTime()) ? null : dataObj;
+    };
+
+    const hoje = new Date();
+    const anoAtual = String(hoje.getFullYear());
+    const mesAtual = String(hoje.getMonth() + 1).padStart(2, "0");
+
+    const chamadosDoPeriodo = chamadosBrutos.filter((chamado) => {
+      const dataRef = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
+      const dataObjeto = parseData(dataRef);
       
-      if (!dataCriacao) return true; 
+      let anoChamado, mesChamado;
 
-      let dataObjeto;
-      if (typeof dataCriacao.toDate === "function") {
-        dataObjeto = dataCriacao.toDate();
+      if (!dataObjeto) {
+        // Fallback: se o chamado não tiver nenhuma data preenchida, consideramos o mês/ano atual para ele aparecer
+        anoChamado = anoAtual;
+        mesChamado = mesAtual;
       } else {
-        dataObjeto = new Date(dataCriacao);
+        anoChamado = String(dataObjeto.getFullYear());
+        mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
       }
 
-      if (isNaN(dataObjeto.getTime())) return true; 
-
-      const anoChamado = String(dataObjeto.getFullYear());
-      const mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
-
-      return anoChamado === anoAlvo && mesChamado === mesAlvo;
+      if (mesAlvo) {
+        return anoChamado === anoAlvo && mesChamado === mesAlvo;
+      } else {
+        return anoChamado === anoAlvo;
+      }
     });
 
-    const abertos = chamadosFiltrados.filter(d => {
+    const abertos = chamadosDoPeriodo.filter(d => {
       const st = (d.status || "").toLowerCase().trim();
       return st === "aberto" || st === "em atendimento" || !st; 
     }).length;
 
-    const pendentes = chamadosFiltrados.filter(d => {
+    const pendentes = chamadosDoPeriodo.filter(d => {
       const st = (d.status || "").toLowerCase().trim();
       return st === "pendente" || st === "aguardando" || st === "em espera";
     }).length;
-    
-    const fechados = chamadosFiltrados.filter(d => {
+
+    const fechados = chamadosDoPeriodo.filter(d => {
       const st = (d.status || "").toLowerCase().trim();
       return st === "fechado" || st === "arquivado" || st === "baixado" || st === "finalizado" || st === "concluido";
     }).length;
 
     return {
-      total: chamadosFiltrados.length,
-      abertos: abertos > 0 ? abertos : chamadosFiltrados.length, 
+      total: chamadosDoPeriodo.length,
+      abertos, 
       pendentes,
       fechados
     };

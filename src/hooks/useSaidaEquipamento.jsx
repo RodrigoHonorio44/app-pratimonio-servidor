@@ -101,27 +101,36 @@ export const useSaidaEquipamento = () => {
                 ? novoPatrimonioParaSP
                 : itemSelecionado.patrimonio;
 
-            const dataAtual = new Date().toISOString();
+            // Gera a data e hora exata local/UTC padronizada no formato ISO 8601
+            const agora = new Date();
+            const dataAtualISO = agora.toISOString(); // Ex: 2026-07-30T21:39:00.000Z
+
             const itemId = itemSelecionado.id || itemSelecionado._id;
 
+            // 1. Atualiza o ativo informando a movimentação
             await api.put(`/ativos/${itemId}`, {
                 unidade: dadosSaida.novaUnidade,
                 setor: dadosSaida.novoSetor,
                 patrimonio: patrimonioFinal,
-                ultimaMovimentacao: dataAtual
+                ultimaMovimentacao: dataAtualISO
             });
 
-            await api.post('/saidas', {
+            // 2. Salva o registro no endpoint /saidas-equipamentos
+            await api.post('/saidas-equipamentos', {
                 ativoId: itemId,
                 patrimonio: patrimonioFinal,
-                nomeEquipamento: itemSelecionado.nome,
+                equipamento: itemSelecionado.nome || itemSelecionado.nomeEquipamento,
+                nomeEquipamento: itemSelecionado.nome || itemSelecionado.nomeEquipamento,
                 unidadeOrigem: itemSelecionado.unidade,
                 setorOrigem: itemSelecionado.setor,
                 unidadeDestino: dadosSaida.novaUnidade,
                 setorDestino: dadosSaida.novoSetor,
                 responsavelRecebimento: dadosSaida.responsavelRecebimento,
                 motivo: dadosSaida.motivo,
-                dataSaida: dataAtual
+                // Redundância de datas para retrocompatibilidade com parsers
+                dataSaida: dataAtualISO,
+                criadoEm: dataAtualISO,
+                createdAt: dataAtualISO
             });
 
             toast.success("Transferência realizada com sucesso!");
