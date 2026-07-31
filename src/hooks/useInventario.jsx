@@ -93,9 +93,10 @@ export const useInventario = () => {
   };
 
   /**
-   * Função para processar a Baixa Definitiva do Patrimônio via API
+   * Função atualizada para processar a Baixa Definitiva do Patrimônio via API
+   * recebendo todos os detalhes avançados definidos no ModalInventario.
    */
-  const confirmarBaixaPatrimonio = async (equipamentoParaBaixar, destinoArmazenamento) => {
+  const confirmarBaixaPatrimonio = async (equipamentoParaBaixar, dadosBaixaAvulsa) => {
     const itemTarget = equipamentoParaBaixar || equipamentoSelecionado;
 
     if (!itemTarget) {
@@ -116,14 +117,26 @@ export const useInventario = () => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
-      // Atualiza diretamente na sua API REST salvando como 'inutilizado'
+      const dataHoraAtual = new Date().toISOString();
+      const destinoFinal = dadosBaixaAvulsa?.destino || dadosBaixaAvulsa?.localArmazenamento || itemTarget.destino || "Armazenamento Central";
+      const motivoFinal = dadosBaixaAvulsa?.motivoBaixa || "inservivel";
+      const estadoFinal = dadosBaixaAvulsa?.estadoConservacao || "sucata";
+      const processoFinal = dadosBaixaAvulsa?.numeroProcesso || `LAUDO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const parecerFinal = dadosBaixaAvulsa?.parecerTecnico || "";
+
+      // Atualiza diretamente na sua API REST enviando todos os novos campos
       await api.put(
         `/ativos/${idAtivo}`,
         {
           status: "inutilizado",
-          dataBaixa: new Date().toISOString(),
-          destinoArmazenamento: destinoArmazenamento || itemTarget.destino || "Armazenamento Central",
-          motivoBaixa: "Baixa Definitiva de Bem Patrimonial"
+          dataBaixa: dataHoraAtual,
+          localArmazenamentoAcervo: destinoFinal,
+          destino: destinoFinal,
+          motivoBaixa: motivoFinal,
+          estadoConservacao: estadoFinal,
+          numeroProcesso: processoFinal,
+          parecerTecnico: parecerFinal,
+          observacoes: `Baixa Definitiva realizada em ${new Date(dataHoraAtual).toLocaleString("pt-BR")}. Ref/OS: ${processoFinal}. Destino: ${destinoFinal}. Motivo: ${motivoFinal}`
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -272,6 +285,11 @@ export const useInventario = () => {
         observacoes: i.observacoes || "",
         status: i.status || "Ativo",
         tipo: i.tipo || "N/A",
+        motivoBaixa: i.motivoBaixa || "",
+        estadoConservacao: i.estadoConservacao || "",
+        numeroProcesso: i.numeroProcesso || "",
+        parecerTecnico: i.parecerTecnico || "",
+        localArmazenamentoAcervo: i.localArmazenamentoAcervo || "",
         dataBaixa: i.dataBaixa ? formatarDataBR(i.dataBaixa) : ""
       }));
 
@@ -329,7 +347,7 @@ export const useInventario = () => {
     itensExibidos,
     formatarDataBR,
     carregarDados,
-    confirmarBaixaPatrimonio, // <-- Exportada para ser chamada no botão do Modal de Termo
+    confirmarBaixaPatrimonio,
     limparFiltros,
     obterSetoresDisponiveis,
     exportarExcelCompleto,

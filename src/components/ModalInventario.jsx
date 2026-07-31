@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { auth } from "../services/firebase";
 import api from "../services/api";
 import { toast } from "react-toastify";
@@ -14,13 +14,32 @@ import {
 const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
   const [etapa, setEtapa] = useState("confirmacao");
   const [localArmazenamento, setLocalArmazenamento] = useState("");
+  const [motivoBaixa, setMotivoBaixa] = useState("inservivel");
+  const [estadoConservacao, setEstadoConservacao] = useState("sucata");
+  
+  // Já inicia pré-preenchido com o número automático gerado
+  const [referenciaExterna, setReferenciaExterna] = useState("");
+  
+  const [parecerTecnico, setParecerTecnico] = useState("");
   const [processando, setProcessando] = useState(false);
+
+  // Gera a referência automática assim que o modal abre ou o equipamento muda
+  useEffect(() => {
+    if (isOpen) {
+      const codigoAuto = `LAUDO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      setReferenciaExterna(codigoAuto);
+    }
+  }, [isOpen, equipamento]);
 
   if (!isOpen || !equipamento) return null;
 
   const fecharELimpar = () => {
     setEtapa("confirmacao");
     setLocalArmazenamento("");
+    setMotivoBaixa("inservivel");
+    setEstadoConservacao("sucata");
+    setReferenciaExterna("");
+    setParecerTecnico("");
     onClose();
   };
 
@@ -42,14 +61,21 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
+      const dataHoraAtual = new Date().toISOString();
+      const refFinal = referenciaExterna.trim() || `LAUDO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
       await api.put(
         `/ativos/${idAtivo}`,
         {
           status: "inutilizado",
           localArmazenamentoAcervo: localArmazenamento.trim(),
           destino: localArmazenamento.trim(),
-          dataBaixa: new Date().toISOString(),
-          observacoes: `Baixa Definitiva realizada. Destino: ${localArmazenamento.trim()}`
+          motivoBaixa: motivoBaixa,
+          estadoConservacao: estadoConservacao,
+          numeroProcesso: refFinal,
+          parecerTecnico: parecerTecnico.trim(),
+          dataBaixa: dataHoraAtual,
+          observacoes: `Baixa Definitiva realizada em ${new Date(dataHoraAtual).toLocaleString("pt-BR")}. Ref/OS: ${refFinal}. Destino: ${localArmazenamento.trim()}`
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -128,12 +154,12 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
           </div>
         )}
 
-        {/* ETAPA 2: FORMULÁRIO DE PREENCHIMENTO DO DESTINO */}
+        {/* ETAPA 2: FORMULÁRIO COM CAMPO JÁ PRÉ-PREENCHIDO */}
         {etapa === "formulario" && (
-          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100 my-auto">
+          <div className="bg-white rounded-[32px] p-6 max-w-xl w-full shadow-2xl space-y-5 border border-slate-100 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider flex items-center gap-2">
-                <Archive size={16} className="text-red-600" /> Detalhes da Baixa Patrimonial
+                <Archive size={16} className="text-red-600" /> Detalhes e Laudo da Baixa Patrimonial
               </h3>
               <button onClick={fecharELimpar} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X size={18} />
@@ -151,16 +177,80 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                  Motivo Principal da Baixa *
+                </label>
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
+                  value={motivoBaixa}
+                  onChange={(e) => setMotivoBaixa(e.target.value)}
+                >
+                  <option value="inservivel">Inservível / Recuperação Inviável</option>
+                  <option value="obsoleto">Obsoleto Tecnologicamente</option>
+                  <option value="avariado">Avaria Irrecuperável / Sinistro</option>
+                  <option value="exturgo">Exturgo / Desaparecimento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                  Estado Físico / Conservação *
+                </label>
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
+                  value={estadoConservacao}
+                  onChange={(e) => setEstadoConservacao(e.target.value)}
+                >
+                  <option value="sucata">Sucata / Irrecuperável</option>
+                  <option value="mau">Mau Estado (Estrutura Comprometida)</option>
+                  <option value="parcial">Danificado Parcialmente</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                  Local de Armazenamento / Destino *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Depósito de Inservíveis / Galpão Central"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500 uppercase"
+                  value={localArmazenamento}
+                  onChange={(e) => setLocalArmazenamento(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Nº OS / Chamado ou Processo SEI
+                  </label>
+                  <span className="text-[9px] font-bold text-blue-600">Editável (Apague para mudar)</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Ex: OS #4829"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500"
+                  value={referenciaExterna}
+                  onChange={(e) => setReferenciaExterna(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                Local de Armazenamento / Destino do Descarte
+                Parecer / Justificativa Técnica do Analista
               </label>
-              <input
-                type="text"
-                placeholder="Ex: Depósito de Inservíveis / Galpão Central"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500 transition-all uppercase"
-                value={localArmazenamento}
-                onChange={(e) => setLocalArmazenamento(e.target.value)}
+              <textarea
+                rows={3}
+                placeholder="Descreva detalhadamente o estado do bem e o motivo técnico..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                value={parecerTecnico}
+                onChange={(e) => setParecerTecnico(e.target.value)}
               />
             </div>
 
@@ -184,12 +274,11 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
           </div>
         )}
 
-        {/* ETAPA 3: LAUDO OFICIAL EM FORMATO A4 ISOLADO PARA IMPRESSÃO */}
+        {/* ETAPA 3: LAUDO OFICIAL EM FORMATO A4 */}
         {etapa === "preview" && (
           <div className="bg-white w-full max-w-[800px] max-h-[92vh] overflow-y-auto shadow-2xl p-6 sm:p-8 flex flex-col justify-between font-serif text-slate-900 mx-auto rounded-[24px] my-auto">
             
             <div>
-              {/* Menu Superior de Ações */}
               <div className="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-md border border-slate-200 p-3 rounded-xl mb-4 flex flex-wrap justify-between items-center gap-3 shadow-sm">
                 <div className="flex items-center gap-2 text-red-600 font-bold text-xs uppercase tracking-tight">
                   <AlertTriangle size={16} /> Conferência do Laudo de Baixa
@@ -217,7 +306,6 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                 </div>
               </div>
 
-              {/* Bloco Exclusivo do Termo Impresso */}
               <div id="termo-baixa-imprimir" className="bg-white">
                 <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-200 w-full">
                   <img src="/Imagem1.png" alt="Logo 1" className="h-8 sm:h-10 w-auto max-w-[22%] object-contain" />
@@ -236,12 +324,27 @@ const ModalInventario = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                   <div><strong>Nº de Patrimônio (TAG):</strong> <span className="font-mono font-bold uppercase">{equipamento.patrimonio || "S/P"}</span></div>
                   <div><strong>Unidade de Origem:</strong> {equipamento.unidade}</div>
                   <div className="capitalize"><strong>Setor de Origem:</strong> {equipamento.setor}</div>
+                  <div className="capitalize"><strong>Motivo da Baixa:</strong> {motivoBaixa}</div>
+                  <div className="capitalize"><strong>Estado Físico:</strong> {estadoConservacao}</div>
+                  
+                  <div className="col-span-1 sm:col-span-2">
+                    <strong>Referência (OS / Chamado / Processo):</strong> <span className="font-mono text-blue-700">{referenciaExterna.trim() || "N/A"}</span>
+                  </div>
+
                   <div className="col-span-1 sm:col-span-2 border-t border-slate-200 pt-1.5 uppercase text-red-700">
                     <strong>Destino / Local de Armazenamento:</strong> {localArmazenamento}
                   </div>
-                  <div><strong>Data de Emissão:</strong> {new Date().toLocaleDateString("pt-BR")}</div>
-                  <div><strong>Status do Processo:</strong> Em Homologação</div>
+                  <div className="col-span-1 sm:col-span-2 text-slate-700 font-semibold">
+                    <strong>Data e Hora da Emissão:</strong> {new Date().toLocaleString("pt-BR")}
+                  </div>
                 </div>
+
+                {parecerTecnico && (
+                  <div className="text-xs mb-4 font-sans border border-slate-200 p-3 rounded-lg bg-slate-50">
+                    <strong className="block text-slate-700 uppercase text-[10px] mb-1">Parecer Técnico:</strong>
+                    <p className="italic text-slate-600">{parecerTecnico}</p>
+                  </div>
+                )}
 
                 <div className="text-xs leading-relaxed text-justify mb-6 space-y-2.5">
                   <p>
