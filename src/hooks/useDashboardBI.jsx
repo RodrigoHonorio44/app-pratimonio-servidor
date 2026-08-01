@@ -1,4 +1,3 @@
-// src/hooks/useDashboardBI.js
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
@@ -374,10 +373,20 @@ export const useDashboardBI = () => {
         api.get("/saidas-equipamentos")
       ]);
 
-      const chamadosData = resChamados.status === "fulfilled" && Array.isArray(resChamados.value.data) ? resChamados.value.data : [];
-      const ativosData = resAtivos.status === "fulfilled" && Array.isArray(resAtivos.value.data) ? resAtivos.value.data : [];
-      const laudosData = resLaudos.status === "fulfilled" && Array.isArray(resLaudos.value.data) ? resLaudos.value.data : [];
-      const saidasData = resSaidas.status === "fulfilled" && Array.isArray(resSaidas.value.data) ? resSaidas.value.data : [];
+      const extrairDados = (res) => {
+        if (res.status !== "fulfilled") return [];
+        const payload = res.value.data;
+        if (Array.isArray(payload)) return payload;
+        if (payload && Array.isArray(payload.data)) return payload.data;
+        if (payload && Array.isArray(payload.content)) return payload.content;
+        if (payload && Array.isArray(payload.itens)) return payload.itens;
+        return [];
+      };
+
+      const chamadosData = extrairDados(resChamados);
+      const ativosData = extrairDados(resAtivos);
+      const laudosData = extrairDados(resLaudos);
+      const saidasData = extrairDados(resSaidas);
 
       const novosDadosBrutos = {
         chamados: chamadosData,
@@ -388,7 +397,6 @@ export const useDashboardBI = () => {
 
       setDadosBrutos(novosDadosBrutos);
 
-      // Coleta unificada de unidades considerando chamados, saídas e ativos para o filtro funcionar plenamente
       const unidadesSet = new Set();
       chamadosData.forEach(c => c.unidade && unidadesSet.add(String(c.unidade).trim().toUpperCase()));
       saidasData.forEach(s => {

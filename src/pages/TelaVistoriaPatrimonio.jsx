@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { 
   ArrowLeft, ClipboardCheck, CheckCircle2, AlertTriangle, RefreshCw, XCircle, 
-  Search, Plus, Trash2, Printer, Check, PackagePlus, Clock, RotateCcw, Camera, Edit3
+  Search, Plus, Trash2, Check, PackagePlus, Clock, RotateCcw, Camera, Edit3, FileText
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
@@ -9,6 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
 import { useTelaVistoriaPatrimonio } from "../hooks/useTelaVistoriaPatrimonio";
+import TelaVistoriaPatrimonioModal from "../components/TelaVistoriaPatrimonioModal";
 
 const OPCOES_ESTADO = [
   { id: "bom", label: "Bom", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
@@ -28,29 +29,27 @@ const TelaVistoriaPatrimonio = () => {
     ativosDoSetor = [],
     loadingAtivos,
     loading,
+    itensAvaliados,
+    setItensAvaliados,
     limparFiltros,
     handleFinalizarVistoriaLote,
   } = useTelaVistoriaPatrimonio();
 
-  // Estados locais da sessão
   const [busca, setBusca] = useState("");
-  const [itensAvaliados, setItensAvaliados] = useState([]);
-
-  // Estado para permitir setor manual
   const [setorManualMode, setSetorManualMode] = useState(false);
   const [inputSetorManual, setInputSetorManual] = useState("");
 
-  // Item selecionado para avaliação
   const [itemEmEdicao, setItemEmEdicao] = useState(null);
   const [estadoModal, setEstadoModal] = useState("bom");
   const [obsModal, setObsModal] = useState("");
   const [fotoModal, setFotoModal] = useState(null);
   const [compactandoFoto, setCompactandoFoto] = useState(false);
 
-  // Cadastro de item manual
   const [modoManual, setModoManual] = useState(false);
   const [manualNome, setManualNome] = useState("");
   const [manualPatrimonio, setManualPatrimonio] = useState("");
+
+  const [modalDocumentoAberto, setModalDocumentoAberto] = useState(false);
 
   const dataHoraVistoria = useMemo(
     () => new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
@@ -81,7 +80,6 @@ const TelaVistoriaPatrimonio = () => {
 
     try {
       const arquivoCompactado = await imageCompression(file, opcoesCompressao);
-      
       const reader = new FileReader();
       reader.readAsDataURL(arquivoCompactado);
       reader.onloadend = () => {
@@ -89,7 +87,7 @@ const TelaVistoriaPatrimonio = () => {
         setCompactandoFoto(false);
       };
     } catch (error) {
-      console.error("Erro ao compactar imagem:", error);
+      console.error("erro ao compactar imagem:", error);
       setCompactandoFoto(false);
     }
   };
@@ -113,13 +111,14 @@ const TelaVistoriaPatrimonio = () => {
 
   const handleAdicionarAoLote = () => {
     if (!itemEmEdicao) return;
+    const nomeEquipamento = (itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "equipamento").toLowerCase();
 
     const novoItem = {
       idTemp: Date.now(),
-      patrimonio: itemEmEdicao.patrimonio || "S/P",
-      equipamento: itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "Equipamento",
+      patrimonio: (itemEmEdicao.patrimonio || "s/p").toLowerCase(),
+      equipamento: nomeEquipamento,
       estado: estadoModal,
-      observacao: obsModal.trim(),
+      observacao: obsModal.trim().toLowerCase(),
       foto: fotoModal,
       dataHora: new Date().toLocaleString("pt-BR")
     };
@@ -136,10 +135,10 @@ const TelaVistoriaPatrimonio = () => {
 
     const itemManual = {
       idTemp: Date.now(),
-      patrimonio: manualPatrimonio.trim() || "S/P",
-      equipamento: manualNome.trim(),
+      patrimonio: manualPatrimonio.trim().toLowerCase() || "s/p",
+      equipamento: manualNome.trim().toLowerCase(),
       estado: estadoModal,
-      observacao: obsModal.trim(),
+      observacao: obsModal.trim().toLowerCase(),
       foto: fotoModal,
       dataHora: new Date().toLocaleString("pt-BR")
     };
@@ -156,12 +155,36 @@ const TelaVistoriaPatrimonio = () => {
     setItensAvaliados((prev) => prev.filter((i) => i.idTemp !== idTemp));
   };
 
+  const handleGerarTermoModal = () => {
+    setModalDocumentoAberto(true);
+  };
+
+  const handleConfirmarESalvar = () => {
+    handleFinalizarVistoriaLote({
+      unidade: unidadeSelecionada,
+      setor: setorSelecionado,
+      dataHora: dataHoraVistoria,
+      itens: itensAvaliados,
+      onSuccess: () => {
+        setModalDocumentoAberto(false);
+        setItensAvaliados([]);
+        limparFiltros();
+      }
+    });
+  };
+
+  const handleImprimir = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
-      <Header />
+      <div className="no-print">
+        <Header />
+      </div>
 
-      <main className="flex-grow p-4 md:p-8 max-w-7xl w-full mx-auto">
-        <header className="mb-6 no-print">
+      <main className="flex-grow p-4 md:p-8 max-w-7xl w-full mx-auto no-print">
+        <header className="mb-6">
           <button
             onClick={() => navigate("/")}
             className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group cursor-pointer"
@@ -178,7 +201,6 @@ const TelaVistoriaPatrimonio = () => {
           </p>
         </header>
 
-        {/* FILTROS DE UNIDADE E SETOR */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 mb-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider">Filtros da Vistoria</span>
@@ -200,15 +222,14 @@ const TelaVistoriaPatrimonio = () => {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                 value={unidadeSelecionada} 
                 onChange={(e) => { 
-                  setUnidadeSelecionada(e.target.value); 
+                  setUnidadeSelecionada(e.target.value.toLowerCase()); 
                   setSetorSelecionado(""); 
                   setInputSetorManual("");
                   setSetorManualMode(false);
-                  setItensAvaliados([]);
                 }}
               >
                 <option value="">Selecione a Unidade...</option>
-                {Object.keys(MAPA_SETORES_POR_UNIDADE).map((u) => <option key={u} value={u}>{u}</option>)}
+                {Object.keys(MAPA_SETORES_POR_UNIDADE).map((u) => <option key={u} value={u.toLowerCase()}>{u}</option>)}
               </select>
             </div>
 
@@ -222,7 +243,6 @@ const TelaVistoriaPatrimonio = () => {
                       setSetorManualMode(!setorManualMode);
                       setSetorSelecionado("");
                       setInputSetorManual("");
-                      setItensAvaliados([]);
                     }}
                     className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
                   >
@@ -240,8 +260,9 @@ const TelaVistoriaPatrimonio = () => {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                     value={inputSetorManual}
                     onChange={(e) => {
-                      setInputSetorManual(e.target.value);
-                      setSetorSelecionado(e.target.value);
+                      const val = e.target.value.toLowerCase();
+                      setInputSetorManual(val);
+                      setSetorSelecionado(val);
                     }}
                   />
                 </div>
@@ -250,23 +271,21 @@ const TelaVistoriaPatrimonio = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                   value={setorSelecionado} 
                   onChange={(e) => {
-                    setSetorSelecionado(e.target.value);
-                    setItensAvaliados([]);
+                    setSetorSelecionado(e.target.value.toLowerCase());
                   }}
                   disabled={!unidadeSelecionada}
                 >
                   <option value="">Selecione o Setor...</option>
-                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || []).map((s) => <option key={s} value={s}>{s}</option>)}
+                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || MAPA_SETORES_POR_UNIDADE[Object.keys(MAPA_SETORES_POR_UNIDADE).find(k => k.toLowerCase() === unidadeSelecionada)] || []).map((s) => (
+                    <option key={s} value={s.toLowerCase()}>{s}</option>
+                  ))}
                 </select>
               )}
             </div>
           </div>
         </div>
 
-        {/* RESTANTE DO LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* COLUNA ESQUERDA: LISTA DE ATIVOS DO BANCO */}
           <div className="lg:col-span-7 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
               <div>
@@ -289,14 +308,13 @@ const TelaVistoriaPatrimonio = () => {
                 placeholder="Buscar por patrimônio ou descrição..." 
                 className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={busca}
-                onChange={(e) => setBusca(e.target.value)}
+                onChange={(e) => setBusca(e.target.value.toLowerCase())}
               />
               {busca && (
                 <button type="button" onClick={() => setBusca("")} className="absolute right-3.5 text-slate-400 hover:text-slate-600 font-bold text-xs">✕</button>
               )}
             </div>
 
-            {/* FORMULÁRIO DE ITEM MANUAL */}
             {modoManual && (
               <form onSubmit={handleAdicionarManual} className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-center">
@@ -309,14 +327,14 @@ const TelaVistoriaPatrimonio = () => {
                     placeholder="Patrimônio (Ex: 37031)" 
                     className="sm:col-span-1 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualPatrimonio}
-                    onChange={(e) => setManualPatrimonio(e.target.value)}
+                    onChange={(e) => setManualPatrimonio(e.target.value.toLowerCase())}
                   />
                   <input 
                     type="text" 
                     placeholder="Descrição do Equipamento" 
                     className="sm:col-span-2 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualNome}
-                    onChange={(e) => setManualNome(e.target.value)}
+                    onChange={(e) => setManualNome(e.target.value.toLowerCase())}
                     required
                   />
                 </div>
@@ -357,10 +375,10 @@ const TelaVistoriaPatrimonio = () => {
 
                 <input 
                   type="text" 
-                  placeholder="Observação (Ex: Gabinete amassado...)" 
+                  placeholder="Observação..." 
                   className="w-full bg-white border border-slate-200 p-2 rounded-xl text-xs font-medium outline-none"
                   value={obsModal}
-                  onChange={(e) => setObsModal(e.target.value)}
+                  onChange={(e) => setObsModal(e.target.value.toLowerCase())}
                 />
                 <button type="submit" disabled={compactandoFoto} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer">
                   + Adicionar à Vistoria
@@ -368,7 +386,6 @@ const TelaVistoriaPatrimonio = () => {
               </form>
             )}
 
-            {/* LISTA DOS ATIVOS */}
             {!setorSelecionado ? (
               <div className="p-8 text-center text-slate-400 text-sm font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
                 Selecione a Unidade e o Setor acima para carregar a lista de patrimônios.
@@ -385,8 +402,8 @@ const TelaVistoriaPatrimonio = () => {
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {equipamentosFiltrados.map((item) => {
-                  const pat = item.patrimonio || "S/P";
-                  const nomeItem = item.descricao || item.equipamento || item.nome;
+                  const pat = (item.patrimonio || "s/p").toLowerCase();
+                  const nomeItem = (item.descricao || item.equipamento || item.nome || "").toLowerCase();
                   const jaAvaliado = itensAvaliados.some((i) => i.patrimonio === pat && i.equipamento === nomeItem);
 
                   return (
@@ -402,7 +419,7 @@ const TelaVistoriaPatrimonio = () => {
                         </span>
                         <div>
                           <p className="font-bold text-slate-800 text-sm uppercase">{nomeItem}</p>
-                          <p className="text-[11px] text-slate-400 font-medium">{unidadeSelecionada} • {setorSelecionado}</p>
+                          <p className="text-[11px] text-slate-400 font-medium capitalize">{unidadeSelecionada} • {setorSelecionado}</p>
                         </div>
                       </div>
 
@@ -426,7 +443,6 @@ const TelaVistoriaPatrimonio = () => {
             )}
           </div>
 
-          {/* COLUNA DIREITA: SESSÃO DE AVALIAÇÃO DA VISTORIA */}
           <div className="lg:col-span-5 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5">
             <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
               <div>
@@ -440,7 +456,6 @@ const TelaVistoriaPatrimonio = () => {
               </span>
             </div>
 
-            {/* AVALIAÇÃO DO ITEM SELECIONADO */}
             {itemEmEdicao && (
               <div className="p-4 bg-slate-50 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start">
@@ -449,7 +464,7 @@ const TelaVistoriaPatrimonio = () => {
                     <h4 className="font-extrabold text-slate-800 text-sm uppercase">
                       {itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome}
                     </h4>
-                    <span className="text-xs font-mono font-bold text-slate-500">Patrimônio: #{itemEmEdicao.patrimonio || "S/P"}</span>
+                    <span className="text-xs font-mono font-bold text-slate-500">Patrimônio: #{itemEmEdicao.patrimonio || "s/p"}</span>
                   </div>
                   <button type="button" onClick={() => setItemEmEdicao(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Cancelar</button>
                 </div>
@@ -477,7 +492,7 @@ const TelaVistoriaPatrimonio = () => {
                   placeholder="Observações técnicas ou motivo do estado..."
                   className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 outline-none resize-none"
                   value={obsModal}
-                  onChange={(e) => setObsModal(e.target.value)}
+                  onChange={(e) => setObsModal(e.target.value.toLowerCase())}
                 />
 
                 <div>
@@ -508,7 +523,6 @@ const TelaVistoriaPatrimonio = () => {
               </div>
             )}
 
-            {/* LISTA DOS ITENS AVALIADOS */}
             <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
               {itensAvaliados.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
@@ -551,31 +565,34 @@ const TelaVistoriaPatrimonio = () => {
               )}
             </div>
 
-            {/* BOTAO PARA FINALIZAR */}
             <button
               type="button"
-              disabled={loading || itensAvaliados.length === 0 || !unidadeSelecionada || !setorSelecionado}
-              onClick={() => handleFinalizarVistoriaLote({
-                unidade: unidadeSelecionada,
-                setor: setorSelecionado,
-                dataHora: dataHoraVistoria,
-                itens: itensAvaliados,
-                onSuccess: () => {
-                  setItensAvaliados([]);
-                  limparFiltros();
-                }
-              })}
+              disabled={itensAvaliados.length === 0 || !unidadeSelecionada || !setorSelecionado}
+              onClick={handleGerarTermoModal}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-100 cursor-pointer text-sm"
             >
-              <Printer size={18} />
-              {loading ? "Salvando Vistoria..." : `Fechar Vistoria e Gerar Relatório (${itensAvaliados.length})`}
+              <FileText size={18} />
+              Conferir e Gerar Termo ({itensAvaliados.length})
             </button>
           </div>
-
         </div>
       </main>
 
-      <Footer />
+      <div className="no-print">
+        <Footer />
+      </div>
+
+      <TelaVistoriaPatrimonioModal
+        modalDocumentoAberto={modalDocumentoAberto}
+        setModalDocumentoAberto={setModalDocumentoAberto}
+        handleImprimir={handleImprimir}
+        loading={loading}
+        handleConfirmarESalvar={handleConfirmarESalvar}
+        unidadeSelecionada={unidadeSelecionada}
+        setorSelecionado={setorSelecionado}
+        dataHoraVistoria={dataHoraVistoria}
+        itensAvaliados={itensAvaliados}
+      />
     </div>
   );
 };

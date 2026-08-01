@@ -1,4 +1,3 @@
-// src/pages/PainelAnalyticsBI.jsx
 import React, { useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
