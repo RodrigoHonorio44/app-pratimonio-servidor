@@ -23,7 +23,7 @@ import PainelCoordenacao from "../pages/PainelCoordenacao";
 import Laudos from "../pages/Laudos";
 import TelaEtiquetas from "../pages/TelaEtiquetas";
 import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
-import HistoricoVistoria from "../pages/HistoricoVistoria"; // <-- NOVA TELA DE HISTÓRICO IMPORTADA
+import HistoricoVistoria from "../pages/HistoricoVistoria";
 
 // Importando componentes
 import CadastroChamado from "../components/CadastroChamado";
@@ -64,9 +64,18 @@ export default function AppRoutes({
         </>
       ) : (
         <>
+          {/* Rota de Login ajustada para verificar troca de senha ao autenticar */}
           <Route
             path="/login"
-            element={!user ? <Login /> : <Navigate to={getHomePath()} replace />}
+            element={
+              !user ? (
+                <Login />
+              ) : precisaTrocarSenha ? (
+                <Navigate to="/trocar-senha" replace />
+              ) : (
+                <Navigate to={getHomePath()} replace />
+              )
+            }
           />
 
           {user ? (
@@ -146,7 +155,7 @@ export default function AppRoutes({
                   }
                 />
 
-                {/* --- NOVA ROTA DE HISTÓRICO DE VISTORIA --- */}
+                {/* --- HISTÓRICO DE VISTORIA --- */}
                 <Route
                   path="/historico-vistorias"
                   element={

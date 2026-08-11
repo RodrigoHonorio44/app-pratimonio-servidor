@@ -119,7 +119,6 @@ export default function Usuarios() {
     }
   };
 
-  // Função Unificada e Corrigida recebendo o objeto do usuário completo (u)
   const alterarNivel = async (userAlvo, novoRole) => {
     if (userAlvo.role === "root" && !isOperadorRoot) {
       return toast.error("Apenas um ROOT pode alterar outro ROOT.");
@@ -189,7 +188,7 @@ export default function Usuarios() {
         statusLicenca: "ativa",
         validadeLicenca: Timestamp.fromDate(dataVencimento),
         status: "Ativo",
-        requiresPasswordChange: false,
+        requiresPasswordChange: true, // Força a troca de senha no primeiro acesso
         createdAt: Timestamp.now(),
         ultimaTrocaSenha: Timestamp.now(),
         historicoSenhas: [],
