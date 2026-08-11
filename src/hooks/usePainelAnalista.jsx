@@ -7,6 +7,16 @@ import { toast } from "react-toastify";
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbyGgcYmM7oXjpx0li898F2RCy5M4a6os5Ti9s9t5J6h9BbgO0W8PpOfrQ3TxqIOCNNVpg/exec";
 
+// Helper para normalizar textos removendo acentos e espaços extras
+const normalizarTexto = (str) =>
+  typeof str === "string"
+    ? str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+    : "";
+
 // ✅ Helper para formatar e-mails e strings para exibição legível
 export const obterNomeExibicao = (valor) => {
   if (!valor || typeof valor !== "string") return "";
@@ -163,7 +173,7 @@ export const usePainelAnalista = () => {
     const fetchUserData = async () => {
       try {
         const response = await api.get(`/usuarios/${user.uid}`);
-        if (response.data && typeof response.data !== "string") {
+        if (response.data && typeof response.data !== "string" && response.data.equipe) {
           setUserData(response.data);
           return;
         }
@@ -199,7 +209,6 @@ export const usePainelAnalista = () => {
 
         const listaBruta = Array.isArray(dadosBrutos) ? dadosBrutos : (dadosBrutos?.chamados || []);
 
-        // Mapeia e formata os nomes dos solicitantes e técnicos
         const listaTratada = listaBruta.map((item) => {
           const nomeSolicitanteBruto = item.solicitante || item.nome || item.emailSolicitante || "Não informado";
           const nomeTecnicoBruto = item.tecnicoResponsavel || item.tecnico;
@@ -236,7 +245,7 @@ export const usePainelAnalista = () => {
     try {
       const dadosAtualizacao = {
         status: "em atendimento",
-        tecnicoResponsavel: analistaNome, // Salva o nome tratado do analista
+        tecnicoResponsavel: analistaNome,
         tecnicoId: user.uid,
         iniciadoEm: new Date().toISOString(),
         logSeguranca: jaTemTecnico
@@ -439,32 +448,52 @@ export const usePainelAnalista = () => {
     }
   };
 
+  // ✅ FILTRAGEM RIGOROSA DE CHAMADOS POR EQUIPE, ROLE E BUSCA
   const chamadosFiltrados = useMemo(() => {
     const listaSegura = Array.isArray(chamados) ? chamados : [];
-    const busca = termoBusca.toLowerCase().trim();
-    
-    const roleUser = (userData?.role || userData?.cargo || "").toLowerCase();
-    const isAdminOuRoot = ["root", "admin", "administrador"].includes(roleUser) || !userData;
-    const equipeUsuario = userData?.equipe?.toLowerCase().trim();
+    const busca = normalizarTexto(termoBusca);
+
+    // Se userData ainda não carregou, bloqueia por segurança
+    if (!userData) {
+      return [];
+    }
+
+    const roleUser = normalizarTexto(userData.role || userData.cargo);
+    const isAdminOuRoot = ["root", "admin", "administrador"].includes(roleUser);
+    const equipeUsuario = normalizarTexto(userData.equipe || userData.setor || userData.departamento);
 
     return listaSegura.filter((c) => {
-      if (!isAdminOuRoot && equipeUsuario) {
-        const equipeChamado = c.equipe?.toLowerCase().trim();
-        if (equipeChamado && equipeChamado !== equipeUsuario) {
-          return false;
+      // 1. BARREIRA DE EQUIPE (Para usuários que NÃO são Admin/Root)
+      if (!isAdminOuRoot) {
+        if (!equipeUsuario) return false;
+
+        const equipeChamado = normalizarTexto(c.equipe || c.equipeAtendimento || c.setorDestino);
+
+        const usuarioEhPatrimonio = equipeUsuario.includes("patrimon");
+        const chamadoEhPatrimonio = equipeChamado.includes("patrimon");
+
+        const eMesmaEquipe =
+          equipeChamado === equipeUsuario || (usuarioEhPatrimonio && chamadoEhPatrimonio);
+
+        if (!eMesmaEquipe) {
+          return false; // Descarta chamados de outras equipes
         }
       }
 
-      const matchesBusca =
-        c.numeroOs?.toString().includes(busca) ||
-        c.solicitanteExibicao?.toLowerCase().includes(busca) ||
-        c.tecnicoExibicao?.toLowerCase().includes(busca) ||
-        c.unidade?.toLowerCase().includes(busca) ||
-        c.patrimonio?.toLowerCase().includes(busca) ||
-        c.equipamento?.toLowerCase().includes(busca) ||
-        c.equipe?.toLowerCase().includes(busca);
+      // 2. FILTRO DE BUSCA OU STATUS (Executado apenas para chamados autorizados)
+      if (busca) {
+        return (
+          c.numeroOs?.toString().includes(busca) ||
+          normalizarTexto(c.solicitanteExibicao).includes(busca) ||
+          normalizarTexto(c.tecnicoExibicao).includes(busca) ||
+          normalizarTexto(c.unidade).includes(busca) ||
+          normalizarTexto(c.patrimonio).includes(busca) ||
+          normalizarTexto(c.equipamento).includes(busca) ||
+          normalizarTexto(c.equipe).includes(busca)
+        );
+      }
 
-      return busca ? matchesBusca : c.status?.toLowerCase() !== "arquivado";
+      return normalizarTexto(c.status) !== "arquivado";
     });
   }, [chamados, termoBusca, userData]);
 

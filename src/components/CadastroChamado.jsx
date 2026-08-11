@@ -91,6 +91,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                     <option value="">Para qual equipe é o chamado?</option>
                     <option value="refrigeracao">Refrigeração</option>
                     <option value="patrimonio">Patrimônio</option>
+                    <option value="Manutencao patrimonial">Manutenção Patrimônial</option>
                     <option value="ti computadores impressoras">TI Computadores e Impressoras</option>
                     <option value="ti sistema e redes">TI Sistema e Redes</option>
                     <option value="manutencao predial">Manutenção Predial</option>

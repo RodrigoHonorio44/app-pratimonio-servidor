@@ -7,7 +7,7 @@ import { toast } from "react-toastify";
 export default function ModalPermissoes({ usuario, aoFechar }) {
   // FUNÇÃO DE NORMALIZAÇÃO
   const inicializarPermissoes = () => {
-    const extras = usuario.permissoesExtras || {};
+    const extras = usuario?.permissoesExtras || {};
     const estadoLimpo = {};
 
     Object.keys(extras).forEach((key) => {
@@ -56,7 +56,11 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
       desc: "Controle de ativos e consulta de patrimônio",
     },
     {
-      // 🚀 NOVO MÓDULO ADICIONADO:
+      id: "vistoria",
+      nome: "Vistoria de Patrimônio",
+      desc: "Realização de vistorias técnicas e consulta ao histórico",
+    },
+    {
       id: "etiquetas",
       nome: "Etiquetas de Patrimônio",
       desc: "Geração de layout de identificação física e sequenciais unificados",
@@ -108,7 +112,7 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
               Privilégios SaaS
             </h3>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              Cliente: {usuario.nome}
+              Cliente: {usuario?.nome}
             </p>
           </div>
           <button

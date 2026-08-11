@@ -86,6 +86,7 @@ const FormAnalista = ({ dados, setDados, onSubmit, loading }) => {
             <option value="manutencao predial">Manutenção Predial</option>
             <option value="engenharia clinica">Engenharia Clínica</option>
             <option value="patrimonio">Patrimônio</option>
+            <option value="Manutencao patrimonial">Manutenção Patrimônial</option>
             <option value="ti malta">Ti Malta</option>
             <option value="sistema e redes">Sistema e Redes</option>
             <option value="refrigeracao">Refrigeração</option>

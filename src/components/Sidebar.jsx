@@ -214,7 +214,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
         )}
 
         {/* Patrimônio */}
-        {(temAcesso("inventario") || temAcesso("etiquetas")) && (
+        {(temAcesso("inventario") || temAcesso("etiquetas") || temAcesso("vistoria")) && (
           <div className={`${sidebarOpen ? "bg-slate-200/40 border border-slate-200/60 rounded-2xl p-1.5" : "bg-transparent"} transition-all`}>
             <div
               onClick={() => toggleSection("patrimonio")}
@@ -246,8 +246,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                 <NavButton icon={Layers3} label="Consulta de Itens" path="/consulta-patrimonio" moduloId="inventario" />
                 <NavButton icon={Package} label="Sala do Patrimônio" path="/estoque" moduloId="inventario" />
                 <NavButton icon={Truck} label="Saída/Transferência" path="/transferencia" moduloId="inventario" />
-                <NavButton icon={ClipboardCheck} label="Vistoria Patrimônio" path="/vistoria-patrimonio" moduloId="inventario" />
-                <NavButton icon={ClipboardList} label="Histórico Vistorias" path="/historico-vistorias" moduloId="inventario" />
+                <NavButton icon={ClipboardCheck} label="Vistoria Patrimônio" path="/vistoria-patrimonio" moduloId="vistoria" />
+                <NavButton icon={ClipboardList} label="Histórico Vistorias" path="/historico-vistorias" moduloId="vistoria" />
                 <NavButton icon={Barcode} label="Gerar Etiquetas" path="/emissao-etiquetas" moduloId="etiquetas" />
               </div>
             )}
