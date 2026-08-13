@@ -71,7 +71,7 @@ export default function HistoricoVistoria() {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
           >
             <Printer size={18} />
-            Gerar Relatório Consolidado ({selecionadas.length})
+            Gerar Ordens de Manutenção ({selecionadas.length})
           </button>
         )}
       </header>
@@ -287,7 +287,7 @@ export default function HistoricoVistoria() {
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
               >
                 <Printer size={16} />
-                Imprimir Termo Desta Vistoria
+                Imprimir Ordem de Manutenção
               </button>
             </div>
           </div>
@@ -295,12 +295,12 @@ export default function HistoricoVistoria() {
       )}
 
       {/* ========================================================================= */}
-      {/* SEÇÃO DE IMPRESSÃO OFICIAL (Mesmo layout exato do ImpressaoLaudoTecnico) */}
+      {/* SEÇÃO DE IMPRESSÃO OFICIAL - ORDEM DE MANUTENÇÃO / LAUDO FOCADO          */}
       {/* ========================================================================= */}
       <div id="secao-laudo-oficial" className="hidden print:block bg-white w-full max-w-[850px] font-sans text-slate-900 mx-auto p-2">
         <div className="w-full flex flex-col justify-between flex-1 corpo-documento-print">
           <div>
-            {/* CABEÇALHO COM OS 4 LOGOS OFICIAIS */}
+            {/* CABEÇALHO COM LOGOS */}
             <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-200 w-full cabecalho-logos">
               <img src="/Imagem1.png" alt="Logo 1" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
               <img src="/Imagem2.png" alt="Logo 2" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
@@ -308,13 +308,18 @@ export default function HistoricoVistoria() {
               <img src="/Imagem4.png" alt="Logo 4" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
             </div>
 
-            <div className="text-center space-y-0.5 border-b-2 border-slate-800 pb-2 mb-3">
-              <h2 className="text-sm sm:text-base font-black uppercase tracking-wide">Relatório Oficial de Vistorias Patrimoniais</h2>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Documento formal para auditoria e prestação de contas — Emitido em: {new Date().toLocaleString("pt-BR")}</p>
+            {/* TÍTULO FOCADO EM MANUTENÇÃO */}
+            <div className="text-center space-y-0.5 border-b-2 border-slate-800 pb-2 mb-4">
+              <h2 className="text-base sm:text-lg font-black uppercase tracking-wide">
+                Ordem de Serviço & Laudo de Manutenção
+              </h2>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                Documento de Encaminhamento Técnico — Emitido em: {new Date().toLocaleString("pt-BR")}
+              </p>
             </div>
 
-            {/* LISTAGEM DOS ITENS DAS VISTORIAS SELECIONADAS */}
-            <div className="space-y-4">
+            {/* CARDS INDIVIDUAIS POR EQUIPAMENTO */}
+            <div className="space-y-6">
               {vistoriasParaImprimir.length === 0 ? (
                 <p className="text-xs font-bold text-slate-600">Nenhuma vistoria selecionada para impressão.</p>
               ) : (
@@ -323,35 +328,89 @@ export default function HistoricoVistoria() {
                   const dataVistoria = v.dataHoraInicio || v.dataHora ? new Date(v.dataHoraInicio || v.dataHora).toLocaleString("pt-BR") : "Data não informada";
 
                   return (
-                    <div key={i} className="mb-4 border border-slate-200 p-2 rounded-xl bg-slate-50/50">
-                      <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-200">
-                        <span className="text-[11px] font-black uppercase text-blue-700">{v.unidade} — Setor: {v.setor}</span>
-                        <span className="text-[10px] text-slate-500 font-bold">Realizado em: {dataVistoria}</span>
-                      </div>
+                    <div key={i} className="space-y-6">
+                      {itens.map((item, idx) => {
+                        const estadoChave = (item.estadoConservacao || item.estado || "bom").toUpperCase();
+                        const fotoItem = item.foto || item.fotoUrl;
 
-                      <table className="w-full text-[9px] border-collapse text-left">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-700 font-black uppercase text-[8px]">
-                            <th className="p-1 w-[15%]">Patrimônio</th>
-                            <th className="p-1 w-[40%]">Equipamento / Descrição</th>
-                            <th className="p-1 w-[15%]">Estado</th>
-                            <th className="p-1 w-[30%]">Observação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700 uppercase">
-                          {itens.map((item, idx) => {
-                            const estadoChave = (item.estadoConservacao || item.estado || "bom").toUpperCase();
-                            return (
-                              <tr key={idx}>
-                                <td className="p-1 font-mono font-bold">#{item.patrimonio || "S/P"}</td>
-                                <td className="p-1 font-bold">{item.equipamento || item.descricao || item.nome}</td>
-                                <td className="p-1 font-extrabold">{estadoChave}</td>
-                                <td className="p-1 italic text-slate-600">{item.observacao || "-"}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                        return (
+                          <div key={idx} className="border-2 border-slate-800 rounded-2xl p-4 bg-white page-break-inside-avoid">
+                            {/* DADOS DE LOCALIZAÇÃO */}
+                            <div className="flex justify-between items-center bg-slate-900 text-white px-3 py-1.5 rounded-lg mb-4 text-xs font-black uppercase">
+                              <span>Unidade: {v.unidade} — Setor: {v.setor}</span>
+                              <span className="text-[10px] text-slate-300">Vistoriado em: {dataVistoria}</span>
+                            </div>
+
+                            {/* FOTO GRANDE E CENTRALIZADA */}
+                            <div className="flex flex-col items-center justify-center my-3">
+                              {fotoItem ? (
+                                <div className="border-2 border-slate-300 p-1 bg-slate-50 rounded-xl max-w-[320px] w-full flex justify-center">
+                                  <img 
+                                    src={fotoItem} 
+                                    alt="Foto do Equipamento" 
+                                    className="max-h-[220px] w-auto object-contain rounded-lg" 
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full max-w-[320px] h-36 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-slate-50">
+                                  <span className="text-xs font-bold text-slate-400 uppercase">Sem foto cadastrada</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* DETALHES DO EQUIPAMENTO */}
+                            <div className="grid grid-cols-3 gap-2 bg-slate-100 p-3 rounded-xl mb-4 text-xs uppercase border border-slate-200">
+                              <div>
+                                <span className="block text-[8px] font-black text-slate-500">Patrimônio</span>
+                                <span className="font-mono font-black text-slate-900 text-sm">#{item.patrimonio || "S/P"}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-black text-slate-500">Equipamento / Descrição</span>
+                                <span className="font-extrabold text-slate-900">{item.equipamento || item.descricao || item.nome}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[8px] font-black text-slate-500">Estado Constatado</span>
+                                <span className="font-black text-red-700 bg-red-100 px-2 py-0.5 rounded text-[10px] inline-block mt-0.5">
+                                  {estadoChave}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* DIZERES E INSTRUÇÕES PARA A EQUIPE DE MANUTENÇÃO */}
+                            <div className="space-y-3">
+                              <div className="border border-slate-300 p-2.5 rounded-xl bg-slate-50/50">
+                                <span className="block text-[9px] font-black uppercase text-blue-800 mb-1">
+                                  📌 Observação do Técnico da Vistoria:
+                                </span>
+                                <p className="text-xs font-semibold text-slate-800 capitalize italic">
+                                  {item.observacao || "Nenhuma observação informada."}
+                                </p>
+                              </div>
+
+                              <div className="border border-amber-300 bg-amber-50/40 p-2.5 rounded-xl">
+                                <span className="block text-[9px] font-black uppercase text-amber-900 mb-1">
+                                  🛠️ Instrução para Equipe de Manutenção:
+                                </span>
+                                <p className="text-[10px] font-bold text-slate-700 uppercase">
+                                  Realizar avaliação técnica, reparo/mantenabilidade do item listado ou emitir laudo de baixa definitiva caso seja irrecuperável.
+                                </p>
+                              </div>
+
+                              {/* CAMPO EM BRANCO PARA O TÉCNICO DE MANUTENÇÃO PREENCHER */}
+                              <div className="border border-slate-300 p-2.5 rounded-xl space-y-2">
+                                <span className="block text-[9px] font-black uppercase text-slate-600">
+                                  ✍️ Parecer do Técnico de Manutenção (Preenchimento Manual):
+                                </span>
+                                <div className="h-10 border-b border-dashed border-slate-300"></div>
+                                <div className="flex justify-between items-center pt-1 text-[8px] font-bold text-slate-500 uppercase">
+                                  <span>Data do Reparo: ____/____/________</span>
+                                  <span>Status: (  ) Concluído  (  ) Aguardando Peça  (  ) Condenado</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })
@@ -359,42 +418,37 @@ export default function HistoricoVistoria() {
             </div>
           </div>
 
-          {/* ASSINATURAS */}
+          {/* ASSINATURAS DE PROTOCOLO */}
           <div className="mt-6 pt-2">
             <div className="grid grid-cols-2 gap-8 sm:gap-12 text-center text-xs">
               <div className="space-y-1">
                 <div className="border-t border-slate-400 w-full mx-auto pt-1"></div>
-                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Responsável Pela Vistoria</p>
-                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Técnico em TI / Patrimônio</p>
+                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Solicitante / Patrimônio</p>
+                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Assinatura do Emissor</p>
               </div>
               <div className="space-y-1">
                 <div className="border-t border-slate-400 w-full mx-auto pt-1"></div>
-                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Aceite do Setor / Chefia</p>
-                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Assinatura / Carimbo</p>
+                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Recebido Pela Manutenção Patrimonial</p>
+                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Técnico Responsável / Data</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ESTILOS DE IMPRESSÃO IGUAIS AO LAUDO */}
+        {/* ESTILOS DE IMPRESSÃO */}
         <style>{`
           @media print {
             @page {
               size: A4 portrait;
-              margin: 15mm 10mm 10mm 10mm;
+              margin: 12mm 10mm 10mm 10mm;
             }
 
             body, html {
               background: #ffffff !important;
               color: #000000 !important;
-              height: 100% !important;
-              overflow: hidden !important;
             }
 
-            button,
-            nav,
-            header,
-            aside {
+            button, nav, header, aside {
               display: none !important;
             }
 
@@ -404,19 +458,21 @@ export default function HistoricoVistoria() {
               left: 0 !important;
               width: 100% !important;
               max-width: 100% !important;
-              box-shadow: none !important;
-              border: none !important;
               padding: 0 !important;
               margin: 0 !important;
               background: #ffffff !important;
               display: flex !important;
               flex-direction: column !important;
-              justify-content: space-between !important;
             }
 
-            .cabecalho-logos {
-              margin-top: 8px !important;
-              padding-top: 4px !important;
+            .page-break-inside-avoid {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+
+            img {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
             .corpo-documento-print,
