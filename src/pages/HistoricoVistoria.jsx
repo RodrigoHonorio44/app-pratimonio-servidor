@@ -9,9 +9,11 @@ import {
   Square,
   ArrowLeft,
   Image as ImageIcon,
-  Maximize2
+  Maximize2,
+  Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useHistoricoVistoria } from "../hooks/useHistoricoVistoria";
 
 const OPCOES_ESTADO = {
@@ -39,10 +41,70 @@ export default function HistoricoVistoria() {
     selecionarTodas,
     vistoriaAtiva,
     setVistoriaAtiva,
+    excluirVistoria,
   } = useHistoricoVistoria();
 
   const [fotoExpandida, setFotoExpandida] = useState(null);
   const vistoriasParaImprimir = vistoriasFiltradas.filter(v => selecionadas.includes(v.id));
+
+  // CONFIRMAÇÃO DE EXCLUSÃO COM TOAST
+  const handleExcluir = (e, id) => {
+    e.stopPropagation();
+
+    toast.custom((t) => (
+      <div
+        className={`${
+          t.visible ? "animate-enter" : "animate-leave"
+        } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col p-5 border border-slate-200`}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+            <Trash2 size={20} />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-slate-800">Excluir Vistoria</h4>
+            <p className="text-xs font-semibold text-slate-500">
+              Tem certeza que deseja remover este item do histórico?
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                await excluirVistoria(id);
+                if (vistoriaAtiva?.id === id) {
+                  setVistoriaAtiva(null);
+                }
+                toast.success("Vistoria excluída com sucesso!", {
+                  style: {
+                    borderRadius: "16px",
+                    background: "#0f172a",
+                    color: "#fff",
+                    fontWeight: "bold",
+                    fontSize: "13px",
+                  },
+                });
+              } catch (error) {
+                toast.error("Erro ao excluir vistoria.");
+              }
+            }}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+          >
+            Confirmar Exclusão
+          </button>
+        </div>
+      </div>
+    ), { duration: 5000 });
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans antialiased text-slate-900">
@@ -217,6 +279,15 @@ export default function HistoricoVistoria() {
                       >
                         Ver Detalhes
                       </button>
+
+                      {/* BOTÃO EXCLUIR VISTORIA */}
+                      <button
+                        onClick={(e) => handleExcluir(e, v.id)}
+                        title="Excluir Vistoria"
+                        className="p-2.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-sm"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
                 );
@@ -257,7 +328,12 @@ export default function HistoricoVistoria() {
                   <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       {fotoItem && (
-                        <img src={fotoItem} alt="Foto" className="w-14 h-14 object-cover rounded-xl border cursor-pointer" onClick={() => setFotoExpandida(fotoItem)} />
+                        <img 
+                          src={fotoItem} 
+                          alt="Foto" 
+                          className="w-14 h-14 object-cover rounded-xl border cursor-pointer hover:opacity-90 transition-opacity" 
+                          onClick={() => setFotoExpandida(fotoItem)} 
+                        />
                       )}
                       <div>
                         <div className="flex items-center gap-2">
@@ -278,7 +354,15 @@ export default function HistoricoVistoria() {
               })}
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-between items-center gap-3 border-t border-slate-100 pt-6">
+              <button
+                onClick={(e) => handleExcluir(e, vistoriaAtiva.id)}
+                className="flex items-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer"
+              >
+                <Trash2 size={16} />
+                Excluir Vistoria
+              </button>
+
               <button
                 onClick={() => {
                   setVistoriaAtiva(null);
@@ -294,9 +378,29 @@ export default function HistoricoVistoria() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SEÇÃO DE IMPRESSÃO OFICIAL - ORDEM DE MANUTENÇÃO / LAUDO FOCADO          */}
-      {/* ========================================================================= */}
+      {/* MODAL DE AMPLIAÇÃO DA FOTO */}
+      {fotoExpandida && (
+        <div 
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[60] flex items-center justify-center p-4 print:hidden"
+          onClick={() => setFotoExpandida(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img 
+              src={fotoExpandida} 
+              alt="Foto Expandida" 
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl border-4 border-white shadow-2xl"
+            />
+            <button
+              onClick={() => setFotoExpandida(null)}
+              className="absolute -top-4 -right-4 bg-white text-slate-900 w-10 h-10 rounded-full font-black flex items-center justify-center shadow-lg hover:bg-slate-100 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SEÇÃO DE IMPRESSÃO OFICIAL */}
       <div id="secao-laudo-oficial" className="hidden print:block bg-white w-full max-w-[850px] font-sans text-slate-900 mx-auto p-2">
         <div className="w-full flex flex-col justify-between flex-1 corpo-documento-print">
           <div>

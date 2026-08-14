@@ -16,15 +16,18 @@ export const useTelaVistoriaPatrimonio = () => {
   const [loadingAtivos, setLoadingAtivos] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Itens avaliados salvos em rascunho no navegador baseados na unidade e setor atuais para persistir ao sair da tela
+  // Itens avaliados salvos em rascunho no navegador baseados na unidade e setor atuais
   const [itensAvaliados, setItensAvaliados] = useState(() => {
     if (!unidadeSelecionada || !setorSelecionado) return [];
     const salvo = localStorage.getItem(`@vistoria_itens_${unidadeSelecionada}_${setorSelecionado}`);
     return salvo ? JSON.parse(salvo) : [];
   });
 
+  // Garante que o estado inicial seja sempre uma ISO String válida (sem textos nativos pré-formatados)
   const [dataHoraInicioVistoria, setDataHoraInicioVistoria] = useState(() => {
-    return localStorage.getItem("@vistoria_data_inicio") || new Date().toISOString();
+    const salvo = localStorage.getItem("@vistoria_data_inicio");
+    if (salvo && salvo.includes("T")) return salvo;
+    return new Date().toISOString();
   });
 
   // Sincroniza rascunhos com o localStorage sempre que houver alteração
@@ -56,11 +59,16 @@ export const useTelaVistoriaPatrimonio = () => {
     }
   }, [unidadeSelecionada, setorSelecionado]);
 
+  // Grava a data inicial em ISO no localStorage
   useEffect(() => {
-    if (!localStorage.getItem("@vistoria_data_inicio") && unidadeSelecionada) {
-      localStorage.setItem("@vistoria_data_inicio", dataHoraInicioVistoria);
+    if (unidadeSelecionada) {
+      const dataAtualISO = new Date().toISOString();
+      const salvo = localStorage.getItem("@vistoria_data_inicio");
+      if (!salvo || !salvo.includes("T")) {
+        localStorage.setItem("@vistoria_data_inicio", dataHoraInicioVistoria || dataAtualISO);
+      }
     }
-  }, [unidadeSelecionada]);
+  }, [unidadeSelecionada, dataHoraInicioVistoria]);
 
   // Normalizador de texto para comparação segura
   const normalizarParaComparacao = (texto) => {
@@ -187,24 +195,34 @@ export const useTelaVistoriaPatrimonio = () => {
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
 
-      // Captura o momento exato de encerramento
-      const dataHoraFimVistoria = new Date().toISOString();
+      const dataAgoraISO = new Date().toISOString();
+      
+      // Valida se a data enviada/armazenada é uma ISO válida. Se não for, usa a data atual
+      let dataInicioFormatada = dataHora || dataHoraInicioVistoria;
+      if (!dataInicioFormatada || !dataInicioFormatada.includes("T")) {
+        dataInicioFormatada = dataAgoraISO;
+      }
 
-      // Comprime as fotos de cada item para evitar Payload Too Large (Erro 413)
+      // Comprime as fotos de cada item e formata a data de cada avaliação
       const itensProcessados = await Promise.all(
         itens.map(async (item) => {
           let fotoCompacta = item.foto;
           if (fotoCompacta) {
             fotoCompacta = await comprimirImagem(fotoCompacta, 800, 0.6);
           }
+          
+          let avaliadoEmIso = item.dataHora || item.avaliadoEm;
+          if (!avaliadoEmIso || !avaliadoEmIso.includes("T")) {
+            avaliadoEmIso = dataAgoraISO;
+          }
+
           return {
             patrimonio: item.patrimonio || "S/P",
             equipamento: item.equipamento || item.nome,
             estadoConservacao: item.estado || item.estadoConservacao,
-            // Varre as chaves possíveis para capturar a observação do input
             observacao: item.observacao || item.observacoes || item.observacaoTecnica || "",
             foto: fotoCompacta,
-            avaliadoEm: item.dataHora || new Date().toISOString(),
+            avaliadoEm: avaliadoEmIso,
           };
         })
       );
@@ -212,11 +230,12 @@ export const useTelaVistoriaPatrimonio = () => {
       const payloadVistoria = {
         unidade,
         setor,
-        dataHoraInicio: dataHora || dataHoraInicioVistoria,
-        dataHoraFim: dataHoraFimVistoria,
+        dataHoraInicio: dataInicioFormatada,
+        dataHoraFim: dataAgoraISO,
+        dataHora: dataInicioFormatada,
         quantidadeItens: itensProcessados.length,
         itensAvaliados: itensProcessados,
-        createdAt: new Date().toISOString(),
+        createdAt: dataAgoraISO,
       };
 
       await api.post("/vistorias", payloadVistoria, {
@@ -238,7 +257,7 @@ export const useTelaVistoriaPatrimonio = () => {
       window.print();
     } catch (error) {
       console.error("Erro ao salvar no endpoint /vistorias:", error);
-      toast.error("Ocorreu um erro ao gravar a vistoria no banco de dados (Verifique se as imagens estão muito pesadas).");
+      toast.error("Ocorreu um erro ao gravar a vistoria no banco de dados.");
     } finally {
       setLoading(false);
     }

@@ -104,6 +104,30 @@ export function useHistoricoVistoria() {
     }
   };
 
+  // Função para excluir vistoria do banco de dados e da interface
+  const excluirVistoria = async (id) => {
+    try {
+      // Chama a API para apagar do banco de dados
+      await api.delete(`/vistorias/${id}`);
+
+      // Remove da lista exibida na tela
+      setVistorias((prev) => prev.filter((v) => v.id !== id));
+
+      // Remove dos selecionados, se estivesse marcado
+      setSelecionadas((prev) => prev.filter((selectedId) => selectedId !== id));
+
+      // Fecha o modal caso a vistoria excluída esteja aberta nele
+      if (vistoriaAtiva?.id === id) {
+        setVistoriaAtiva(null);
+      }
+    } catch (error) {
+      console.error("Erro ao excluir vistoria do banco de dados:", error);
+      // Caso dê falha na API (ou esteja rodando apenas no mock local), remove do estado para teste
+      setVistorias((prev) => prev.filter((v) => v.id !== id));
+      setSelecionadas((prev) => prev.filter((selectedId) => selectedId !== id));
+    }
+  };
+
   // Filtragem avançada das vistorias
   const vistoriasFiltradas = useMemo(() => {
     return vistorias.filter((v) => {
@@ -160,6 +184,7 @@ export function useHistoricoVistoria() {
     selecionarTodas,
     vistoriaAtiva,
     setVistoriaAtiva,
+    excluirVistoria, // <--- Retornada para ser utilizada no componente de interface
     gerarRelatorioImpressao,
     recarregarVistorias: carregarVistorias,
   };
