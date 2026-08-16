@@ -28,7 +28,7 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
   const [permissoes, setPermissoes] = useState(inicializarPermissoes);
   const [salvando, setSalvando] = useState(false);
 
-  // LISTA DE MÓDULOS ATUALIZADA
+  // LISTA DE MÓDULOS ATUALIZADA (COM GERENCIAR SETORES)
   const modulosDisponiveis = [
     {
       id: "dashboard_bi",
@@ -39,6 +39,11 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
       id: "chamados",
       nome: "Gestão de Chamados",
       desc: "Acesso à fila de suporte e atendimento de chamados",
+    },
+    {
+      id: "gerenciarSetores",
+      nome: "Gerenciar Setores",
+      desc: "Controle e gerenciamento de setores da instituição",
     },
     {
       id: "laudos",

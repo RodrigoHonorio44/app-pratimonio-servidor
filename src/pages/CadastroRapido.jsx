@@ -85,28 +85,41 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   // Carrega dados para edição ou limpa para novo cadastro
   useEffect(() => {
     if (isEditing && initialData) {
-      const unidadeAtual = initialData.unidade || "";
+      // 1. Pega todas as possibilidades de onde a unidade pode vir no objeto
+      const unidadeBruta = 
+        initialData.unidade || 
+        initialData.unidadeAtual || 
+        initialData.local || 
+        "";
+
+      // 2. Faz a correspondência flexível com as unidades disponíveis (ignorando case e espaços)
+      const unidadeEncontrada = unidades.find(
+        (u) => u.toLowerCase().trim() === unidadeBruta.toLowerCase().trim()
+      ) || unidadeBruta;
+
+      // 3. Garante que o setor venha limpo
       const setorAtual = initialData.setor || "";
 
-      // Verifica se o setor salvo existe na lista oficial da unidade
-      const setoresUnidade = MAPA_SETORES_POR_UNIDADE[unidadeAtual] || [];
+      // 4. Verifica se o setor preenchido existe na lista oficial daquela unidade
+      const setoresUnidade = MAPA_SETORES_POR_UNIDADE[unidadeEncontrada] || [];
       const existeNaLista = setoresUnidade.some(
         (s) => s.toLowerCase().trim() === setorAtual.toLowerCase().trim()
       );
 
-      // Se não existir na lista, ativa o campo de digitação manual automaticamente
+      // 5. Se houver setor mas ele não estiver na lista padrão, força o modo manual automaticamente
       if (setorAtual && !existeNaLista) {
         setSetorManual(true);
       } else {
         setSetorManual(false);
       }
 
+      // 6. Preenche o formulário garantindo que o patrimônio (mesmo S/P) seja tratado como string limpa
       setFormData({
-        patrimonio: initialData.patrimonio || "",
+        patrimonio: initialData.patrimonio ? String(initialData.patrimonio).trim() : "",
         nome: initialData.nome || "",
         tipo: initialData.tipoItem || initialData.tipo || "Mobiliário",
+        unidade: unidadeEncontrada,
         setor: setorAtual,
-        unidade: unidadeAtual,
         estado: (initialData.estado || "novo").toLowerCase(),
         observacoes: initialData.observacoes || "",
       });
@@ -395,7 +408,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                           ? "Selecione o setor..."
                           : "Escolha a unidade primeiro"}
                       </option>
-                      {MAPA_SETORES_POR_UNIDADE[formData.unidade]?.map((s) => (
+                      {(MAPA_SETORES_POR_UNIDADE[formData.unidade] || []).map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>

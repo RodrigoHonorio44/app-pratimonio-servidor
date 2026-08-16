@@ -283,7 +283,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
           {/* Patrimônio */}
           {(temAcesso("inventario") ||
             temAcesso("etiquetas") ||
-            temAcesso("vistoria")) && (
+            temAcesso("vistoria") ||
+            temAcesso("gerenciarSetores")) && (
             <div
               className={`${
                 sidebarOpen || window.innerWidth < 768
@@ -336,7 +337,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     icon={Boxes}
                     label="Gerenciar Setor"
                     path="/gerenciar-setor"
-                    moduloId="inventario"
+                    moduloId="gerenciarSetores"
                   />
                   <NavButton
                     icon={Package}
