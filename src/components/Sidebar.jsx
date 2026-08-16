@@ -23,7 +23,6 @@ import {
   FolderKanban,
   Boxes,
   X,
-  Zap,
 } from "lucide-react";
 import { auth } from "../services/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -55,7 +54,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
     userData?.cargo?.toUpperCase() === "ADMINISTRADOR" ||
     userData?.role?.toLowerCase() === "admin";
 
-  // Variável que faltava e causava o erro ReferenceError
   const canManageUsers = isRoot || isAdmin;
 
   const temAcesso = (moduloId) => {
@@ -323,12 +321,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     moduloId="inventario"
                   />
                   <NavButton
-                    icon={Zap}
-                    label="Cadastro Direto"
-                    path="/cadastro-rapido"
-                    moduloId="inventario"
-                  />
-                  <NavButton
                     icon={Search}
                     label="Inventário"
                     path="/inventario"
@@ -338,6 +330,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     icon={Layers3}
                     label="Consulta de Itens"
                     path="/consulta-patrimonio"
+                    moduloId="inventario"
+                  />
+                  <NavButton
+                    icon={Boxes}
+                    label="Gerenciar Setor"
+                    path="/gerenciar-setor"
                     moduloId="inventario"
                   />
                   <NavButton

@@ -13,7 +13,6 @@ import DashboardBI from "../pages/DashboardBI";
 import PainelAnalista from "../pages/PainelAnalista";
 import Home from "../pages/Home";
 import CadastroEquipamento from "../pages/CadastroEquipamento";
-import CadastroRapido from "../pages/CadastroRapido"; // Nova página de Cadastro Direto
 import Transferencia from "../pages/Transferencia";
 import Inventario from "../pages/Inventario";
 import Estoque from "../pages/Estoque";
@@ -25,6 +24,7 @@ import Laudos from "../pages/Laudos";
 import TelaEtiquetas from "../pages/TelaEtiquetas";
 import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
 import HistoricoVistoria from "../pages/HistoricoVistoria";
+import GerenciarSetor from "../pages/GerenciarSetor";
 
 // Importando componentes
 import CadastroChamado from "../components/CadastroChamado";
@@ -114,15 +114,6 @@ export default function AppRoutes({
                     </ProtectedRoute>
                   }
                 />
-                {/* Rota adicionada para o Cadastro Direto */}
-                <Route
-                  path="/cadastro-rapido"
-                  element={
-                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
-                      <CadastroRapido />
-                    </ProtectedRoute>
-                  }
-                />
                 <Route
                   path="/estoque"
                   element={
@@ -171,6 +162,16 @@ export default function AppRoutes({
                   element={
                     <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
                       <HistoricoVistoria />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* --- GERENCIAR SETOR --- */}
+                <Route
+                  path="/gerenciar-setor"
+                  element={
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                      <GerenciarSetor />
                     </ProtectedRoute>
                   }
                 />
