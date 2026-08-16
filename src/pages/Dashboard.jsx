@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import React from "react";
 import {
   ClipboardList,
@@ -13,7 +12,6 @@ import {
   ClipboardCheck,
   Search,
   ChevronRight,
-  Menu,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -25,8 +23,12 @@ export default function Dashboard() {
   const {
     sidebarOpen,
     setSidebarOpen,
+    modoFiltro,
+    setModoFiltro,
     mesFiltro,
     setMesFiltro,
+    anoFiltro,
+    setAnoFiltro,
     userData,
     loading,
     estatisticas,
@@ -34,7 +36,7 @@ export default function Dashboard() {
     isAdmin,
     temAcesso,
     nomeExibicao,
-    unidadExibicao,
+    unidadExibicao
   } = useDashboard();
 
   if (loading) {
@@ -52,116 +54,104 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans antialiased text-slate-900">
-      {/* SIDEBAR IMPORTADA */}
-      <Sidebar
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        userData={userData}
+      
+      <Sidebar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userData={userData} 
       />
 
-      {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-hidden w-full">
-        {/* HEADER RESPONSIVO E CORRIGIDO */}
-        <header className="min-h-[72px] md:h-24 bg-white border-b border-slate-100 flex items-center justify-between px-3 sm:px-6 md:px-10 z-40 shrink-0 gap-2">
-          {/* Esquerda: Ícone Hambúrguer + Título */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-2 text-slate-700 hover:text-blue-600 hover:bg-slate-100 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs cursor-pointer transition-colors"
-              aria-label="Abrir Menu"
-            >
-              <Menu size={20} />
-            </button>
-
-            <div className="flex flex-col">
-              <span className="text-[8px] sm:text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">
-                {isRoot ? "Root Access" : isAdmin ? "Administrador" : "Analista"}
-              </span>
-              <h1 className="text-base sm:text-xl font-black text-slate-800 tracking-tight italic leading-none">
-                Dashboard
-              </h1>
-            </div>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 z-40">
+          <div className="flex flex-col">
+            <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+              {isRoot ? "Root Access" : isAdmin ? "Administrador" : "Analista"}
+            </h2>
+            <h1 className="text-xl font-black text-slate-800 tracking-tight italic">
+              Dashboard
+            </h1>
           </div>
 
-          {/* Direita: Perfil / Unidade */}
-          <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
-            <div className="flex flex-col items-end overflow-hidden">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <span className="px-1.5 sm:px-2.5 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-tighter max-w-[80px] sm:max-w-none truncate">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-tighter">
                   {unidadExibicao}
                 </span>
-                <span className="hidden sm:inline text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                   Usuário
                 </span>
               </div>
-              <h3 className="text-xs sm:text-base md:text-lg font-black text-slate-800 uppercase italic leading-tight mt-0.5 max-w-[110px] sm:max-w-[200px] md:max-w-none truncate text-right">
+              <h3 className="text-lg font-black text-slate-800 uppercase italic leading-tight mt-0.5">
                 {nomeExibicao}
               </h3>
             </div>
-
-            <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl sm:rounded-2xl shadow-md sm:shadow-lg shadow-blue-200 flex items-center justify-center text-white shrink-0">
-              <User size={18} className="sm:w-6 sm:h-6" strokeWidth={2.5} />
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white">
+              <User size={28} strokeWidth={2.5} />
             </div>
           </div>
         </header>
 
-        {/* ÁREA DE CONTEÚDO */}
-        <section className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 bg-[#F8FAFC]">
+        <section className="flex-1 overflow-y-auto p-10 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">
-            {/* Cabeçalho de Boas-Vindas e Filtro de Período */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-6 md:mb-10">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 leading-tight">
+            
+            {/* CABEÇALHO DO PAINEL COM FILTRO REFORÇADO */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
+              <h1 className="text-4xl font-black text-slate-900">
                 Olá, {nomeExibicao.split(" ")[0]}!
               </h1>
+              
+              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm">
+                
+                {/* Selector do Modo (Mensal ou Anual) */}
+                <select
+                  value={modoFiltro}
+                  onChange={(e) => setModoFiltro(e.target.value)}
+                  className="bg-slate-100 font-black text-slate-700 text-xs uppercase rounded-xl px-3 py-2 border-none focus:outline-none cursor-pointer"
+                >
+                  <option value="mensal">Visão Mensal</option>
+                  <option value="anual">Visão Anual (Ano Todo)</option>
+                </select>
 
-              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-2xs w-full sm:w-auto justify-between sm:justify-start">
-                <div className="flex items-center gap-1.5">
-                  <Calendar size={14} className="text-blue-600 shrink-0" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Período:
-                  </span>
+                <div className="h-6 w-[1px] bg-slate-200"></div>
+
+                {/* Input Dinâmico de acordo com a seleção */}
+                <div className="flex items-center gap-2 px-2 py-1">
+                  <Calendar size={16} className="text-blue-600" />
+                  
+                  {modoFiltro === "mensal" ? (
+                    <input
+                      type="month"
+                      value={mesFiltro}
+                      onChange={(e) => setMesFiltro(e.target.value)}
+                      className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+                    />
+                  ) : (
+                    <select
+                      value={anoFiltro}
+                      onChange={(e) => setAnoFiltro(e.target.value)}
+                      className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+                    >
+                      <option value="2026">2026</option>
+                      <option value="2025">2025</option>
+                      <option value="2024">2024</option>
+                    </select>
+                  )}
                 </div>
-                <input
-                  type="month"
-                  value={mesFiltro}
-                  onChange={(e) => setMesFiltro(e.target.value)}
-                  className="bg-transparent font-bold text-slate-700 text-xs sm:text-sm focus:outline-none cursor-pointer"
-                />
               </div>
             </div>
 
-            {/* CARDS DE ESTATÍSTICAS */}
+            {/* CARDS DE ESTATÍSTICA */}
             {temAcesso("chamados") && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 md:mb-12">
-                <StatCard
-                  title="Em Aberto"
-                  value={estatisticas.abertos}
-                  color="amber"
-                  icon={Clock}
-                />
-                <StatCard
-                  title="Aguardando"
-                  value={estatisticas.pendentes}
-                  color="rose"
-                  icon={AlertCircle}
-                />
-                <StatCard
-                  title="Concluídos"
-                  value={estatisticas.fechados}
-                  color="emerald"
-                  icon={CheckCircle}
-                />
-                <StatCard
-                  title="Histórico"
-                  value={estatisticas.total}
-                  color="blue"
-                  icon={ClipboardList}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <StatCard title="Em Aberto" value={estatisticas.abertos} color="amber" icon={Clock} />
+                <StatCard title="Aguardando" value={estatisticas.pendentes} color="rose" icon={AlertCircle} />
+                <StatCard title="Concluídos" value={estatisticas.fechados} color="emerald" icon={CheckCircle} />
+                <StatCard title="Histórico" value={estatisticas.total} color="blue" icon={ClipboardList} />
               </div>
             )}
 
-            {/* MÓDULOS DE ACESSO RÁPIDO */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {temAcesso("dashboard_bi") && (
                 <QuickActionCard
                   title="Painel de BI"
@@ -232,18 +222,16 @@ function StatCard({ title, value, color, icon: Icon }) {
     blue: "bg-blue-600 shadow-blue-100",
   };
   return (
-    <div className="bg-white p-5 sm:p-7 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-2xs hover:shadow-xl transition-all group overflow-hidden">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <div
-          className={`${themes[color]} p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-white shadow-md group-hover:scale-110 transition-transform`}
-        >
-          <Icon size={18} className="sm:w-5 sm:h-5" />
+    <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden">
+      <div className="flex justify-between items-center mb-6">
+        <div className={`${themes[color]} p-3 rounded-2xl text-white shadow-lg group-hover:scale-110 transition-transform`}>
+          <Icon size={20} />
         </div>
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
           {title}
         </span>
       </div>
-      <h3 className="text-3xl sm:text-4xl font-black text-slate-900">
+      <h3 className="text-4xl font-black text-slate-900">
         {value.toString().padStart(2, "0")}
       </h3>
     </div>
@@ -255,31 +243,24 @@ function QuickActionCard({ title, description, icon: Icon, onClick, variant }) {
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 transition-all flex flex-col justify-between min-h-[220px] sm:h-72 ${
+      className={`group cursor-pointer rounded-[2rem] p-8 transition-all flex flex-col justify-between h-72 ${
         isDark
           ? "bg-slate-900 text-white hover:bg-slate-800"
-          : "bg-white border border-slate-200 text-slate-900 shadow-2xs hover:border-blue-200"
+          : "bg-white border border-slate-200 text-slate-900 shadow-sm hover:border-blue-200"
       }`}
     >
       <div>
-        <div
-          className={`mb-4 sm:mb-6 inline-block p-3 sm:p-4 rounded-xl sm:rounded-2xl ${
-            isDark ? "bg-slate-800" : "bg-blue-50 text-blue-600"
-          }`}
-        >
-          <Icon size={20} className="sm:w-6 sm:h-6" />
+        <div className={`mb-6 inline-block p-4 rounded-2xl ${isDark ? "bg-slate-800" : "bg-blue-50 text-blue-600"}`}>
+          <Icon size={24} />
         </div>
-        <h2 className="text-lg sm:text-xl font-black mb-1.5 sm:mb-2">{title}</h2>
-        <p className="text-xs sm:text-sm opacity-70 leading-relaxed font-medium">
+        <h2 className="text-xl font-black mb-2">{title}</h2>
+        <p className="text-sm opacity-70 leading-relaxed font-medium">
           {description}
         </p>
       </div>
-      <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 mt-4">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500">
         Acessar Módulo{" "}
-        <ChevronRight
-          size={12}
-          className="sm:w-3.5 sm:h-3.5 group-hover:translate-x-1 transition-transform"
-        />
+        <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
       </div>
     </div>
   );

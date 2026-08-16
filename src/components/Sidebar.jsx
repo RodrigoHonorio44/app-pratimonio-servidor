@@ -23,6 +23,7 @@ import {
   FolderKanban,
   Boxes,
   X,
+  Zap,
 } from "lucide-react";
 import { auth } from "../services/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -44,7 +45,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
 
   const handleNavigate = (path) => {
     navigate(path);
-    // Se estiver no mobile, fecha a gaveta ao clicar em um link
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -55,12 +55,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
     userData?.cargo?.toUpperCase() === "ADMINISTRADOR" ||
     userData?.role?.toLowerCase() === "admin";
 
+  // Variável que faltava e causava o erro ReferenceError
+  const canManageUsers = isRoot || isAdmin;
+
   const temAcesso = (moduloId) => {
     if (isRoot) return true;
     return userData?.permissoesExtras?.[moduloId] === true;
   };
-
-  const canManageUsers = isRoot || isAdmin;
 
   const NavButton = ({ icon: Icon, label, path, moduloId }) => {
     if (moduloId && !temAcesso(moduloId)) return null;
@@ -84,7 +85,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
               : "text-slate-400 group-hover:text-blue-600 group-hover:scale-110 transition-all"
           }
         />
-        {/* No mobile o texto sempre aparece; no desktop depende da prop sidebarOpen */}
         <span className={`truncate ${!sidebarOpen ? "md:hidden" : "inline"}`}>
           {label}
         </span>
@@ -94,7 +94,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
 
   return (
     <>
-      {/* OVERLAY DE FUNDO PARA O MOBILE */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -102,17 +101,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
         />
       )}
 
-      {/* CONTAINER ASIDE (DESKTOP E MOBILE GAVETA) */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-50 bg-[#F8FAFC] border-r border-slate-200/80 flex flex-col transition-all duration-300 ease-in-out ${
-          // Regras para Mobile (Gaveta)
           sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0"
-        } ${
-          // Regras para Desktop (Retração)
-          sidebarOpen ? "md:w-72" : "md:w-24"
-        }`}
+        } ${sidebarOpen ? "md:w-72" : "md:w-24"}`}
       >
-        {/* Botão de Retração / Expansão (Visível apenas em Desktop) */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="hidden md:flex absolute -right-3 top-12 bg-white border border-slate-200 text-slate-400 p-1.5 rounded-full shadow-sm z-60 cursor-pointer hover:text-blue-600 hover:scale-105 transition-all"
@@ -120,7 +113,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
           {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
         </button>
 
-        {/* Header da Sidebar */}
         <div className="h-20 md:h-28 flex items-center justify-between px-6 mb-2 border-b border-slate-200/50">
           <div className="flex items-center text-xl md:text-2xl font-black italic tracking-tighter">
             {sidebarOpen ? (
@@ -135,7 +127,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
             )}
           </div>
 
-          {/* Botão fechar (Apenas no Mobile) */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="md:hidden text-slate-400 hover:text-slate-700 p-2"
@@ -144,9 +135,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
           </button>
         </div>
 
-        {/* Navegação */}
         <nav className="flex-1 px-3 space-y-3 overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
-          
           {/* Master Control */}
           {canManageUsers && (
             <div
@@ -329,8 +318,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                 <div className="space-y-1 mt-1.5">
                   <NavButton
                     icon={PlusCircle}
-                    label="Novo Ativo"
+                    label="Novo Ativo (Estoque)"
                     path="/cadastro-equipamento"
+                    moduloId="inventario"
+                  />
+                  <NavButton
+                    icon={Zap}
+                    label="Cadastro Direto"
+                    path="/cadastro-rapido"
                     moduloId="inventario"
                   />
                   <NavButton
@@ -347,7 +342,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                   />
                   <NavButton
                     icon={Package}
-                    label="Sala do Patrimônio"
+                    label="Estoque"
                     path="/estoque"
                     moduloId="inventario"
                   />

@@ -35,8 +35,11 @@ export const useDashboardBI = () => {
   const [kpisAvancados, setKpisAvancados] = useState({
     eficienciaOperacional: 0,
     taxaInutilizacao: 0,
-    volumeMovimentacoes: 0
+    volumeMovimentacoes: 0,
   });
+
+  // ESTADO EXPLICITO DOS CHAMADOS FILTRADOS PARA EXPORTAÇÃO
+  const [chamadosFiltradosList, setChamadosFiltradosList] = useState([]);
 
   const [filtroUnidade, setFiltroUnidade] = useState("TODAS");
   const [dataInicio, setDataInicio] = useState("");
@@ -53,16 +56,17 @@ export const useDashboardBI = () => {
   const [showTop10, setShowTop10] = useState(false);
   const [showDetalhes, setShowDetalhes] = useState(false);
 
-  const normalizar = useCallback(
-    (texto = "") =>
+  // Normalizador com fallback seguro
+  const normalizar = useCallback((texto = "") => {
+    return (
       texto
         ?.toString()
         .toUpperCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .trim() || "",
-    []
-  );
+        .trim() || ""
+    );
+  }, []);
 
   const parseDataComp = (dataStr) => {
     if (!dataStr || dataStr === "N/A") return null;
@@ -91,7 +95,9 @@ export const useDashboardBI = () => {
 
   const formatarDataTexto = (dataBruta) => {
     if (!dataBruta) return "N/A";
-    if (typeof dataBruta === "string" && !dataBruta.includes("T")) return dataBruta;
+    if (typeof dataBruta === "string" && !dataBruta.includes("T") && !dataBruta.includes("-")) {
+      return dataBruta;
+    }
     const dObj = parseDataComp(dataBruta);
     if (dObj && !isNaN(dObj.getTime())) {
       return dObj.toLocaleDateString("pt-BR");
@@ -101,15 +107,15 @@ export const useDashboardBI = () => {
 
   const processarDados = useCallback(
     (
-      chamados = dadosBrutos.chamados, 
+      chamados = dadosBrutos.chamados,
       ativos = dadosBrutos.ativos,
       laudos = dadosBrutos.laudos,
       saidas = dadosBrutos.saidas
     ) => {
-      const dInicio = dataInicio ? parseDataComp(dataInicio) : null;
+      let dInicio = dataInicio ? parseDataComp(dataInicio) : null;
       if (dInicio) dInicio.setHours(0, 0, 0, 0);
 
-      const dFim = dataFim ? parseDataComp(dataFim) : null;
+      let dFim = dataFim ? parseDataComp(dataFim) : null;
       if (dFim) dFim.setHours(23, 59, 59, 999);
 
       const chamadosFiltrados = (chamados || []).filter((item) => {
@@ -120,10 +126,9 @@ export const useDashboardBI = () => {
 
         const dataCrua = item.criadoEm || item.data || item.finalizadoEm;
         const dObj = parseDataComp(dataCrua);
-        
+
         let matchData = true;
         if (dObj) {
-          dObj.setHours(12, 0, 0, 0);
           if (dInicio && dObj.getTime() < dInicio.getTime()) matchData = false;
           if (dFim && dObj.getTime() > dFim.getTime()) matchData = false;
         } else if (dInicio || dFim) {
@@ -131,6 +136,8 @@ export const useDashboardBI = () => {
         }
         return matchUnidade && matchData;
       });
+
+      setChamadosFiltradosList(chamadosFiltrados);
 
       const chamadosFechados = chamadosFiltrados.filter((c) => {
         const st = normalizar(c.status || "");
@@ -148,14 +155,15 @@ export const useDashboardBI = () => {
       });
 
       const totalChamadosValidos = chamadosFiltrados.length;
-      const taxaConclusaoCalc = totalChamadosValidos > 0
-        ? ((chamadosFechados.length / totalChamadosValidos) * 100).toFixed(1)
-        : "0";
+      const taxaConclusaoCalc =
+        totalChamadosValidos > 0
+          ? ((chamadosFechados.length / totalChamadosValidos) * 100).toFixed(1)
+          : "0";
 
       setDistribuicaoStatus([
         { name: "Fechados / Concluídos", value: chamadosFechados.length, color: "#10B981" },
         { name: "Abertos / Em Andamento", value: chamadosAbertos.length, color: "#3B82F6" },
-        { name: "Pendentes / Espera", value: chamadosPendentes.length, color: "#F59E0B" }
+        { name: "Pendentes / Espera", value: chamadosPendentes.length, color: "#F59E0B" },
       ]);
 
       const equipesSlaMap = {};
@@ -174,7 +182,7 @@ export const useDashboardBI = () => {
         if (dataAberturaObj && dataFechamentoObj && dataFechamentoObj >= dataAberturaObj) {
           const diferencaMilissegundos = dataFechamentoObj - dataAberturaObj;
           const minutosGerais = Math.floor(diferencaMilissegundos / 1000 / 60);
-          
+
           totalSLAEmMinutos += minutosGerais;
           chamadosComSLAValido++;
 
@@ -187,23 +195,27 @@ export const useDashboardBI = () => {
         }
       });
 
-      const dadosEquipesFormatados = Object.keys(equipesSlaMap).map((nome) => {
-        const item = equipesSlaMap[nome];
-        const media = item.totalHoras / item.totalChamados;
-        return {
-          name: nome,
-          mediaSLA: parseFloat(media.toFixed(2)),
-          total: item.totalChamados,
-        };
-      }).sort((a, b) => b.mediaSLA - a.mediaSLA);
+      const dadosEquipesFormatados = Object.keys(equipesSlaMap)
+        .map((nome) => {
+          const item = equipesSlaMap[nome];
+          const media = item.totalHoras / item.totalChamados;
+          return {
+            name: nome,
+            mediaSLA: parseFloat(media.toFixed(2)),
+            total: item.totalChamados,
+          };
+        })
+        .sort((a, b) => b.mediaSLA - a.mediaSLA);
 
       setDadosSlaEquipes(dadosEquipesFormatados);
 
-      const equipesAtendimentoArray = Object.keys(equipesAtendimentoMap).map(nome => ({
-        name: nome,
-        total: equipesAtendimentoMap[nome]
-      })).sort((a, b) => b.total - a.total);
-      
+      const equipesAtendimentoArray = Object.keys(equipesAtendimentoMap)
+        .map((nome) => ({
+          name: nome,
+          total: equipesAtendimentoMap[nome],
+        }))
+        .sort((a, b) => b.total - a.total);
+
       setDadosEquipesAtendimento(equipesAtendimentoArray);
 
       let slaFormatado = "00h 00m";
@@ -211,7 +223,9 @@ export const useDashboardBI = () => {
         const mediaMinutos = Math.floor(totalSLAEmMinutos / chamadosComSLAValido);
         const horas = Math.floor(mediaMinutos / 60);
         const minutos = mediaMinutos % 60;
-        slaFormatado = `${horas.toString().padStart(2, "0")}h ${minutos.toString().padStart(2, "0")}m`;
+        slaFormatado = `${horas.toString().padStart(2, "0")}h ${minutos
+          .toString()
+          .padStart(2, "0")}m`;
       }
 
       const inventarioMap = {};
@@ -220,7 +234,7 @@ export const useDashboardBI = () => {
       const listaBaixasTemp = [];
       let totalAtivosGeral = (ativos || []).length;
 
-      (ativos || []).forEach(ativo => {
+      (ativos || []).forEach((ativo) => {
         const nomeEq = (ativo.nome || ativo.nomeEquipamento || "OUTROS").toUpperCase().trim();
         const qtd = Number(ativo.quantidade) || 1;
         const unidadeAtivo = (ativo.unidade || "GERAL").toUpperCase().trim();
@@ -236,8 +250,8 @@ export const useDashboardBI = () => {
           inventarioMap[nomeEq].quantidade += qtd;
 
           if (
-            statusAtivo.includes("BAIXADO") || 
-            statusAtivo.includes("INATIVO") || 
+            statusAtivo.includes("BAIXADO") ||
+            statusAtivo.includes("INATIVO") ||
             statusAtivo.includes("INUTILIZADO")
           ) {
             inventarioMap[nomeEq].manutencao += qtd;
@@ -245,13 +259,18 @@ export const useDashboardBI = () => {
 
             const chaveUnidadeSetor = `${unidadeAtivo} — ${setorAtivo}`;
             if (!baixasPorUnidadeSetorMap[chaveUnidadeSetor]) {
-              baixasPorUnidadeSetorMap[chaveUnidadeSetor] = { unidade: unidadeAtivo, setor: setorAtivo, totalBaixas: 0, itens: [] };
+              baixasPorUnidadeSetorMap[chaveUnidadeSetor] = {
+                unidade: unidadeAtivo,
+                setor: setorAtivo,
+                totalBaixas: 0,
+                itens: [],
+              };
             }
             baixasPorUnidadeSetorMap[chaveUnidadeSetor].totalBaixas += 1;
-            baixasPorUnidadeSetorMap[chaveUnidadeSetor].itens.push({ 
-              equipamento: nomeEq, 
-              patrimonio, 
-              data: dataFormatadaStr 
+            baixasPorUnidadeSetorMap[chaveUnidadeSetor].itens.push({
+              equipamento: nomeEq,
+              patrimonio,
+              data: dataFormatadaStr,
             });
 
             listaBaixasTemp.push({
@@ -260,7 +279,7 @@ export const useDashboardBI = () => {
               unidade: unidadeAtivo,
               setor: setorAtivo,
               data: dataFormatadaStr,
-              parecerTecnico: ativo.observacoes || "Equipamento baixado/inutilizado"
+              parecerTecnico: ativo.observacoes || "Equipamento baixado/inutilizado",
             });
           } else {
             inventarioMap[nomeEq].ativos += qtd;
@@ -268,46 +287,79 @@ export const useDashboardBI = () => {
         }
       });
 
-      setInventarioEquipamentos(Object.values(inventarioMap).sort((a, b) => b.quantidade - a.quantidade));
-      setBaixasPorUnidadeSetor(Object.values(baixasPorUnidadeSetorMap).sort((a, b) => b.totalBaixas - a.totalBaixas));
+      setInventarioEquipamentos(
+        Object.values(inventarioMap).sort((a, b) => b.quantidade - a.quantidade)
+      );
+      setBaixasPorUnidadeSetor(
+        Object.values(baixasPorUnidadeSetorMap).sort((a, b) => b.totalBaixas - a.totalBaixas)
+      );
       setListaBaixas(listaBaixasTemp);
 
       const contagemRanking = listaBaixasTemp.reduce((acc, b) => {
         const chave = `${b.equipamento}|${b.unidade}|${b.setor}`;
-        if (!acc[chave]) acc[chave] = { nome: b.equipamento, unidade: b.unidade, setor: b.setor, total: 0 };
+        if (!acc[chave])
+          acc[chave] = { nome: b.equipamento, unidade: b.unidade, setor: b.setor, total: 0 };
         acc[chave].total += 1;
         return acc;
       }, {});
 
       const rankingFormatado = Object.values(contagemRanking)
-        .map((item) => ({ nome: item.nome, unidade: item.unidade, setor: item.setor, total: item.total }))
+        .map((item) => ({
+          nome: item.nome,
+          unidade: item.unidade,
+          setor: item.setor,
+          total: item.total,
+        }))
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
 
       setTop10Baixas(rankingFormatado);
 
-      const laudosFiltrados = (laudos || []).map(l => ({
-        ...l,
-        criadoEmStr: formatarDataTexto(l.criadoEm),
-        dataDecisaoStr: formatarDataTexto(l.dataDecisao)
-      })).filter(l => {
-        const u = (l.unidade || "").toUpperCase();
-        return filtroUnidade === "TODAS" || u === filtroUnidade.toUpperCase();
-      });
+      const laudosFiltrados = (laudos || [])
+        .map((l) => ({
+          ...l,
+          criadoEmStr: formatarDataTexto(l.criadoEm || l.data),
+          dataDecisaoStr: formatarDataTexto(l.dataDecisao || l.criadoEm),
+        }))
+        .filter((l) => {
+          const u = (l.unidade || "").toUpperCase();
+          return filtroUnidade === "TODAS" || u === filtroUnidade.toUpperCase();
+        });
 
-      const saidasFiltradas = (saidas || []).map(s => ({
-        ...s,
-        dataSaidaStr: formatarDataTexto(s.dataSaida || s.criadoEm)
-      })).filter(s => {
-        const uOrigem = (s.unidadeOrigem || "").toUpperCase();
-        const uDestino = (s.unidadeDestino || "").toUpperCase();
-        return filtroUnidade === "TODAS" || uOrigem === filtroUnidade.toUpperCase() || uDestino === filtroUnidade.toUpperCase();
-      });
+      // MAPEAMENTO FLEXÍVEL DA COLEÇÃO SAIDAEQUIPAMENTO
+      const saidasFiltradas = (saidas || [])
+        .map((s) => {
+          const equipamento = s.equipamento || s.nomeEquipamento || s.descricao || s.nome || "N/I";
+          const patrimonio = s.patrimonio || s.tombo || s.numPatrimonio || "S/P";
+          const uOrigem = (s.unidadeOrigem || s.origem || s.unidade || "N/I").toUpperCase();
+          const uDestino = (s.unidadeDestino || s.destino || "N/I").toUpperCase();
+          const motivo = s.motivo || s.observacao || s.descricaoMotivo || "TRANSFERÊNCIA / SAÍDA";
+          const dataSaida = s.dataSaida || s.data || s.criadoEm || s.createdAt;
+
+          return {
+            ...s,
+            equipamento,
+            patrimonio,
+            unidadeOrigem: uOrigem,
+            unidadeDestino: uDestino,
+            motivo,
+            dataSaidaStr: formatarDataTexto(dataSaida),
+          };
+        })
+        .filter((s) => {
+          if (filtroUnidade === "TODAS") return true;
+          const filterUpper = filtroUnidade.toUpperCase();
+          return (
+            s.unidadeOrigem === filterUpper ||
+            s.unidadeDestino === filterUpper
+          );
+        });
 
       setListaLaudos(laudosFiltrados);
       setListaSaidas(saidasFiltradas);
 
-      const taxaInutilizacaoCalc = totalAtivosGeral > 0 ? ((totalBaixasContagem / totalAtivosGeral) * 100).toFixed(1) : 0;
+      const taxaInutilizacaoCalc =
+        totalAtivosGeral > 0 ? ((totalBaixasContagem / totalAtivosGeral) * 100).toFixed(1) : 0;
 
       setStats({
         total: totalChamadosValidos,
@@ -321,13 +373,16 @@ export const useDashboardBI = () => {
         totalSaidas: saidasFiltradas.length,
         taxaConclusao: `${taxaConclusaoCalc}%`,
         tempoMedioResolucao: slaFormatado,
-        produtividadeGeral: totalChamadosValidos > 0 ? Math.round((chamadosFechados.length / totalChamadosValidos) * 100) : 0,
+        produtividadeGeral:
+          totalChamadosValidos > 0
+            ? Math.round((chamadosFechados.length / totalChamadosValidos) * 100)
+            : 0,
       });
 
       setKpisAvancados({
         eficienciaOperacional: Number(taxaConclusaoCalc),
         taxaInutilizacao: Number(taxaInutilizacaoCalc),
-        volumeMovimentacoes: saidasFiltradas.length + laudosFiltrados.length
+        volumeMovimentacoes: saidasFiltradas.length + laudosFiltrados.length,
       });
 
       const porUnidade = chamadosFiltrados.reduce((acc, c) => {
@@ -335,7 +390,7 @@ export const useDashboardBI = () => {
         acc[u] = (acc[u] || 0) + 1;
         return acc;
       }, {});
-      
+
       setDadosSetores(
         Object.keys(porUnidade)
           .map((k) => ({ name: k, total: porUnidade[k] }))
@@ -358,19 +413,26 @@ export const useDashboardBI = () => {
           .sort((a, b) => a.dataObj - b.dataObj)
           .slice(-15)
       );
-
     },
     [dadosBrutos, dataInicio, dataFim, filtroUnidade, normalizar]
   );
 
+  useEffect(() => {
+    if (dadosBrutos.chamados.length > 0 || dadosBrutos.saidas.length > 0) {
+      processarDados();
+    }
+  }, [filtroUnidade, dataInicio, dataFim, processarDados, dadosBrutos]);
+
   const carregarDadosDoBanco = async () => {
     setLoading(true);
     try {
-      const [resChamados, resAtivos, resLaudos, resSaidas] = await Promise.allSettled([
+      // BUSCA EMBUTIDA EM MÚLTIPLOS ENDPOINTS POSSÍVEIS PARA A COLEÇÃO SAIDAEQUIPAMENTO
+      const [resChamados, resAtivos, resLaudos, resSaidas, resSaidaEq] = await Promise.allSettled([
         api.get("/chamados"),
         api.get("/ativos"),
         api.get("/laudos"),
-        api.get("/saidas-equipamentos")
+        api.get("/saidas-equipamentos"),
+        api.get("/saidaEquipamento")
       ]);
 
       const extrairDados = (res) => {
@@ -386,7 +448,12 @@ export const useDashboardBI = () => {
       const chamadosData = extrairDados(resChamados);
       const ativosData = extrairDados(resAtivos);
       const laudosData = extrairDados(resLaudos);
-      const saidasData = extrairDados(resSaidas);
+      
+      // TENTA RECUPERAR DE /saidaEquipamento CASO /saidas-equipamentos RETORNE VAZIO
+      let saidasData = extrairDados(resSaidas);
+      if (saidasData.length === 0) {
+        saidasData = extrairDados(resSaidaEq);
+      }
 
       const novosDadosBrutos = {
         chamados: chamadosData,
@@ -398,12 +465,14 @@ export const useDashboardBI = () => {
       setDadosBrutos(novosDadosBrutos);
 
       const unidadesSet = new Set();
-      chamadosData.forEach(c => c.unidade && unidadesSet.add(String(c.unidade).trim().toUpperCase()));
-      saidasData.forEach(s => {
-        if (s.unidadeOrigem) unidadesSet.add(String(s.unidadeOrigem).trim().toUpperCase());
-        if (s.unidadeDestino) unidadesSet.add(String(s.unidadeDestino).trim().toUpperCase());
+      chamadosData.forEach((c) => c.unidade && unidadesSet.add(String(c.unidade).trim().toUpperCase()));
+      saidasData.forEach((s) => {
+        const uOrig = s.unidadeOrigem || s.origem || s.unidade;
+        const uDest = s.unidadeDestino || s.destino;
+        if (uOrig) unidadesSet.add(String(uOrig).trim().toUpperCase());
+        if (uDest) unidadesSet.add(String(uDest).trim().toUpperCase());
       });
-      ativosData.forEach(a => a.unidade && unidadesSet.add(String(a.unidade).trim().toUpperCase()));
+      ativosData.forEach((a) => a.unidade && unidadesSet.add(String(a.unidade).trim().toUpperCase()));
 
       const unidadesUnicas = ["TODAS", ...Array.from(unidadesSet)];
       setUnidadesDisponiveis(unidadesUnicas);
@@ -447,6 +516,7 @@ export const useDashboardBI = () => {
     setDataFim,
     loading,
     dadosBrutos,
+    chamados: chamadosFiltradosList,
     showTop10,
     setShowTop10,
     showDetalhes,

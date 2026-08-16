@@ -24,7 +24,7 @@ export const useEstoque = () => {
     novaUnidade: "",
     novoSetor: "",
     responsavelRecebimento: "",
-    motivo: "Transferência Regular (Reforço/Expansão)",
+    motivo: "transferência regular (reforço/expansão)",
   });
 
   const navigate = useNavigate();
@@ -52,11 +52,11 @@ export const useEstoque = () => {
   };
 
   const motivosSaida = [
-    { value: "Transferência Regular (Reforço/Expansão)", label: "Transferência Regular (Reforço/Expansão)" },
-    { value: "Substituição por Rasgo/Avaria", label: "Substituição por Rasgo/Avaria" },
-    { value: "Substituição por Infecção/Contaminação", label: "Substituição por Infecção/Contaminação (Descarte Sanitário)" },
-    { value: "Substituição por Defeito Técnico/Mecânico", label: "Substituição por Defeito Técnico/Mecânico" },
-    { value: "Empréstimo Temporário", label: "Empréstimo Temporário" },
+    { value: "transferência regular (reforço/expansão)", label: "Transferência Regular (Reforço/Expansão)" },
+    { value: "substituição por rasgo/avaria", label: "Substituição por Rasgo/Avaria" },
+    { value: "substituição por infecção/contaminação", label: "Substituição por Infecção/Contaminação (Descarte Sanitário)" },
+    { value: "substituição por defeito técnico/mecânico", label: "Substituição por Defeito Técnico/Mecânico" },
+    { value: "empréstimo temporário", label: "Empréstimo Temporário" },
   ];
 
   const carregarEstoque = async () => {
@@ -65,8 +65,8 @@ export const useEstoque = () => {
       const resposta = await api.get("/estoque");
       const listaCompleta = Array.isArray(resposta.data) ? resposta.data : [];
       
-      // Filtra estritamente apenas os ativos (igual ao código antigo do Firebase)
-      const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase() === "ativo");
+      // Filtra estritamente apenas os ativos
+      const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase().trim() === "ativo");
       setItensEstoque(lista);
     } catch (error) {
       console.error("Erro ao carregar estoque:", error);
@@ -92,9 +92,10 @@ export const useEstoque = () => {
       return;
     }
 
-    const patrimonioFinal = itemParaAdicionar.patrimonio === "S/P" 
-      ? patrimonioInput.trim() 
-      : String(itemParaAdicionar.patrimonio || "").trim();
+    const patrimonioOriginal = String(itemParaAdicionar.patrimonio || "").toLowerCase().trim();
+    const patrimonioFinal = (patrimonioOriginal === "s/p" || patrimonioOriginal === "sp")
+      ? patrimonioInput.toLowerCase().trim()
+      : patrimonioOriginal;
 
     if (!patrimonioFinal) {
       toast.error("Insira um número de patrimônio válido.");
@@ -132,7 +133,7 @@ export const useEstoque = () => {
 
     const responsavelFinal = naoSabeResponsavel 
       ? "responsável pelo setor" 
-      : dadosSaida.responsavelRecebimento.trim();
+      : dadosSaida.responsavelRecebimento.toLowerCase().trim();
 
     try {
       const currentUser = auth.currentUser;
@@ -146,54 +147,109 @@ export const useEstoque = () => {
           throw new Error(`Estoque insuficiente para ${item.nome}!`);
         }
 
-        // 1. Registra a saída do equipamento na API
+        const itemId = item._id || item.id;
+        const patrimonioFinal = (item.patrimonioMapeado || item.patrimonio || "").toLowerCase().trim();
+        const categoriaTratada = (item.categoriaItem || item.tipoItem || item.tipo || "mobiliário").toLowerCase().trim();
+
+        if (!itemId) {
+          throw new Error(`Item "${item.nome || 'desconhecido'}" sem identificador válido.`);
+        }
+
+        // 1. Registra o histórico na coleção /saidaEquipamento
         await api.post("/saidaEquipamento", {
-          estoqueId: item.id,
-          patrimonio: item.patrimonioMapeado,
-          nomeEquipamento: (item.nome || "").trim(),
-          unidadeOrigem: item.unidade || "Almoxarifado Central",
-          setorOrigem: item.setor || "Patrimônio",
-          unidadeDestino: dadosSaida.novaUnidade,
-          setorDestino: dadosSaida.novoSetor.trim(),
+          estoqueId: itemId,
+          patrimonio: patrimonioFinal,
+          nomeEquipamento: (item.nome || "").toLowerCase().trim(),
+          unidadeOrigem: (item.unidade || "almoxarifado central").toLowerCase().trim(),
+          setorOrigem: (item.setor || "patrimônio").toLowerCase().trim(),
+          unidadeDestino: dadosSaida.novaUnidade.toLowerCase().trim(),
+          setorDestino: dadosSaida.novoSetor.toLowerCase().trim(),
           quantidadeRetirada: qtdSolicitada,
           responsavelRecebimento: responsavelFinal,
-          motivo: dadosSaida.motivo,
+          motivo: dadosSaida.motivo.toLowerCase().trim(),
           dataSaida: new Date().toISOString()
         });
 
-        // 2. Se não for bem durável, cria o registro nos ativos
-        if (item.categoriaItem !== "Bem durável") {
-          await api.post("/ativos", {
-            nome: (item.nome || "").trim(),
-            categoriaItem: item.categoriaItem || item.tipo || "Mobiliário",
-            tipo: item.tipo || "equipamento",
-            estado: item.estado || "Bom",
-            observacoes: item.observacoes || "",
-            cadastradoPor: item.cadastradoPor || currentUser.email,
+        // 2. Se não for bem durável, faz UPSERT nos ativos (Cria novo ou incrementa existente no destino)
+        if (categoriaTratada !== "bem durável") {
+          const resAtivos = await api.get("/ativos").catch(() => ({ data: [] }));
+          const listaAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+
+          let ativoExistente = null;
+          if (patrimonioFinal === "s/p" || patrimonioFinal === "sp") {
+            ativoExistente = listaAtivos.find(
+              (a) =>
+                String(a.patrimonio || "").toLowerCase().trim() === patrimonioFinal &&
+                String(a.nome || "").toLowerCase().trim() === (item.nome || "").toLowerCase().trim() &&
+                String(a.unidade || "").toLowerCase().trim() === dadosSaida.novaUnidade.toLowerCase().trim() &&
+                String(a.setor || "").toLowerCase().trim() === dadosSaida.novoSetor.toLowerCase().trim()
+            );
+          } else {
+            ativoExistente = listaAtivos.find(
+              (a) => String(a.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+            );
+          }
+
+          const payloadAtivo = {
+            nome: (item.nome || "").toLowerCase().trim(),
+            tipoItem: categoriaTratada,
+            tipo: (item.tipo || "equipamento").toLowerCase().trim(),
+            estado: (item.estado || "bom").toLowerCase().trim(),
+            observacoes: (item.observacoes || "").toLowerCase().trim(),
+            cadastradoPor: (item.cadastradoPor || currentUser.email || "").toLowerCase().trim(),
             criadoEm: item.criadoEm || new Date().toISOString(),
-            quantidade: qtdSolicitada,
-            patrimonio: item.patrimonioMapeado,
-            unidade: dadosSaida.novaUnidade,
-            setor: dadosSaida.novoSetor.trim(),
-            status: "Ativo",
-            ultimaMovimentacao: new Date().toISOString()
-          });
+            quantidade: ativoExistente ? Number(ativoExistente.quantidade || 0) + qtdSolicitada : qtdSolicitada,
+            patrimonio: patrimonioFinal,
+            unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
+            setor: dadosSaida.novoSetor.toLowerCase().trim(),
+            status: "ativo",
+            ultimaMovimentacao: new Date().toISOString(),
+          };
+
+          if (ativoExistente) {
+            const idTarget = ativoExistente._id || ativoExistente.id;
+            await api.put(`/ativos/${idTarget}`, payloadAtivo);
+          } else {
+            await api.post("/ativos", payloadAtivo);
+          }
         }
 
-        // 3. Atualiza o estoque decrementando ou zerando (igualzinho à lógica antiga)
+        // 3. Atualiza ou Remove o registro da coleção /estoque
         if (qtdSolicitada < qtdAtual) {
-          await api.put(`/estoque/${item.id}`, {
+          // Se ainda sobrou saldo, decrementa a quantidade via PUT
+          const payloadEstoque = {
             ...item,
+            nome: (item.nome || "").toLowerCase().trim(),
+            patrimonio: (item.patrimonio || "").toLowerCase().trim(),
             quantidade: qtdAtual - qtdSolicitada,
+            status: "ativo",
             ultimaMovimentacao: new Date().toISOString(),
-          });
+          };
+
+          delete payloadEstoque.quantidadeMovimentada;
+          delete payloadEstoque.patrimonioMapeado;
+
+          await api.put(`/estoque/${itemId}`, payloadEstoque);
         } else {
-          await api.put(`/estoque/${item.id}`, {
-            ...item,
-            status: "movimentado", // Some da tela pois a listagem filtra por "ativo"
-            quantidade: 0,
-            ultimaMovimentacao: new Date().toISOString(),
-          });
+          // Se a quantidade foi toda transferida, deleta do estoque
+          try {
+            await api.delete(`/estoque/${itemId}`);
+          } catch (errDelete) {
+            // Fallback caso a rota DELETE não esteja mapeada no backend
+            const payloadFallback = {
+              ...item,
+              nome: (item.nome || "").toLowerCase().trim(),
+              patrimonio: (item.patrimonio || "").toLowerCase().trim(),
+              quantidade: 0,
+              status: "movimentado",
+              ultimaMovimentacao: new Date().toISOString(),
+            };
+
+            delete payloadFallback.quantidadeMovimentada;
+            delete payloadFallback.patrimonioMapeado;
+
+            await api.put(`/estoque/${itemId}`, payloadFallback);
+          }
         }
       }
 
@@ -207,7 +263,7 @@ export const useEstoque = () => {
         novaUnidade: "",
         novoSetor: "",
         responsavelRecebimento: "",
-        motivo: "Transferência Regular (Reforço/Expansão)",
+        motivo: "transferência regular (reforço/expansão)",
       });
       carregarEstoque();
     } catch (error) {

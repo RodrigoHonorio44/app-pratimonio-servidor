@@ -13,6 +13,7 @@ import DashboardBI from "../pages/DashboardBI";
 import PainelAnalista from "../pages/PainelAnalista";
 import Home from "../pages/Home";
 import CadastroEquipamento from "../pages/CadastroEquipamento";
+import CadastroRapido from "../pages/CadastroRapido"; // Nova página de Cadastro Direto
 import Transferencia from "../pages/Transferencia";
 import Inventario from "../pages/Inventario";
 import Estoque from "../pages/Estoque";
@@ -110,6 +111,15 @@ export default function AppRoutes({
                   element={
                     <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
                       <CadastroEquipamento />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Rota adicionada para o Cadastro Direto */}
+                <Route
+                  path="/cadastro-rapido"
+                  element={
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                      <CadastroRapido />
                     </ProtectedRoute>
                   }
                 />

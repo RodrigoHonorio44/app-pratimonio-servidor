@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { auth } from "../services/firebase";
-import api from "../services/api"; // Importa a instância centralizada do axios
+import api from "../services/api";
 import { toast } from "react-toastify";
 import { abrirVisualizacaoTermo } from "../components/ImpressaoTransferencia";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores"; 
+import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
 
 export const useTransferencia = () => {
   const [patrimonioBusca, setPatrimonioBusca] = useState("");
@@ -28,7 +28,7 @@ export const useTransferencia = () => {
   const [dadosSaida, setDadosSaida] = useState({
     novaUnidade: "",
     novoSetor: "",
-    motivo: "Transferência",
+    motivo: "transferência",
     responsavelRecebimento: "",
     pacienteEndereco: "",
     pacienteTelefone: "",
@@ -116,27 +116,35 @@ export const useTransferencia = () => {
       let listaGeral = [];
 
       if (tipo === "patrimonio" && termoOriginal.trim() !== "") {
-        const termoBuscaExato = termoOriginal.trim();
+        const termoBuscaExato = termoOriginal.trim().toLowerCase();
         
-        const [resAtivos, resPac] = await Promise.all([
+        const [resAtivos, resEstoque, resPac] = await Promise.all([
           api.get(`/ativos`, { params: { patrimonio: termoBuscaExato } }).catch(() => ({ data: [] })),
+          api.get(`/estoque`, { params: { patrimonio: termoBuscaExato } }).catch(() => ({ data: [] })),
           api.get(`/equipamento_com_paciente`, { params: { patrimonio: termoBuscaExato } }).catch(() => ({ data: [] }))
         ]);
 
         const dadosAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+        const dadosEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
         const dadosPac = Array.isArray(resPac.data) ? resPac.data : [];
 
         if (dadosAtivos.length > 0) {
           listaGeral = dadosAtivos.map((item) => ({
             ...item,
-            id: item.id || item._id,
+            id: item._id || item.id,
             _colecaoOrigem: "ativos",
+          }));
+        } else if (dadosEstoque.length > 0) {
+          listaGeral = dadosEstoque.map((item) => ({
+            ...item,
+            id: item._id || item.id,
+            _colecaoOrigem: "estoque",
           }));
         } else if (dadosPac.length > 0) {
           listaGeral = dadosPac.map((item) => {
             return {
-              id: item.equipamentoId || item.id || item._id,
-              _docPacienteId: item.id || item._id,
+              id: item.equipamentoId || item._id || item.id,
+              _docPacienteId: item._id || item.id,
               nome: item.equipamentoNome || item.nome,
               patrimonio: item.patrimonio,
               unidade: "Residência do Paciente",
@@ -152,8 +160,8 @@ export const useTransferencia = () => {
           const dadosPacientes = Array.isArray(resPacientes.data) ? resPacientes.data : [];
           listaGeral = dadosPacientes.map((item) => {
             return {
-              id: item.equipamentoId || item.id || item._id,
-              _docPacienteId: item.id || item._id,
+              id: item.equipamentoId || item._id || item.id,
+              _docPacienteId: item._id || item.id,
               nome: item.equipamentoNome || item.nome,
               patrimonio: item.patrimonio,
               unidade: "Residência do Paciente",
@@ -162,12 +170,20 @@ export const useTransferencia = () => {
               _colecaoOrigem: "ativos",
             };
           });
+        } else if (unidadeFiltroNorm.includes("estoque")) {
+          const resEstoque = await api.get(`/estoque`).catch(() => ({ data: [] }));
+          const dadosEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
+          listaGeral = dadosEstoque.map((item) => ({
+            ...item,
+            id: item._id || item.id,
+            _colecaoOrigem: "estoque",
+          }));
         } else {
           const resGeral = await api.get(`/ativos`).catch(() => ({ data: [] }));
           const dadosGeral = Array.isArray(resGeral.data) ? resGeral.data : [];
           listaGeral = dadosGeral.map((item) => ({
             ...item,
-            id: item.id || item._id,
+            id: item._id || item.id,
             _colecaoOrigem: "ativos",
           }));
         }
@@ -181,7 +197,8 @@ export const useTransferencia = () => {
         if (
           statusItemNorm !== "ativo" && 
           statusItemNorm !== "em_uso_residencial" && 
-          statusItemNorm !== "operante"
+          statusItemNorm !== "operante" &&
+          statusItemNorm !== "movimentado"
         ) {
           return false;
         }
@@ -236,7 +253,7 @@ export const useTransferencia = () => {
     const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
     const isVindoDeResidencial = itemSelecionado?.status === "em_uso_residencial" || itemSelecionado?.unidade === "Residência do Paciente";
 
-    if (!dadosSaida.novaUnidade || !dadosSaida.novoSetor || !dadosSaida.responsavelRecebimento) {
+    if (!dadosSaida.novaUnidade || (!isResidencial && !normalizarParaComparacao(dadosSaida.novaUnidade).includes("estoque") && !dadosSaida.novoSetor) || !dadosSaida.responsavelRecebimento) {
       toast.warn("Por favor, preencha todos os campos obrigatórios antes de visualizar.");
       return;
     }
@@ -253,7 +270,7 @@ export const useTransferencia = () => {
 
     const patrimonioFinal =
       normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" && novoPatrimonioParaSP
-        ? novoPatrimonioParaSP
+        ? novoPatrimonioParaSP.toLowerCase().trim()
         : itemSelecionado.patrimonio;
 
     if (isVindoDeResidencial) {
@@ -264,7 +281,7 @@ export const useTransferencia = () => {
         setorOrigem: itemSelecionado.setor,
         nomePaciente: itemSelecionado.setor,
         unidadeDestino: dadosSaida.novaUnidade,
-        setorDestino: dadosSaida.novoSetor,
+        setorDestino: dadosSaida.novoSetor || "estoque patrimonio",
         responsavelRecebimento: dadosSaida.responsavelRecebimento,
       });
 
@@ -282,15 +299,15 @@ export const useTransferencia = () => {
     }
 
     const dadosCompletosParaTermo = {
-      ativoId: itemSelecionado.id,
+      ativoId: itemSelecionado._id || itemSelecionado.id,
       patrimonio: patrimonioFinal,
       nomeEquipamento: itemSelecionado.nome,
       unidadeOrigem: itemSelecionado.unidade,
       setorOrigem: itemSelecionado.setor,
       unidadeDestino: dadosSaida.novaUnidade,
-      setorDestino: dadosSaida.novoSetor,
+      setorDestino: dadosSaida.novoSetor || "estoque patrimonio",
       responsavelRecebimento: dadosSaida.responsavelRecebimento,
-      motivo: isResidencial ? "Internação Domiciliar (Home Care)" : dadosSaida.motivo,
+      motivo: isResidencial ? "internação domiciliar (home care)" : dadosSaida.motivo,
       pacienteEndereco: dadosSaida.pacienteEndereco,
       pacienteTelefone: dadosSaida.pacienteTelefone,
       pacienteIdentidade: dadosSaida.pacienteIdentidade,
@@ -306,94 +323,158 @@ export const useTransferencia = () => {
   const handleSaida = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
-    const destinoEhEstoque = normalizarParaComparacao(dadosSaida.novaUnidade).includes("estoque");
+    
+    // O item vai para o estoque se a unidade OU o setor contiverem "estoque"
+    const destinoEhEstoque = 
+      normalizarParaComparacao(dadosSaida.novaUnidade).includes("estoque") || 
+      normalizarParaComparacao(dadosSaida.novoSetor).includes("estoque");
 
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Usuário não autenticado");
 
+      const idOriginal = itemSelecionado._id || itemSelecionado.id;
       const patrimonioFinal =
-        normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" &&
-        novoPatrimonioParaSP
-          ? novoPatrimonioParaSP
-          : itemSelecionado.patrimonio;
+        normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" && novoPatrimonioParaSP
+          ? novoPatrimonioParaSP.toLowerCase().trim()
+          : String(itemSelecionado.patrimonio || "").toLowerCase().trim();
 
-      // Se o item estava em uso residencial, removemos o vínculo do paciente
+      const ehSemPatrimonio = 
+        !patrimonioFinal || 
+        patrimonioFinal === "sp" || 
+        patrimonioFinal === "s/p";
+
+      // 1. LIMPA VÍNCULO SE O ITEM ESTAVA COM PACIENTE
       if (itemSelecionado.status === "em_uso_residencial" || itemSelecionado._docPacienteId) {
         if (itemSelecionado._docPacienteId) {
-          await api.delete(`/equipamento_com_paciente/${itemSelecionado._docPacienteId}`);
+          await api.delete(`/equipamento_com_paciente/${itemSelecionado._docPacienteId}`).catch(() => {});
         } else {
           const resPac = await api.get(`/equipamento_com_paciente`).catch(() => ({ data: [] }));
           const listaPac = Array.isArray(resPac.data) ? resPac.data : [];
-          const pacsEncontrados = listaPac.filter(p => p.equipamentoId === itemSelecionado.id);
+          const pacsEncontrados = listaPac.filter(p => String(p.equipamentoId) === String(idOriginal));
           for (const docP of pacsEncontrados) {
-            await api.delete(`/equipamento_com_paciente/${docP.id || docP._id}`);
+            await api.delete(`/equipamento_com_paciente/${docP._id || docP.id}`).catch(() => {});
           }
         }
       }
 
-      // Atualiza o registro principal na coleção "ativos"
-      let itemExiste = false;
-      try {
-        const resItem = await api.get(`/ativos/${itemSelecionado.id}`);
-        itemExiste = resItem.status === 200;
-      } catch {
-        itemExiste = false;
-      }
-
-      const atualizacaoPayload = {
-        unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
-        setor: dadosSaida.novoSetor.toLowerCase().trim(),
+      // PREPARA PAYLOAD: Mantém exatamente a unidade e o setor selecionados por você
+      const basePayload = {
+        ...itemSelecionado,
+        nome: itemSelecionado.nome ? itemSelecionado.nome.toLowerCase().trim() : "",
         patrimonio: patrimonioFinal,
+        unidade: dadosSaida.novaUnidade, // Preserva a unidade selecionada (ex: Hospital Conde)
+        setor: dadosSaida.novoSetor.toLowerCase().trim(), // Preserva o setor selecionado (ex: estoque patrimonio)
         status: "ativo",
+        quantidade: 1,
         ultimaMovimentacao: new Date().toISOString(),
       };
 
-      if (itemExiste) {
-        await api.put(`/ativos/${itemSelecionado.id}`, atualizacaoPayload);
-      } else {
-        await api.post(`/ativos`, {
-          nome: itemSelecionado.nome.toLowerCase().trim(),
-          patrimonio: patrimonioFinal,
-          unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
-          setor: dadosSaida.novoSetor.toLowerCase().trim(),
-          status: "ativo",
-          ultimaMovimentacao: new Date().toISOString(),
-        });
-      }
+      // Limpa chaves internas/temporárias
+      delete basePayload._colecaoOrigem;
+      delete basePayload._docPacienteId;
+      delete basePayload.id;
+      delete basePayload._id;
 
-      // Se o destino for o estoque, adiciona/registra também na coleção "estoque"
+      // 2. LÓGICA DE DESTINO (ESTOQUE vs ATIVOS)
       if (destinoEhEstoque) {
-        const resEstoque = await api.get(`/estoque`).catch(() => ({ data: [] }));
-        const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
-        const estoqueExistente = listaEstoque.find(e => String(e.patrimonio).trim() === String(patrimonioFinal).trim());
+        // --- VAI PARA A COLEÇÃO /estoque MAS MANTÉM A UNIDADE E SETOR ESCOLHIDOS ---
 
-        const estoquePayload = {
-          nome: itemSelecionado.nome.toLowerCase().trim(),
-          patrimonio: patrimonioFinal,
-          unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
-          setor: dadosSaida.novoSetor.toLowerCase().trim(),
-          status: "ativo",
-          quantidade: 1,
-          ultimaMovimentacao: new Date().toISOString(),
-        };
+        // A. Remove de /ativos pelo ID original
+        if (idOriginal) {
+          await api.delete(`/ativos/${idOriginal}`).catch((err) => {
+            console.warn("Falha ao deletar ativo por ID:", err);
+          });
+        }
 
-        if (estoqueExistente) {
-          await api.put(`/estoque/${estoqueExistente.id || estoqueExistente._id}`, estoquePayload);
+        // B. Varre /ativos e remove qualquer duplicado com o mesmo patrimonio
+        if (!ehSemPatrimonio) {
+          const resAtivos = await api.get(`/ativos`).catch(() => ({ data: [] }));
+          const listaAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+          const duplicados = listaAtivos.filter(
+            (atv) => String(atv.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+          );
+          for (const atv of duplicados) {
+            const targetAtivoId = atv._id || atv.id;
+            if (targetAtivoId) {
+              await api.delete(`/ativos/${targetAtivoId}`).catch(() => {});
+            }
+          }
+        }
+
+        // C. Salva/Atualiza na coleção /estoque
+        if (!ehSemPatrimonio) {
+          const resEstoque = await api.get(`/estoque`).catch(() => ({ data: [] }));
+          const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
+          const estoqueExistente = listaEstoque.find(
+            (e) => String(e.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+          );
+
+          if (estoqueExistente) {
+            const targetId = estoqueExistente._id || estoqueExistente.id;
+            await api.put(`/estoque/${targetId}`, {
+              ...basePayload,
+              quantidade: Number(estoqueExistente.quantidade || 0) + 1,
+            });
+          } else {
+            await api.post(`/estoque`, basePayload);
+          }
         } else {
-          await api.post(`/estoque`, estoquePayload);
+          await api.post(`/estoque`, basePayload);
+        }
+
+      } else {
+        // --- DESTINO É UNIDADE DE PONTA NORMAL (EM USO) ---
+
+        // A. Remove de /estoque pelo ID original
+        if (idOriginal) {
+          await api.delete(`/estoque/${idOriginal}`).catch(() => {});
+        }
+
+        // B. Se tiver patrimônio válido, limpa de /estoque por número de patrimônio
+        if (!ehSemPatrimonio) {
+          const resEstoque = await api.get(`/estoque`).catch(() => ({ data: [] }));
+          const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
+          const duplicados = listaEstoque.filter(
+            (est) => String(est.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+          );
+          for (const est of duplicados) {
+            const targetEstId = est._id || est.id;
+            if (targetEstId) {
+              await api.delete(`/estoque/${targetEstId}`).catch(() => {});
+            }
+          }
+        }
+
+        // C. Salva/Atualiza na coleção /ativos
+        if (!ehSemPatrimonio) {
+          const resAtivosGeral = await api.get(`/ativos`, { params: { patrimonio: patrimonioFinal } }).catch(() => ({ data: [] }));
+          const ativosArray = Array.isArray(resAtivosGeral.data) ? resAtivosGeral.data : [];
+          const ativoExistente = ativosArray.find(
+            (a) => String(a.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+          );
+
+          if (ativoExistente) {
+            const targetId = ativoExistente._id || ativoExistente.id;
+            await api.put(`/ativos/${targetId}`, basePayload);
+          } else {
+            await api.post(`/ativos`, basePayload);
+          }
+        } else {
+          await api.post(`/ativos`, basePayload);
         }
       }
 
-      // Registra o histórico da movimentação de saída
+      // 3. REGISTRO HISTÓRICO DE SAÍDA (saidaEquipamento)
       const payloadSaida = {
-        ativoId: itemSelecionado.id,
+        ativoId: idOriginal,
         patrimonio: patrimonioFinal,
-        nomeEquipamento: itemSelecionado.nome.toLowerCase().trim(),
-        unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
-        setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
-        unidadeDestino: dadosSaida.novaUnidade.toLowerCase().trim(),
+        nomeEquipamento: String(itemSelecionado.nome || "").toLowerCase().trim(),
+        unidadeOrigem: String(itemSelecionado.unidade || "").toLowerCase().trim(),
+        setorOrigem: String(itemSelecionado.setor || "").toLowerCase().trim(),
+        unidadeDestino: dadosSaida.novaUnidade,
         setorDestino: dadosSaida.novoSetor.toLowerCase().trim(),
         responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase().trim(),
         motivo: isResidencial ? "home care" : dadosSaida.motivo.toLowerCase().trim(),
@@ -410,11 +491,11 @@ export const useTransferencia = () => {
         };
 
         await api.post(`/equipamento_com_paciente`, {
-          equipamentoId: itemSelecionado.id,
-          equipamentoNome: itemSelecionado.nome.toLowerCase().trim(),
+          equipamentoId: idOriginal,
+          equipamentoNome: String(itemSelecionado.nome || "").toLowerCase().trim(),
           patrimonio: patrimonioFinal,
-          unidadeOrigem: itemSelecionado.unidade.toLowerCase().trim(),
-          setorOrigem: itemSelecionado.setor.toLowerCase().trim(),
+          unidadeOrigem: String(itemSelecionado.unidade || "").toLowerCase().trim(),
+          setorOrigem: String(itemSelecionado.setor || "").toLowerCase().trim(),
           dataEntrega: new Date().toISOString(),
           statusVinculo: "ativo",
           paciente: {
@@ -442,7 +523,7 @@ export const useTransferencia = () => {
       setDadosSaida({
         novaUnidade: "",
         novoSetor: "",
-        motivo: "Transferência",
+        motivo: "transferência",
         responsavelRecebimento: "",
         pacienteEndereco: "",
         pacienteTelefone: "",

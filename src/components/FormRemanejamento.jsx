@@ -51,7 +51,7 @@ const FormRemanejamento = ({ onClose }) => {
     { value: "manutencao predial", label: "Manutenção Predial" },
     { value: "engenharia clinica", label: "Engenharia Clínica" },
     { value: "patrimonio", label: "Patrimônio" },
-    { value: " manutencao patrimonial", label: "Patrimônial" },
+    { value: " manutencao patrimonial", label: "Manutenção Patrimonial" },
     { value: "ti malta", label: "Ti Malta" },
     { value: "sistema e redes", label: "Sistema e Redes" },
     { value: "refrigeracao", label: "Refrigeração" },

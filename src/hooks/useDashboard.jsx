@@ -1,4 +1,3 @@
-// src/hooks/useDashboard.js
 import { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../services/firebase";
 import api from "../services/api";
@@ -7,12 +6,20 @@ import { doc, getDoc } from "firebase/firestore";
 export function useDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // O filtro suporta formato mensal ("YYYY-MM") ou anual ("YYYY")
+  // Modos: 'mensal' ou 'anual'
+  const [modoFiltro, setModoFiltro] = useState("mensal");
+
+  // Guarda o mês selecionado (YYYY-MM)
   const [mesFiltro, setMesFiltro] = useState(() => {
     const hoje = new Date();
     const ano = hoje.getFullYear();
     const mes = String(hoje.getMonth() + 1).padStart(2, "0");
     return `${ano}-${mes}`;
+  });
+
+  // Guarda o ano selecionado (YYYY)
+  const [anoFiltro, setAnoFiltro] = useState(() => {
+    return String(new Date().getFullYear());
   });
 
   const [chamadosBrutos, setChamadosBrutos] = useState([]);
@@ -25,14 +32,12 @@ export function useDashboard() {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
-        // 1. Carrega os dados do usuário do Firestore
         const docRef = doc(db, "usuarios", currentUser.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserData(docSnap.data());
         }
 
-        // 2. Consome os chamados da API do seu backend
         const responseChamados = await api.get("/chamados");
         setChamadosBrutos(Array.isArray(responseChamados.data) ? responseChamados.data : []);
 
@@ -46,17 +51,11 @@ export function useDashboard() {
     loadData();
   }, []);
 
-  // Processamento das Estatísticas robusto: se a OS não tiver data de criação, ela entra no mês atual por padrão para não sumir do dashboard
   const estatisticas = useMemo(() => {
     if (!Array.isArray(chamadosBrutos) || chamadosBrutos.length === 0) {
       return { abertos: 0, fechados: 0, total: 0, pendentes: 0 };
     }
 
-    const partesFiltro = (mesFiltro || "").split("-");
-    const anoAlvo = partesFiltro[0];
-    const mesAlvo = partesFiltro[1]; // undefined se for selecionado apenas o ano (YYYY)
-
-    // Função auxiliar robusta para converter qualquer tipo de data
     const parseData = (campoData) => {
       if (!campoData) return null;
       if (typeof campoData.toDate === "function") {
@@ -70,8 +69,8 @@ export function useDashboard() {
     };
 
     const hoje = new Date();
-    const anoAtual = String(hoje.getFullYear());
-    const mesAtual = String(hoje.getMonth() + 1).padStart(2, "0");
+    const anoAtualStr = String(hoje.getFullYear());
+    const mesAtualStr = String(hoje.getMonth() + 1).padStart(2, "0");
 
     const chamadosDoPeriodo = chamadosBrutos.filter((chamado) => {
       const dataRef = chamado.criadoEm || chamado.criatedAt || chamado.createdAt || chamado.data || chamado.timestamp;
@@ -80,19 +79,21 @@ export function useDashboard() {
       let anoChamado, mesChamado;
 
       if (!dataObjeto) {
-        // Fallback: se o chamado não tiver nenhuma data preenchida, consideramos o mês/ano atual para ele aparecer
-        anoChamado = anoAtual;
-        mesChamado = mesAtual;
+        anoChamado = anoAtualStr;
+        mesChamado = mesAtualStr;
       } else {
         anoChamado = String(dataObjeto.getFullYear());
         mesChamado = String(dataObjeto.getMonth() + 1).padStart(2, "0");
       }
 
-      if (mesAlvo) {
+      // Se o modo for 'mensal', filtra por Ano e Mês
+      if (modoFiltro === "mensal") {
+        const [anoAlvo, mesAlvo] = (mesFiltro || "").split("-");
         return anoChamado === anoAlvo && mesChamado === mesAlvo;
-      } else {
-        return anoChamado === anoAlvo;
-      }
+      } 
+      
+      // Se o modo for 'anual', filtra apenas pelo Ano
+      return anoChamado === anoFiltro;
     });
 
     const abertos = chamadosDoPeriodo.filter(d => {
@@ -116,7 +117,7 @@ export function useDashboard() {
       pendentes,
       fechados
     };
-  }, [chamadosBrutos, mesFiltro]);
+  }, [chamadosBrutos, modoFiltro, mesFiltro, anoFiltro]);
 
   const isRoot = useMemo(
     () => userData?.role?.toLowerCase() === "root",
@@ -141,8 +142,12 @@ export function useDashboard() {
   return {
     sidebarOpen,
     setSidebarOpen,
+    modoFiltro,
+    setModoFiltro,
     mesFiltro,
     setMesFiltro,
+    anoFiltro,
+    setAnoFiltro,
     userData,
     loading,
     estatisticas,

@@ -1,9 +1,18 @@
 import axios from 'axios';
 import { auth } from './firebase';
 
+// Trata a URL base para garantir que SEMPRE termine com /api
+const getBaseURL = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return '/api';
+  
+  // Remove barra no final se houver e adiciona /api
+  const urlLimpa = envUrl.replace(/\/$/, '');
+  return urlLimpa.endsWith('/api') ? urlLimpa : `${urlLimpa}/api`;
+};
+
 const api = axios.create({
-  // Se não houver variável de ambiente, usa '/api' (caminho relativo)
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseURL(),
   withCredentials: true,
 });
 
