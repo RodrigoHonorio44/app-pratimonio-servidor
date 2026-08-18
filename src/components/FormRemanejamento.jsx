@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import api from "../services/api"; // Import do serviço do Axios
 import { auth } from "../services/firebase";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -35,7 +36,7 @@ const FormRemanejamento = ({ onClose }) => {
     setorDestino: "",
     descricao: "",
     prioridade: "baixa",
-    equipe: "", 
+    equipe: "",
   });
 
   const unidades = [
@@ -51,7 +52,7 @@ const FormRemanejamento = ({ onClose }) => {
     { value: "manutencao predial", label: "Manutenção Predial" },
     { value: "engenharia clinica", label: "Engenharia Clínica" },
     { value: "patrimonio", label: "Patrimônio" },
-    { value: " manutencao patrimonial", label: "Manutenção Patrimonial" },
+    { value: "manutencao patrimonial", label: "Manutenção Patrimonial" },
     { value: "ti malta", label: "Ti Malta" },
     { value: "sistema e redes", label: "Sistema e Redes" },
     { value: "refrigeracao", label: "Refrigeração" },
@@ -66,56 +67,71 @@ const FormRemanejamento = ({ onClose }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUserData = async () => {
       const user = auth.currentUser;
       if (user) {
         try {
-          const response = await fetch(`/api/usuarios/${user.uid}`);
-          if (response.ok) {
-            const data = await response.json();
+          // Atualizado para usar Axios (api.get)
+          const response = await api.get(`/usuarios/${user.uid}`);
+          const data = response.data;
+
+          if (isMounted) {
             setUserName((data.nome || "usuário").toLowerCase());
-            
+
             if (data.equipe) {
               const equipeUser = data.equipe.toLowerCase();
-              const existeEquipe = equipesDisponiveis.some(e => e.value === equipeUser);
+              const existeEquipe = equipesDisponiveis.some(
+                (e) => e.value === equipeUser
+              );
               if (existeEquipe) {
                 setFormData((prev) => ({ ...prev, equipe: equipeUser }));
               }
             }
-          } else {
-            setUserName((user.displayName || user.email.split("@")[0]).toLowerCase());
           }
         } catch (error) {
-          console.error("erro ao buscar dados do usuário:", error);
+          console.error("Erro ao buscar dados do usuário:", error);
+          if (isMounted) {
+            setUserName(
+              (user.displayName || user.email.split("@")[0]).toLowerCase()
+            );
+          }
         }
       }
     };
+
     fetchUserData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleChange = (e) => {
     const value = e.target.value;
-    const formattedValue = e.target.type === "text" || e.target.tagName === "TEXTAREA" 
-      ? value.toLowerCase() 
-      : value;
+    const formattedValue =
+      e.target.type === "text" || e.target.tagName === "TEXTAREA"
+        ? value.toLowerCase()
+        : value;
 
-    setFormData({ ...formData, [e.target.name]: formattedValue });
+    setFormData((prev) => ({ ...prev, [e.target.name]: formattedValue }));
   };
 
   const handleNaoSeiPatrimonio = () => {
     const novoEstado = !naoSeiPatrimonio;
     setNaoSeiPatrimonio(novoEstado);
-    setFormData({ ...formData, patrimonio: novoEstado ? "s/p" : "" });
+    setFormData((prev) => ({ ...prev, patrimonio: novoEstado ? "s/p" : "" }));
   };
 
   const alternarModoSetor = () => {
     const novoModo = !modoSetor;
     setModoSetor(novoModo);
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       equipamento: novoModo ? "setor inteiro" : "",
       patrimonio: novoModo ? "s/p" : "",
-    });
+    }));
     setNaoSeiPatrimonio(false);
   };
 
@@ -128,29 +144,30 @@ const FormRemanejamento = ({ onClose }) => {
 
     setLoadingAtivo(true);
     try {
-      const response = await fetch(`/api/ativos?patrimonio=${encodeURIComponent(nPatrimonio)}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        const ativoEncontrado = Array.isArray(data) ? data[0] : data;
+      // Atualizado para usar Axios (api.get)
+      const response = await api.get(
+        `/ativos?patrimonio=${encodeURIComponent(nPatrimonio)}`
+      );
+      const data = response.data;
+      const ativoEncontrado = Array.isArray(data) ? data[0] : data;
 
-        if (ativoEncontrado) {
-          const unidadeAtivo = (ativoEncontrado.unidade || "").toLowerCase();
-          const unidadeCorrespondente = unidades.find(
-            (u) => u.toLowerCase() === unidadeAtivo
-          ) || ""; 
+      if (ativoEncontrado) {
+        const unidadeAtivo = (ativoEncontrado.unidade || "").toLowerCase();
+        const unidadeCorrespondente =
+          unidades.find((u) => u.toLowerCase() === unidadeAtivo) || "";
 
-          setFormData((prev) => ({
-            ...prev,
-            equipamento: (ativoEncontrado.nome || ativoEncontrado.equipamento || "").toLowerCase(),
-            setorOrigem: (ativoEncontrado.setor || "").toLowerCase(),
-            unidade: unidadeCorrespondente, 
-          }));
+        setFormData((prev) => ({
+          ...prev,
+          equipamento: (
+            ativoEncontrado.nome ||
+            ativoEncontrado.equipamento ||
+            ""
+          ).toLowerCase(),
+          setorOrigem: (ativoEncontrado.setor || "").toLowerCase(),
+          unidade: unidadeCorrespondente,
+        }));
 
-          toast.success("ativo localizado! campos preenchidos.");
-        } else {
-          toast.warning("nenhum ativo localizado com este patrimônio.");
-        }
+        toast.success("ativo localizado! campos preenchidos.");
       } else {
         toast.warning("nenhum ativo localizado com este patrimônio.");
       }
@@ -165,7 +182,7 @@ const FormRemanejamento = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) return toast.error("usuário não autenticado.");
     if (!formData.equipe) return toast.error("selecione a equipe responsável.");
 
     setLoading(true);
@@ -187,17 +204,8 @@ const FormRemanejamento = ({ onClose }) => {
         ...formData,
       };
 
-      const response = await fetch("/api/remanejamentos", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(novoRemanejamento),
-      });
-
-      if (!response.ok) {
-        throw new Error("falha ao salvar na api");
-      }
+      // Atualizado para usar Axios (api.post)
+      await api.post("/remanejamentos", novoRemanejamento);
 
       setOsGerada(numeroOS);
       setSucesso(true);
@@ -237,7 +245,7 @@ const FormRemanejamento = ({ onClose }) => {
             <button
               type="button"
               onClick={handleExit}
-              className="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-xs uppercase hover:bg-slate-900 transition-all"
+              className="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-xs uppercase hover:bg-slate-900 transition-all cursor-pointer"
             >
               concluir e sair
             </button>
@@ -247,7 +255,8 @@ const FormRemanejamento = ({ onClose }) => {
             <button
               type="button"
               onClick={handleExit}
-              className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-400 transition-all"
+              aria-label="Fechar formulário"
+              className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-400 transition-all cursor-pointer"
             >
               <FiX size={20} />
             </button>
@@ -262,7 +271,7 @@ const FormRemanejamento = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() => modoSetor && alternarModoSetor()}
-                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer ${
                     !modoSetor
                       ? "bg-white text-orange-400 shadow-sm border border-orange-100"
                       : "text-slate-400"
@@ -273,7 +282,7 @@ const FormRemanejamento = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() => !modoSetor && alternarModoSetor()}
-                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer ${
                     modoSetor
                       ? "bg-white text-orange-400 shadow-sm border border-orange-100"
                       : "text-slate-400"
@@ -297,7 +306,7 @@ const FormRemanejamento = ({ onClose }) => {
                     name="prioridade"
                     value={formData.prioridade}
                     onChange={handleChange}
-                    className={`w-full border-2 rounded-2xl py-4 pl-12 pr-4 text-sm font-black appearance-none focus:outline-none transition-all ${getPrioridadeColor()}`}
+                    className={`w-full border-2 rounded-2xl py-4 pl-12 pr-4 text-sm font-black appearance-none focus:outline-none transition-all cursor-pointer ${getPrioridadeColor()}`}
                   >
                     <option value="baixa">baixa (planejado)</option>
                     <option value="media">média (em breve)</option>
@@ -317,9 +326,11 @@ const FormRemanejamento = ({ onClose }) => {
                     required
                     value={formData.equipe}
                     onChange={handleChange}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all"
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all cursor-pointer"
                   >
-                    <option value="" disabled hidden>selecione a equipe</option>
+                    <option value="" disabled hidden>
+                      selecione a equipe
+                    </option>
                     {equipesDisponiveis.map((eq) => (
                       <option key={eq.value} value={eq.value}>
                         {eq.label}
@@ -340,7 +351,7 @@ const FormRemanejamento = ({ onClose }) => {
                     required
                     value={formData.unidade}
                     onChange={handleChange}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all"
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all cursor-pointer"
                   >
                     <option value="">selecione a unidade...</option>
                     {unidades.map((u) => (
@@ -366,7 +377,7 @@ const FormRemanejamento = ({ onClose }) => {
                       <button
                         type="button"
                         onClick={handleNaoSeiPatrimonio}
-                        className={`text-[9px] px-2 py-0.5 rounded font-black ${
+                        className={`text-[9px] px-2 py-0.5 rounded font-black cursor-pointer ${
                           naoSeiPatrimonio
                             ? "bg-orange-400 text-white"
                             : "bg-slate-200"
@@ -404,8 +415,9 @@ const FormRemanejamento = ({ onClose }) => {
                           type="button"
                           disabled={loadingAtivo}
                           onClick={buscarAtivoNaApi}
-                          className="bg-orange-400 hover:bg-orange-500 text-white px-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
+                          className="bg-orange-400 hover:bg-orange-500 text-white px-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer"
                           title="buscar ativo"
+                          aria-label="Buscar ativo"
                         >
                           {loadingAtivo ? (
                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -500,7 +512,7 @@ const FormRemanejamento = ({ onClose }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-orange-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-100"
+                className="w-full bg-orange-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-100 cursor-pointer"
               >
                 {loading ? (
                   "processando..."
