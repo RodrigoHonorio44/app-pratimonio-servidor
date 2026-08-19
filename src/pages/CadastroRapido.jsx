@@ -357,6 +357,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     <option value="Bem durável">Bem durável</option>
                     <option value="Refrigeração">Refrigeração</option>
                     <option value="Informática">Informática</option>
+                    <option value="Eletrodoméstico/Eletrônico">Eletrodoméstico/Eletrônico</option>
                     <option value="Equip. Médico">Equipamento Médico</option>
                     <option value="Ferramenta">Ferramenta</option>
                   </select>

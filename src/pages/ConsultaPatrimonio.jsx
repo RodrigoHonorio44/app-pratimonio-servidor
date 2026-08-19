@@ -16,6 +16,25 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 
+// Função utilitária para normalizar strings (remover acentos e colocar em minúsculas)
+const normalizarTexto = (texto) => {
+  if (!texto) return "";
+  return texto
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
+// Cores para as badges de estado do equipamento
+const CORES_ESTADO = {
+  bom: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  regular: "bg-amber-100 text-amber-700 border-amber-200",
+  ocioso: "bg-blue-100 text-blue-700 border-blue-200",
+  recuperavel: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  irrecuperavel: "bg-rose-100 text-rose-700 border-rose-200",
+};
+
 export default function ConsultaPatrimonio() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -36,9 +55,9 @@ export default function ConsultaPatrimonio() {
 
   // Estado da Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const itensPorPagina = 5; // Defina quantos grupos/linhas deseja exibir por página
+  const itensPorPagina = 5;
 
-  // 1. BUSCA NA API DO BACKEND USANDO O AXIOS
+  // 1. BUSCA NA API DO BACKEND
   useEffect(() => {
     const fetchAtivos = async () => {
       try {
@@ -46,18 +65,21 @@ export default function ConsultaPatrimonio() {
         const data = response.data;
         
         const lista = data.map((item) => {
+          // Trata variações de chaves comuns do Firestore/MongoDB
+          const nomeFinal = item.nome || item.equipamento || item.descricao || "";
+          const estadoFinal = item.estado || item.estadoConservacao || "Não informado";
+          const obsFinal = item.observacoes || item.observacao || "";
+
           return {
             id: item.id || item._id,
-            patrimonio: item.patrimonio || "",
-            nome: item.nome?.toLowerCase().trim() || "",
-            tipo: item.tipo?.toLowerCase().trim() || "",
-            modelo: item.modelo || "", 
-            potencia: item.potencia || "", 
+            patrimonio: item.patrimonio || "S/P",
+            nome: String(nomeFinal).toLowerCase().trim(),
+            tipo: item.tipo?.toLowerCase().trim() || item.tipoItem?.toLowerCase().trim() || "geral",
             setor: item.setor?.toLowerCase().trim() || "setor não informado",
             unidade: item.unidade?.toLowerCase().trim() || "",
-            estado: item.estado || "Não informado",
-            status: item.status || "Inativo",
-            observacoes: item.observacoes || "",
+            estado: estadoFinal,
+            status: item.status || "ativo",
+            observacoes: String(obsFinal).trim(),
             quantidade: Number(item.quantidade) || 1,
             criadoEm: item.criadoEm ? new Date(item.criadoEm) : null,
           };
@@ -88,7 +110,7 @@ export default function ConsultaPatrimonio() {
       termo: termoPesquisa
     });
     setLinhasExpandidas({});
-    setPaginaAtual(1); // Volta para a primeira página ao buscar
+    setPaginaAtual(1);
   };
 
   // Reseta todos os filtros
@@ -108,7 +130,7 @@ export default function ConsultaPatrimonio() {
     }));
   };
 
-  // 3. PROCESSA E AGRUPA BASEADO NOS FILTROS
+  // 3. PROCESSA E AGRUPA BASEADO NOS FILTROS (NORMALIZADO)
   const resultadoConsulta = useMemo(() => {
     const distribuicao = {};
     let totalGeral = 0;
@@ -117,12 +139,21 @@ export default function ConsultaPatrimonio() {
       return { linhas: [], total: 0, modo: "vazio" };
     }
 
-    const termo = filtrosAplicados.termo.toLowerCase().trim();
+    const termoBuscaNormalizado = normalizarTexto(filtrosAplicados.termo);
 
     ativos.forEach((item) => {
       if (item.status.toLowerCase() === "ativo") {
-        if (item.nome.includes(termo) || item.tipo.includes(termo)) {
-          
+        const nomeNorm = normalizarTexto(item.nome);
+        const tipoNorm = normalizarTexto(item.tipo);
+        const patNorm = normalizarTexto(item.patrimonio);
+
+        // Busca resiliente por Nome, Tipo ou Patrimônio
+        const combinaComBusca = 
+          nomeNorm.includes(termoBuscaNormalizado) || 
+          tipoNorm.includes(termoBuscaNormalizado) ||
+          patNorm.includes(termoBuscaNormalizado);
+
+        if (combinaComBusca) {
           if (filtrosAplicados.unidade === "TODAS") {
             const chaveUnidade = item.unidade.toUpperCase();
             if (!distribuicao[chaveUnidade]) {
@@ -224,7 +255,7 @@ export default function ConsultaPatrimonio() {
               <Search className="absolute left-4 text-slate-400" size={18} />
               <input
                 type="text"
-                placeholder="EX: CADEIRA DE RODAS, CADEIRA FIXA, MACA, IMPRESSORA..."
+                placeholder="EX: POLTRONA, CADEIRA DE RODAS, MACA, IMPRESSORA..."
                 value={termoPesquisa}
                 onChange={(e) => setTermoPesquisa(e.target.value)}
                 className="w-full bg-[#F1F5F9] border border-slate-200 text-slate-700 font-black text-[12px] uppercase tracking-wider pl-12 pr-4 py-4 rounded-2xl focus:outline-hidden focus:border-blue-500 focus:bg-white transition-all"
@@ -329,37 +360,46 @@ export default function ConsultaPatrimonio() {
                           </div>
                         </div>
 
-                        {/* Bloco Detalhado */}
+                        {/* Bloco Detalhado - Tabela Ajustada para os Dados Reais */}
                         {aberto && (
                           <div className="p-4 bg-slate-50/50 border-t border-slate-100 overflow-x-auto">
                             <table className="w-full text-left border-collapse text-[11px]">
                               <thead>
                                 <tr className="border-b border-slate-200 text-slate-400 font-black uppercase tracking-wider">
-                                  <th className="pb-2">Patrimônio</th>
-                                  <th className="pb-2">Modelo</th>
-                                  <th className="pb-2">Potência</th>
-                                  <th className="pb-2">Estado</th>
+                                  <th className="pb-2 pr-4">Patrimônio</th>
+                                  <th className="pb-2 pr-4">Equipamento / Nome</th>
+                                  <th className="pb-2 pr-4">Tipo</th>
+                                  <th className="pb-2 pr-4">Estado</th>
                                   <th className="pb-2">Observações</th>
                                 </tr>
                               </thead>
                               <tbody className="text-slate-600 font-bold uppercase">
-                                {container.itens.map((item) => (
-                                  <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-white transition-all">
-                                    <td className="py-2.5 text-blue-600 font-black">{item.patrimonio || "S/P"}</td>
-                                    <td className="py-2.5 text-slate-700">{item.modelo || "—"}</td>
-                                    <td className="py-2.5 text-slate-700">{item.potencia || "—"}</td>
-                                    <td className="py-2.5">
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-black ${
-                                        item.estado.toLowerCase() === "bom" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                                      }`}>
-                                        {item.estado}
-                                      </span>
-                                    </td>
-                                    <td className="py-2.5 text-slate-400 text-[10px] normal-case max-w-xs truncate" title={item.observacoes}>
-                                      {item.observacoes || "—"}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {container.itens.map((item) => {
+                                  const estadoChave = normalizarTexto(item.estado);
+                                  const badgeCor = CORES_ESTADO[estadoChave] || "bg-slate-100 text-slate-700 border-slate-200";
+
+                                  return (
+                                    <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-white transition-all">
+                                      <td className="py-2.5 pr-4 text-blue-600 font-black whitespace-nowrap">
+                                        {item.patrimonio}
+                                      </td>
+                                      <td className="py-2.5 pr-4 text-slate-800 font-extrabold capitalize">
+                                        {item.nome || "—"}
+                                      </td>
+                                      <td className="py-2.5 pr-4 text-slate-500 font-semibold capitalize whitespace-nowrap">
+                                        {item.tipo}
+                                      </td>
+                                      <td className="py-2.5 pr-4 whitespace-nowrap">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-black uppercase border ${badgeCor}`}>
+                                          {item.estado}
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 text-slate-400 text-[10px] normal-case max-w-xs truncate" title={item.observacoes || "—"}>
+                                        {item.observacoes || "—"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>

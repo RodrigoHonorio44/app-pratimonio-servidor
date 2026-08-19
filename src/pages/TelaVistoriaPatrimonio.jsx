@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { 
   ArrowLeft, ClipboardCheck, CheckCircle2, AlertTriangle, RefreshCw, XCircle, 
-  Search, Plus, Trash2, Check, PackagePlus, Clock, RotateCcw, Camera, Edit3, FileText
+  Search, Plus, Trash2, Check, PackagePlus, Clock, RotateCcw, Camera, Edit3, FileText, Pencil
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
@@ -109,21 +109,49 @@ const TelaVistoriaPatrimonio = () => {
     setFotoModal(null);
   };
 
+  const handleEditarItemAvaliated = (itemAvaliated) => {
+    setItemEmEdicao({
+      idTemp: itemAvaliated.idTemp,
+      patrimonio: itemAvaliated.patrimonio,
+      descricao: itemAvaliated.equipamento,
+      isEditing: true
+    });
+    setEstadoModal(itemAvaliated.estado || "bom");
+    setObsModal(itemAvaliated.observacao || "");
+    setFotoModal(itemAvaliated.foto || null);
+  };
+
   const handleAdicionarAoLote = () => {
     if (!itemEmEdicao) return;
-    const nomeEquipamento = (itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "equipamento").toLowerCase();
+    const nomeEquipamento = itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "Equipamento";
 
-    const novoItem = {
-      idTemp: Date.now(),
-      patrimonio: (itemEmEdicao.patrimonio || "s/p").toLowerCase(),
-      equipamento: nomeEquipamento,
-      estado: estadoModal,
-      observacao: obsModal.trim().toLowerCase(),
-      foto: fotoModal,
-      dataHora: new Date().toLocaleString("pt-BR")
-    };
+    if (itemEmEdicao.isEditing) {
+      setItensAvaliados((prev) =>
+        prev.map((i) =>
+          i.idTemp === itemEmEdicao.idTemp
+            ? {
+                ...i,
+                estado: estadoModal,
+                observacao: obsModal.trim(),
+                foto: fotoModal,
+              }
+            : i
+        )
+      );
+    } else {
+      const novoItem = {
+        idTemp: Date.now(),
+        patrimonio: itemEmEdicao.patrimonio || "s/p",
+        equipamento: nomeEquipamento,
+        estado: estadoModal,
+        observacao: obsModal.trim(),
+        foto: fotoModal,
+        dataHora: new Date().toLocaleString("pt-BR")
+      };
 
-    setItensAvaliados((prev) => [...prev, novoItem]);
+      setItensAvaliados((prev) => [...prev, novoItem]);
+    }
+
     setItemEmEdicao(null);
     setObsModal("");
     setFotoModal(null);
@@ -135,10 +163,10 @@ const TelaVistoriaPatrimonio = () => {
 
     const itemManual = {
       idTemp: Date.now(),
-      patrimonio: manualPatrimonio.trim().toLowerCase() || "s/p",
-      equipamento: manualNome.trim().toLowerCase(),
+      patrimonio: manualPatrimonio.trim() || "s/p",
+      equipamento: manualNome.trim(),
       estado: estadoModal,
-      observacao: obsModal.trim().toLowerCase(),
+      observacao: obsModal.trim(),
       foto: fotoModal,
       dataHora: new Date().toLocaleString("pt-BR")
     };
@@ -153,6 +181,9 @@ const TelaVistoriaPatrimonio = () => {
 
   const handleRemoverItem = (idTemp) => {
     setItensAvaliados((prev) => prev.filter((i) => i.idTemp !== idTemp));
+    if (itemEmEdicao?.idTemp === idTemp) {
+      setItemEmEdicao(null);
+    }
   };
 
   const handleGerarTermoModal = () => {
@@ -222,14 +253,14 @@ const TelaVistoriaPatrimonio = () => {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                 value={unidadeSelecionada} 
                 onChange={(e) => { 
-                  setUnidadeSelecionada(e.target.value.toLowerCase()); 
+                  setUnidadeSelecionada(e.target.value); 
                   setSetorSelecionado(""); 
                   setInputSetorManual("");
                   setSetorManualMode(false);
                 }}
               >
                 <option value="">Selecione a Unidade...</option>
-                {Object.keys(MAPA_SETORES_POR_UNIDADE).map((u) => <option key={u} value={u.toLowerCase()}>{u}</option>)}
+                {Object.keys(MAPA_SETORES_POR_UNIDADE).map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
 
@@ -260,7 +291,7 @@ const TelaVistoriaPatrimonio = () => {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                     value={inputSetorManual}
                     onChange={(e) => {
-                      const val = e.target.value.toLowerCase();
+                      const val = e.target.value;
                       setInputSetorManual(val);
                       setSetorSelecionado(val);
                     }}
@@ -271,13 +302,13 @@ const TelaVistoriaPatrimonio = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                   value={setorSelecionado} 
                   onChange={(e) => {
-                    setSetorSelecionado(e.target.value.toLowerCase());
+                    setSetorSelecionado(e.target.value);
                   }}
                   disabled={!unidadeSelecionada}
                 >
                   <option value="">Selecione o Setor...</option>
-                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || MAPA_SETORES_POR_UNIDADE[Object.keys(MAPA_SETORES_POR_UNIDADE).find(k => k.toLowerCase() === unidadeSelecionada)] || []).map((s) => (
-                    <option key={s} value={s.toLowerCase()}>{s}</option>
+                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || MAPA_SETORES_POR_UNIDADE[Object.keys(MAPA_SETORES_POR_UNIDADE).find(k => k.toLowerCase() === unidadeSelecionada?.toLowerCase())] || []).map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               )}
@@ -308,7 +339,7 @@ const TelaVistoriaPatrimonio = () => {
                 placeholder="Buscar por patrimônio ou descrição..." 
                 className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={busca}
-                onChange={(e) => setBusca(e.target.value.toLowerCase())}
+                onChange={(e) => setBusca(e.target.value)}
               />
               {busca && (
                 <button type="button" onClick={() => setBusca("")} className="absolute right-3.5 text-slate-400 hover:text-slate-600 font-bold text-xs">✕</button>
@@ -327,14 +358,14 @@ const TelaVistoriaPatrimonio = () => {
                     placeholder="Patrimônio (Ex: 37031)" 
                     className="sm:col-span-1 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualPatrimonio}
-                    onChange={(e) => setManualPatrimonio(e.target.value.toLowerCase())}
+                    onChange={(e) => setManualPatrimonio(e.target.value)}
                   />
                   <input 
                     type="text" 
                     placeholder="Descrição do Equipamento" 
                     className="sm:col-span-2 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualNome}
-                    onChange={(e) => setManualNome(e.target.value.toLowerCase())}
+                    onChange={(e) => setManualNome(e.target.value)}
                     required
                   />
                 </div>
@@ -378,7 +409,7 @@ const TelaVistoriaPatrimonio = () => {
                   placeholder="Observação..." 
                   className="w-full bg-white border border-slate-200 p-2 rounded-xl text-xs font-medium outline-none"
                   value={obsModal}
-                  onChange={(e) => setObsModal(e.target.value.toLowerCase())}
+                  onChange={(e) => setObsModal(e.target.value)}
                 />
                 <button type="submit" disabled={compactandoFoto} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer">
                   + Adicionar à Vistoria
@@ -402,8 +433,8 @@ const TelaVistoriaPatrimonio = () => {
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {equipamentosFiltrados.map((item) => {
-                  const pat = (item.patrimonio || "s/p").toLowerCase();
-                  const nomeItem = (item.descricao || item.equipamento || item.nome || "").toLowerCase();
+                  const pat = item.patrimonio || "s/p";
+                  const nomeItem = item.descricao || item.equipamento || item.nome || "";
                   const jaAvaliado = itensAvaliados.some((i) => i.patrimonio === pat && i.equipamento === nomeItem);
 
                   return (
@@ -418,8 +449,8 @@ const TelaVistoriaPatrimonio = () => {
                           #{pat}
                         </span>
                         <div>
-                          <p className="font-bold text-slate-800 text-sm uppercase">{nomeItem}</p>
-                          <p className="text-[11px] text-slate-400 font-medium capitalize">{unidadeSelecionada} • {setorSelecionado}</p>
+                          <p className="font-bold text-slate-800 text-sm">{nomeItem}</p>
+                          <p className="text-[11px] text-slate-400 font-medium">{unidadeSelecionada} • {setorSelecionado}</p>
                         </div>
                       </div>
 
@@ -443,6 +474,7 @@ const TelaVistoriaPatrimonio = () => {
             )}
           </div>
 
+          {/* SESSÃO DE VISTORIA (COLUNA DA DIREITA) */}
           <div className="lg:col-span-5 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5">
             <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
               <div>
@@ -460,13 +492,15 @@ const TelaVistoriaPatrimonio = () => {
               <div className="p-4 bg-slate-50 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Avaliando Item</span>
-                    <h4 className="font-extrabold text-slate-800 text-sm uppercase">
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
+                      {itemEmEdicao.isEditing ? "Editando Avaliação" : "Avaliando Item"}
+                    </span>
+                    <h4 className="font-extrabold text-slate-800 text-sm">
                       {itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome}
                     </h4>
                     <span className="text-xs font-mono font-bold text-slate-500">Patrimônio: #{itemEmEdicao.patrimonio || "s/p"}</span>
                   </div>
-                  <button type="button" onClick={() => setItemEmEdicao(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Cancelar</button>
+                  <button type="button" onClick={() => setItemEmEdicao(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">Cancelar</button>
                 </div>
 
                 <div>
@@ -477,7 +511,7 @@ const TelaVistoriaPatrimonio = () => {
                         key={opt.id}
                         type="button"
                         onClick={() => setEstadoModal(opt.id)}
-                        className={`p-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-2 transition-all ${
+                        className={`p-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           estadoModal === opt.id ? opt.color : 'bg-white border-slate-200 text-slate-600'
                         }`}
                       >
@@ -492,7 +526,7 @@ const TelaVistoriaPatrimonio = () => {
                   placeholder="Observações técnicas ou motivo do estado..."
                   className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 outline-none resize-none"
                   value={obsModal}
-                  onChange={(e) => setObsModal(e.target.value.toLowerCase())}
+                  onChange={(e) => setObsModal(e.target.value)}
                 />
 
                 <div>
@@ -518,11 +552,12 @@ const TelaVistoriaPatrimonio = () => {
                   onClick={handleAdicionarAoLote}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
                 >
-                  <CheckCircle2 size={16} /> Confirmar Avaliação do Item
+                  <CheckCircle2 size={16} /> {itemEmEdicao.isEditing ? "Salvar Alterações" : "Confirmar Avaliação do Item"}
                 </button>
               </div>
             )}
 
+            {/* LISTA DOS CARDS AVALIADOS */}
             <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
               {itensAvaliados.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
@@ -542,23 +577,35 @@ const TelaVistoriaPatrimonio = () => {
                             <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-slate-200 text-slate-700">
                               #{item.patrimonio}
                             </span>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase border ${estInfo?.color}`}>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${estInfo?.color}`}>
                               {estInfo?.label}
                             </span>
                           </div>
-                          <p className="font-bold text-slate-800 text-xs uppercase">{item.equipamento}</p>
+                          <p className="font-bold text-slate-800 text-xs">{item.equipamento}</p>
                           {item.observacao && <p className="text-[11px] text-slate-500 italic">"{item.observacao}"</p>}
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoverItem(item.idTemp)}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
-                        title="Remover item da vistoria"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* BOTÕES DE AÇÃO DO CARD: EDITAR E EXCLUIR */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEditarItemAvaliated(item)}
+                          className="text-slate-400 hover:text-blue-600 p-1.5 transition-colors cursor-pointer"
+                          title="Editar avaliação deste item"
+                        >
+                          <Pencil size={15} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverItem(item.idTemp)}
+                          className="text-slate-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
+                          title="Remover item da vistoria"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })

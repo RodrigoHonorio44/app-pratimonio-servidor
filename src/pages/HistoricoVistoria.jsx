@@ -8,9 +8,7 @@ import {
   CheckSquare,
   Square,
   ArrowLeft,
-  Image as ImageIcon,
-  Maximize2,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -45,7 +43,7 @@ export default function HistoricoVistoria() {
   } = useHistoricoVistoria();
 
   const [fotoExpandida, setFotoExpandida] = useState(null);
-  const vistoriasParaImprimir = vistoriasFiltradas.filter(v => selecionadas.includes(v.id));
+  const vistoriasParaImprimir = vistoriasFiltradas.filter((v) => selecionadas.includes(v.id));
 
   // CONFIRMAÇÃO DE EXCLUSÃO COM TOAST
   const handleExcluir = (e, id) => {
@@ -104,6 +102,18 @@ export default function HistoricoVistoria() {
         </div>
       </div>
     ), { duration: 5000 });
+  };
+
+  // IMPRIMIR APENAS A VISTORIA ATIVA DO MODAL
+  const handleImprimirVistoriaAtiva = () => {
+    if (!vistoriaAtiva) return;
+    if (!selecionadas.includes(vistoriaAtiva.id)) {
+      toggleSelecionar(vistoriaAtiva.id);
+    }
+    setVistoriaAtiva(null);
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   return (
@@ -364,10 +374,7 @@ export default function HistoricoVistoria() {
               </button>
 
               <button
-                onClick={() => {
-                  setVistoriaAtiva(null);
-                  setTimeout(() => window.print(), 100);
-                }}
+                onClick={handleImprimirVistoriaAtiva}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
               >
                 <Printer size={16} />
@@ -565,8 +572,7 @@ export default function HistoricoVistoria() {
               padding: 0 !important;
               margin: 0 !important;
               background: #ffffff !important;
-              display: flex !important;
-              flex-direction: column !important;
+              display: block !important;
             }
 
             .page-break-inside-avoid {
