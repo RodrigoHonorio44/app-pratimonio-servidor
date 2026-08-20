@@ -7,6 +7,23 @@ import { toast } from "react-toastify";
 // 1. IMPORTAR O MAPA REAL DE SETORES
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
 
+// Função utilitária para normalizar strings preservando 'upa inoã'
+const normalizarTexto = (str) => {
+  if (!str) return "";
+  let texto = str.toLowerCase().trim();
+
+  // Força o padrão 'upa inoã' para qualquer variação de Inoã
+  if (/upa.*ino/i.test(texto) || texto.includes("inoã")) {
+    return "upa inoã";
+  }
+
+  // Remove acentos e caracteres especiais das demais strings
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+};
+
 export const useEstoque = () => {
   const [itensEstoque, setItensEstoque] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,39 +41,55 @@ export const useEstoque = () => {
     novaUnidade: "",
     novoSetor: "",
     responsavelRecebimento: "",
-    motivo: "transferência regular (reforço/expansão)",
+    motivo: "transferencia regular (reforco/expansao)",
   });
 
   const navigate = useNavigate();
 
-  // 2. CHAVES EXATAMENTE IGUAIS AS DO MAPA ABAIXO
+  // 2. LISTA PADRÃO DE UNIDADES (Alinhada com 'upa inoã')
   const unidades = [
     "Estoque Central",
     "Hospital Conde",
-    "UPA de Inoã",
-    "UPA de Santa Rita",
-    "SAMU Barroco",
-    "SAMU Ponta Negra",
-    "SAMU Centro",
+    "upa inoã",
+    "upa santa rita",
+    "samu barroco",
+    "samu ponta negra",
+    "samu centro",
   ];
 
-  // 3. ADICIONE O ESTOQUE CENTRAL NO MAPA PARA EVITAR QUEBRA CASO SEJA SELECIONADO
+  // Busca segura no mapa de setores ignorando acentos e caixa alta/baixa
+  const obterSetoresDoMapa = (nomeUnidade) => {
+    if (!MAPA_SETORES_POR_UNIDADE) return [];
+    
+    if (MAPA_SETORES_POR_UNIDADE[nomeUnidade]) {
+      return MAPA_SETORES_POR_UNIDADE[nomeUnidade];
+    }
+
+    const chaveEncontrada = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
+      (chave) => normalizarTexto(chave) === normalizarTexto(nomeUnidade)
+    );
+
+    return chaveEncontrada ? MAPA_SETORES_POR_UNIDADE[chaveEncontrada] : [];
+  };
+
+  // 3. ESTRUTURAÇÃO SEGURA DOS SETORES POR UNIDADE
   const setoresPorUnidade = {
     ...MAPA_SETORES_POR_UNIDADE,
     "Estoque Central": ["Equipamento Usado", "Reserva Técnica", "Inservível / Manutenção"],
-    "UPA de Inoã": MAPA_SETORES_POR_UNIDADE["Upa Inoã"] || MAPA_SETORES_POR_UNIDADE["UPA de Inoã"],
-    "UPA de Santa Rita": MAPA_SETORES_POR_UNIDADE["Upa Santa Rita"] || MAPA_SETORES_POR_UNIDADE["UPA de Santa Rita"],
-    "SAMU Barroco": MAPA_SETORES_POR_UNIDADE["Samu Barroco"] || MAPA_SETORES_POR_UNIDADE["SAMU Barroco"],
-    "SAMU Ponta Negra": MAPA_SETORES_POR_UNIDADE["Samu Ponta Negra"] || MAPA_SETORES_POR_UNIDADE["SAMU Ponta Negra"],
-    "SAMU Centro": MAPA_SETORES_POR_UNIDADE["Samu Centro"] || MAPA_SETORES_POR_UNIDADE["SAMU Centro"],
+    "Hospital Conde": obterSetoresDoMapa("Hospital Conde"),
+    "upa inoã": obterSetoresDoMapa("UPA de Inoã") || obterSetoresDoMapa("upa inoã"),
+    "upa santa rita": obterSetoresDoMapa("UPA de Santa Rita"),
+    "samu barroco": obterSetoresDoMapa("SAMU Barroco"),
+    "samu ponta negra": obterSetoresDoMapa("SAMU Ponta Negra"),
+    "samu centro": obterSetoresDoMapa("SAMU Centro"),
   };
 
   const motivosSaida = [
-    { value: "transferência regular (reforço/expansão)", label: "Transferência Regular (Reforço/Expansão)" },
-    { value: "substituição por rasgo/avaria", label: "Substituição por Rasgo/Avaria" },
-    { value: "substituição por infecção/contaminação", label: "Substituição por Infecção/Contaminação (Descarte Sanitário)" },
-    { value: "substituição por defeito técnico/mecânico", label: "Substituição por Defeito Técnico/Mecânico" },
-    { value: "empréstimo temporário", label: "Empréstimo Temporário" },
+    { value: "transferencia regular (reforco/expansao)", label: "Transferência Regular (Reforço/Expansão)" },
+    { value: "substituicao por rasgo/avaria", label: "Substituição por Rasgo/Avaria" },
+    { value: "substituicao por infeccao/contaminacao", label: "Substituição por Infecção/Contaminação (Descarte Sanitário)" },
+    { value: "substituicao por defeito tecnico/mecanico", label: "Substituição por Defeito Técnico/Mecânico" },
+    { value: "emprestimo temporario", label: "Empréstimo Temporário" },
   ];
 
   const carregarEstoque = async () => {
@@ -65,8 +98,7 @@ export const useEstoque = () => {
       const resposta = await api.get("/estoque");
       const listaCompleta = Array.isArray(resposta.data) ? resposta.data : [];
       
-      // Filtra estritamente apenas os ativos
-      const lista = listaCompleta.filter(item => (item.status || "ativo").toLowerCase().trim() === "ativo");
+      const lista = listaCompleta.filter(item => normalizarTexto(item.status || "ativo") === "ativo");
       setItensEstoque(lista);
     } catch (error) {
       console.error("Erro ao carregar estoque:", error);
@@ -92,9 +124,9 @@ export const useEstoque = () => {
       return;
     }
 
-    const patrimonioOriginal = String(itemParaAdicionar.patrimonio || "").toLowerCase().trim();
+    const patrimonioOriginal = normalizarTexto(itemParaAdicionar.patrimonio);
     const patrimonioFinal = (patrimonioOriginal === "s/p" || patrimonioOriginal === "sp")
-      ? patrimonioInput.toLowerCase().trim()
+      ? normalizarTexto(patrimonioInput)
       : patrimonioOriginal;
 
     if (!patrimonioFinal) {
@@ -132,8 +164,11 @@ export const useEstoque = () => {
     setProcessando(true);
 
     const responsavelFinal = naoSabeResponsavel 
-      ? "responsável pelo setor" 
-      : dadosSaida.responsavelRecebimento.toLowerCase().trim();
+      ? "responsavel pelo setor" 
+      : normalizarTexto(dadosSaida.responsavelRecebimento);
+
+    const unidadeDestinoNormalizada = normalizarTexto(dadosSaida.novaUnidade);
+    const setorDestinoNormalizado = normalizarTexto(dadosSaida.novoSetor);
 
     try {
       const currentUser = auth.currentUser;
@@ -148,8 +183,8 @@ export const useEstoque = () => {
         }
 
         const itemId = item._id || item.id;
-        const patrimonioFinal = (item.patrimonioMapeado || item.patrimonio || "").toLowerCase().trim();
-        const categoriaTratada = (item.categoriaItem || item.tipoItem || item.tipo || "mobiliário").toLowerCase().trim();
+        const patrimonioFinal = normalizarTexto(item.patrimonioMapeado || item.patrimonio);
+        const categoriaTratada = normalizarTexto(item.categoriaItem || item.tipoItem || item.tipo || "mobiliario");
 
         if (!itemId) {
           throw new Error(`Item "${item.nome || 'desconhecido'}" sem identificador válido.`);
@@ -159,19 +194,19 @@ export const useEstoque = () => {
         await api.post("/saidaEquipamento", {
           estoqueId: itemId,
           patrimonio: patrimonioFinal,
-          nomeEquipamento: (item.nome || "").toLowerCase().trim(),
-          unidadeOrigem: (item.unidade || "almoxarifado central").toLowerCase().trim(),
-          setorOrigem: (item.setor || "patrimônio").toLowerCase().trim(),
-          unidadeDestino: dadosSaida.novaUnidade.toLowerCase().trim(),
-          setorDestino: dadosSaida.novoSetor.toLowerCase().trim(),
+          nomeEquipamento: normalizarTexto(item.nome),
+          unidadeOrigem: normalizarTexto(item.unidade || "almoxarifado central"),
+          setorOrigem: normalizarTexto(item.setor || "patrimonio"),
+          unidadeDestino: unidadeDestinoNormalizada,
+          setorDestino: setorDestinoNormalizado,
           quantidadeRetirada: qtdSolicitada,
           responsavelRecebimento: responsavelFinal,
-          motivo: dadosSaida.motivo.toLowerCase().trim(),
+          motivo: normalizarTexto(dadosSaida.motivo),
           dataSaida: new Date().toISOString()
         });
 
-        // 2. Se não for bem durável, faz UPSERT nos ativos (Cria novo ou incrementa existente no destino)
-        if (categoriaTratada !== "bem durável") {
+        // 2. Se não for bem durável, faz UPSERT nos ativos
+        if (categoriaTratada !== "bem duravel") {
           const resAtivos = await api.get("/ativos").catch(() => ({ data: [] }));
           const listaAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
 
@@ -179,29 +214,29 @@ export const useEstoque = () => {
           if (patrimonioFinal === "s/p" || patrimonioFinal === "sp") {
             ativoExistente = listaAtivos.find(
               (a) =>
-                String(a.patrimonio || "").toLowerCase().trim() === patrimonioFinal &&
-                String(a.nome || "").toLowerCase().trim() === (item.nome || "").toLowerCase().trim() &&
-                String(a.unidade || "").toLowerCase().trim() === dadosSaida.novaUnidade.toLowerCase().trim() &&
-                String(a.setor || "").toLowerCase().trim() === dadosSaida.novoSetor.toLowerCase().trim()
+                normalizarTexto(a.patrimonio) === patrimonioFinal &&
+                normalizarTexto(a.nome) === normalizarTexto(item.nome) &&
+                normalizarTexto(a.unidade) === unidadeDestinoNormalizada &&
+                normalizarTexto(a.setor) === setorDestinoNormalizado
             );
           } else {
             ativoExistente = listaAtivos.find(
-              (a) => String(a.patrimonio || "").toLowerCase().trim() === patrimonioFinal
+              (a) => normalizarTexto(a.patrimonio) === patrimonioFinal
             );
           }
 
           const payloadAtivo = {
-            nome: (item.nome || "").toLowerCase().trim(),
+            nome: normalizarTexto(item.nome),
             tipoItem: categoriaTratada,
-            tipo: (item.tipo || "equipamento").toLowerCase().trim(),
-            estado: (item.estado || "bom").toLowerCase().trim(),
-            observacoes: (item.observacoes || "").toLowerCase().trim(),
-            cadastradoPor: (item.cadastradoPor || currentUser.email || "").toLowerCase().trim(),
+            tipo: normalizarTexto(item.tipo || "equipamento"),
+            estado: normalizarTexto(item.estado || "bom"),
+            observacoes: normalizarTexto(item.observacoes),
+            cadastradoPor: normalizarTexto(item.cadastradoPor || currentUser.email),
             criadoEm: item.criadoEm || new Date().toISOString(),
             quantidade: ativoExistente ? Number(ativoExistente.quantidade || 0) + qtdSolicitada : qtdSolicitada,
             patrimonio: patrimonioFinal,
-            unidade: dadosSaida.novaUnidade.toLowerCase().trim(),
-            setor: dadosSaida.novoSetor.toLowerCase().trim(),
+            unidade: unidadeDestinoNormalizada,
+            setor: setorDestinoNormalizado,
             status: "ativo",
             ultimaMovimentacao: new Date().toISOString(),
           };
@@ -216,11 +251,10 @@ export const useEstoque = () => {
 
         // 3. Atualiza ou Remove o registro da coleção /estoque
         if (qtdSolicitada < qtdAtual) {
-          // Se ainda sobrou saldo, decrementa a quantidade via PUT
           const payloadEstoque = {
             ...item,
-            nome: (item.nome || "").toLowerCase().trim(),
-            patrimonio: (item.patrimonio || "").toLowerCase().trim(),
+            nome: normalizarTexto(item.nome),
+            patrimonio: normalizarTexto(item.patrimonio),
             quantidade: qtdAtual - qtdSolicitada,
             status: "ativo",
             ultimaMovimentacao: new Date().toISOString(),
@@ -231,15 +265,13 @@ export const useEstoque = () => {
 
           await api.put(`/estoque/${itemId}`, payloadEstoque);
         } else {
-          // Se a quantidade foi toda transferida, deleta do estoque
           try {
             await api.delete(`/estoque/${itemId}`);
           } catch (errDelete) {
-            // Fallback caso a rota DELETE não esteja mapeada no backend
             const payloadFallback = {
               ...item,
-              nome: (item.nome || "").toLowerCase().trim(),
-              patrimonio: (item.patrimonio || "").toLowerCase().trim(),
+              nome: normalizarTexto(item.nome),
+              patrimonio: normalizarTexto(item.patrimonio),
               quantidade: 0,
               status: "movimentado",
               ultimaMovimentacao: new Date().toISOString(),
@@ -263,7 +295,7 @@ export const useEstoque = () => {
         novaUnidade: "",
         novoSetor: "",
         responsavelRecebimento: "",
-        motivo: "transferência regular (reforço/expansão)",
+        motivo: "transferencia regular (reforco/expansao)",
       });
       carregarEstoque();
     } catch (error) {
@@ -273,7 +305,7 @@ export const useEstoque = () => {
     }
   };
 
-  const isEstoque = dadosSaida.novaUnidade === "Estoque Central";
+  const isEstoque = normalizarTexto(dadosSaida.novaUnidade) === "estoque central";
 
   return {
     itensEstoque,

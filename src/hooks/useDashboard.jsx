@@ -4,7 +4,13 @@ import api from "../services/api";
 import { doc, getDoc } from "firebase/firestore";
 
 export function useDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Inicializa fechado em telas menores que 768px (Mobile)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 768;
+    }
+    return false;
+  });
   
   // Modos: 'mensal' ou 'anual'
   const [modoFiltro, setModoFiltro] = useState("mensal");

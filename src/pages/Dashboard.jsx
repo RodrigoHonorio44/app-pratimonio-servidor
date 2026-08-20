@@ -5,7 +5,6 @@ import {
   CheckCircle,
   AlertCircle,
   PieChart,
-  User,
   FileText,
   Barcode,
   Calendar,
@@ -16,6 +15,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import Header from "../components/Header";
 import { useDashboard } from "../hooks/useDashboard";
 
 export default function Dashboard() {
@@ -32,11 +32,8 @@ export default function Dashboard() {
     userData,
     loading,
     estatisticas,
-    isRoot,
-    isAdmin,
     temAcesso,
     nomeExibicao,
-    unidadExibicao
   } = useDashboard();
 
   if (loading) {
@@ -55,82 +52,59 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans antialiased text-slate-900">
       
+      {/* Sidebar Lateral */}
       <Sidebar 
         sidebarOpen={sidebarOpen} 
         setSidebarOpen={setSidebarOpen} 
         userData={userData} 
       />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 z-40">
-          <div className="flex flex-col">
-            <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-              {isRoot ? "Root Access" : isAdmin ? "Administrador" : "Analista"}
-            </h2>
-            <h1 className="text-xl font-black text-slate-800 tracking-tight italic">
-              Dashboard
-            </h1>
-          </div>
+      {/* Container Principal */}
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
+        
+        {/* Header Único Responsivo */}
+        <Header onOpenSidebar={() => setSidebarOpen(true)} />
 
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-tighter">
-                  {unidadExibicao}
-                </span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  Usuário
-                </span>
-              </div>
-              <h3 className="text-lg font-black text-slate-800 uppercase italic leading-tight mt-0.5">
-                {nomeExibicao}
-              </h3>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white">
-              <User size={28} strokeWidth={2.5} />
-            </div>
-          </div>
-        </header>
-
-        <section className="flex-1 overflow-y-auto p-10 bg-[#F8FAFC]">
+        {/* Conteúdo da Dashboard com Scroll */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">
             
             {/* CABEÇALHO DO PAINEL COM FILTRO REFORÇADO */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
-              <h1 className="text-4xl font-black text-slate-900">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8 md:mb-12">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 truncate max-w-full">
                 Olá, {nomeExibicao.split(" ")[0]}!
               </h1>
               
-              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm">
+              <div className="flex items-center gap-2 sm:gap-3 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm w-full sm:w-auto justify-between sm:justify-start">
                 
-                {/* Selector do Modo (Mensal ou Anual) */}
+                {/* Seletor do Modo (Mensal ou Anual) */}
                 <select
                   value={modoFiltro}
                   onChange={(e) => setModoFiltro(e.target.value)}
-                  className="bg-slate-100 font-black text-slate-700 text-xs uppercase rounded-xl px-3 py-2 border-none focus:outline-none cursor-pointer"
+                  className="bg-slate-100 font-black text-slate-700 text-[11px] sm:text-xs uppercase rounded-xl px-2.5 py-2 border-none focus:outline-none cursor-pointer"
                 >
                   <option value="mensal">Visão Mensal</option>
-                  <option value="anual">Visão Anual (Ano Todo)</option>
+                  <option value="anual">Visão Anual</option>
                 </select>
 
                 <div className="h-6 w-[1px] bg-slate-200"></div>
 
                 {/* Input Dinâmico de acordo com a seleção */}
-                <div className="flex items-center gap-2 px-2 py-1">
-                  <Calendar size={16} className="text-blue-600" />
+                <div className="flex items-center gap-1.5 px-1 sm:px-2 py-1">
+                  <Calendar size={16} className="text-blue-600 shrink-0" />
                   
                   {modoFiltro === "mensal" ? (
                     <input
                       type="month"
                       value={mesFiltro}
                       onChange={(e) => setMesFiltro(e.target.value)}
-                      className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+                      className="bg-transparent font-bold text-slate-700 text-xs sm:text-sm focus:outline-none cursor-pointer w-full"
                     />
                   ) : (
                     <select
                       value={anoFiltro}
                       onChange={(e) => setAnoFiltro(e.target.value)}
-                      className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+                      className="bg-transparent font-bold text-slate-700 text-xs sm:text-sm focus:outline-none cursor-pointer"
                     >
                       <option value="2026">2026</option>
                       <option value="2025">2025</option>
@@ -143,7 +117,7 @@ export default function Dashboard() {
 
             {/* CARDS DE ESTATÍSTICA */}
             {temAcesso("chamados") && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 md:mb-12">
                 <StatCard title="Em Aberto" value={estatisticas.abertos} color="amber" icon={Clock} />
                 <StatCard title="Aguardando" value={estatisticas.pendentes} color="rose" icon={AlertCircle} />
                 <StatCard title="Concluídos" value={estatisticas.fechados} color="emerald" icon={CheckCircle} />
@@ -151,7 +125,8 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* CARDS DE AÇÕES RÁPIDAS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {temAcesso("dashboard_bi") && (
                 <QuickActionCard
                   title="Painel de BI"
@@ -208,8 +183,8 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        </section>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
@@ -222,16 +197,16 @@ function StatCard({ title, value, color, icon: Icon }) {
     blue: "bg-blue-600 shadow-blue-100",
   };
   return (
-    <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden">
-      <div className="flex justify-between items-center mb-6">
-        <div className={`${themes[color]} p-3 rounded-2xl text-white shadow-lg group-hover:scale-110 transition-transform`}>
+    <div className="bg-white p-5 sm:p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <div className={`${themes[color]} p-2.5 sm:p-3 rounded-2xl text-white shadow-lg group-hover:scale-110 transition-transform`}>
           <Icon size={20} />
         </div>
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
           {title}
         </span>
       </div>
-      <h3 className="text-4xl font-black text-slate-900">
+      <h3 className="text-3xl sm:text-4xl font-black text-slate-900">
         {value.toString().padStart(2, "0")}
       </h3>
     </div>
@@ -243,22 +218,22 @@ function QuickActionCard({ title, description, icon: Icon, onClick, variant }) {
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer rounded-[2rem] p-8 transition-all flex flex-col justify-between h-72 ${
+      className={`group cursor-pointer rounded-[2rem] p-6 sm:p-8 transition-all flex flex-col justify-between h-64 sm:h-72 ${
         isDark
           ? "bg-slate-900 text-white hover:bg-slate-800"
           : "bg-white border border-slate-200 text-slate-900 shadow-sm hover:border-blue-200"
       }`}
     >
       <div>
-        <div className={`mb-6 inline-block p-4 rounded-2xl ${isDark ? "bg-slate-800" : "bg-blue-50 text-blue-600"}`}>
-          <Icon size={24} />
+        <div className={`mb-4 sm:mb-6 inline-block p-3 sm:p-4 rounded-2xl ${isDark ? "bg-slate-800" : "bg-blue-50 text-blue-600"}`}>
+          <Icon size={22} />
         </div>
-        <h2 className="text-xl font-black mb-2">{title}</h2>
-        <p className="text-sm opacity-70 leading-relaxed font-medium">
+        <h2 className="text-lg sm:text-xl font-black mb-1.5 sm:mb-2">{title}</h2>
+        <p className="text-xs sm:text-sm opacity-70 leading-relaxed font-medium line-clamp-3">
           {description}
         </p>
       </div>
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 mt-2">
         Acessar Módulo{" "}
         <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
       </div>
