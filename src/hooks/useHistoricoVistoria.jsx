@@ -36,8 +36,8 @@ export function useHistoricoVistoria() {
           return {
             ...item,
             id: item.id || item._id,
-            unidade: unidadeNome || "Unidade Não Informada",
-            setor: setorNome || "Setor Não Informado",
+            unidade: unidadeNome || "unidade não informada",
+            setor: setorNome || "setor não informado",
             dataHora: item.dataHoraInicio || item.dataHora,
             itensAvaliados: listaItens.map((it) => ({
               ...it,
@@ -61,39 +61,39 @@ export function useHistoricoVistoria() {
       setVistorias([
         {
           id: "vist_01",
-          unidade: "Hospital Conde",
-          setor: "UPG",
+          unidade: "hospital conde",
+          setor: "upg",
           dataHora: "2026-06-10T14:30:00",
-          responsavel: "Rodrigo Honório",
+          responsavel: "rodrigo honório",
           itensAvaliados: [
             {
               patrimonio: "PAT-00124",
-              equipamento: "Mesa de escritório em MDF",
+              equipamento: "mesa de escritório em mdf",
               estadoConservacao: "ocioso",
-              observacao: "Tampo riscado e pés frouxos",
+              observacao: "tampo riscado e pés frouxos",
               foto: "https://via.placeholder.com/300?text=Foto+Avaria+1",
             },
             {
               patrimonio: "PAT-00125",
-              equipamento: "Monitor 24 polegadas",
+              equipamento: "monitor 24 polegadas",
               estadoConservacao: "bom",
-              observacao: "Funcionando perfeitamente",
+              observacao: "funcionando perfeitamente",
               foto: null,
             },
           ],
         },
         {
           id: "vist_02",
-          unidade: "UPA Inoã",
-          setor: "Pediatria",
+          unidade: "upa inoã",
+          setor: "pediatria",
           dataHora: "2026-06-12T09:15:00",
-          responsavel: "Rodrigo Honório",
+          responsavel: "rodrigo honório",
           itensAvaliados: [
             {
               patrimonio: "PAT-00892",
-              equipamento: "Cadeira giratória longarina",
+              equipamento: "cadeira giratória longarina",
               estadoConservacao: "irrecuperavel",
-              observacao: "Braço quebrado e sem regulagem de altura",
+              observacao: "braço quebrado e sem regulagem de altura",
               foto: "https://via.placeholder.com/300?text=Foto+Avaria+2",
             },
           ],
@@ -105,26 +105,46 @@ export function useHistoricoVistoria() {
   };
 
   // Função para excluir vistoria do banco de dados e da interface
-  const excluirVistoria = async (id) => {
-    try {
-      // Chama a API para apagar do banco de dados
-      await api.delete(`/vistorias/${id}`);
+  const excluirVistoria = async (idOrObject) => {
+    const targetId = typeof idOrObject === "object" ? (idOrObject?.id || idOrObject?._id) : idOrObject;
 
-      // Remove da lista exibida na tela
-      setVistorias((prev) => prev.filter((v) => v.id !== id));
+    if (!targetId) {
+      console.error("Identificador de vistoria inválido fornecido para exclusão:", idOrObject);
+      throw new Error("ID da vistoria não encontrado.");
+    }
 
-      // Remove dos selecionados, se estivesse marcado
-      setSelecionadas((prev) => prev.filter((selectedId) => selectedId !== id));
-
-      // Fecha o modal caso a vistoria excluída esteja aberta nele
-      if (vistoriaAtiva?.id === id) {
+    // Auxiliar interno para atualizar todos os estados locais da interface
+    const removerDoEstadoLocal = () => {
+      setVistorias((prev) => prev.filter((v) => (v.id || v._id) !== targetId));
+      setSelecionadas((prev) => prev.filter((selectedId) => selectedId !== targetId));
+      if (vistoriaAtiva && (vistoriaAtiva.id === targetId || vistoriaAtiva._id === targetId)) {
         setVistoriaAtiva(null);
       }
+    };
+
+    // Caso seja um item mockado localmente (vist_01, vist_02), remove diretamente
+    if (String(targetId).startsWith("vist_")) {
+      removerDoEstadoLocal();
+      return true;
+    }
+
+    try {
+      // Tenta remover via API no backend
+      await api.delete(`/vistorias/${targetId}`);
+      removerDoEstadoLocal();
+      return true;
     } catch (error) {
       console.error("Erro ao excluir vistoria do banco de dados:", error);
-      // Caso dê falha na API (ou esteja rodando apenas no mock local), remove do estado para teste
-      setVistorias((prev) => prev.filter((v) => v.id !== id));
-      setSelecionadas((prev) => prev.filter((selectedId) => selectedId !== id));
+
+      // Se a rota da API falhar por 404 (endpoint ainda não criado) ou falha de rede/mock local:
+      if (error.response?.status === 404 || !error.response) {
+        console.warn("Rota da API não encontrada ou offline. Removendo localmente para testes.");
+        removerDoEstadoLocal();
+        return true;
+      }
+
+      // Se for um erro real do servidor (ex: 401 Sem Autorização, 500 Erro Interno), propaga o erro
+      throw error;
     }
   };
 
@@ -160,7 +180,7 @@ export function useHistoricoVistoria() {
     if (selecionadas.length === vistoriasFiltradas.length && vistoriasFiltradas.length > 0) {
       setSelecionadas([]);
     } else {
-      setSelecionadas(vistoriasFiltradas.map((v) => v.id));
+      setSelecionadas(vistoriasFiltradas.map((v) => v.id || v._id));
     }
   };
 
@@ -184,7 +204,7 @@ export function useHistoricoVistoria() {
     selecionarTodas,
     vistoriaAtiva,
     setVistoriaAtiva,
-    excluirVistoria, // <--- Retornada para ser utilizada no componente de interface
+    excluirVistoria,
     gerarRelatorioImpressao,
     recarregarVistorias: carregarVistorias,
   };

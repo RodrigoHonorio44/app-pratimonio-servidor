@@ -43,72 +43,71 @@ export default function HistoricoVistoria() {
   } = useHistoricoVistoria();
 
   const [fotoExpandida, setFotoExpandida] = useState(null);
-  const vistoriasParaImprimir = vistoriasFiltradas.filter((v) => selecionadas.includes(v.id));
+  
+  // Tratativa segura para pegar o ID correto do objeto (id ou _id do MongoDB)
+  const getIdVistoria = (v) => v?.id || v?._id;
 
-  // CONFIRMAÇÃO DE EXCLUSÃO COM TOAST
-  const handleExcluir = (e, id) => {
-    e.stopPropagation();
+  const vistoriasParaImprimir = vistoriasFiltradas.filter((v) => 
+    selecionadas.includes(getIdVistoria(v))
+  );
+
+  // EXCLUSÃO COM TOAST PERSONALIZADO
+  const handleExcluirDireto = (idOuObjeto) => {
+    const id = typeof idOuObjeto === "object" ? getIdVistoria(idOuObjeto) : idOuObjeto;
+
+    if (!id) {
+      toast.error("ID da vistoria não encontrado.");
+      return;
+    }
 
     toast.custom((t) => (
-      <div
-        className={`${
-          t.visible ? "animate-enter" : "animate-leave"
-        } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col p-5 border border-slate-200`}
-      >
+      <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col p-5 border border-slate-200`}>
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+          <div className="p-2 bg-rose-100 text-rose-600 rounded-xl">
             <Trash2 size={20} />
           </div>
           <div>
-            <h4 className="text-sm font-black text-slate-800">Excluir Vistoria</h4>
-            <p className="text-xs font-semibold text-slate-500">
-              Tem certeza que deseja remover este item do histórico?
-            </p>
+            <h3 className="text-sm font-black text-slate-800">Confirmar exclusão</h3>
+            <p className="text-xs text-slate-500 font-medium">Tem certeza que deseja excluir esta vistoria?</p>
           </div>
         </div>
-
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <div className="flex gap-2 justify-end mt-2">
           <button
             onClick={() => toast.dismiss(t.id)}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
           >
             Cancelar
           </button>
           <button
             onClick={async () => {
               toast.dismiss(t.id);
+              const toastLoading = toast.loading("Excluindo vistoria...");
               try {
                 await excluirVistoria(id);
-                if (vistoriaAtiva?.id === id) {
+                if (vistoriaAtiva && getIdVistoria(vistoriaAtiva) === id) {
                   setVistoriaAtiva(null);
                 }
-                toast.success("Vistoria excluída com sucesso!", {
-                  style: {
-                    borderRadius: "16px",
-                    background: "#0f172a",
-                    color: "#fff",
-                    fontWeight: "bold",
-                    fontSize: "13px",
-                  },
-                });
+                toast.success("Vistoria excluída com sucesso!", { id: toastLoading });
               } catch (error) {
-                toast.error("Erro ao excluir vistoria.");
+                console.error("Erro capturado ao excluir:", error);
+                toast.error("Erro ao excluir vistoria.", { id: toastLoading });
               }
             }}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-rose-200"
           >
-            Confirmar Exclusão
+            Sim, Excluir
           </button>
         </div>
       </div>
-    ), { duration: 5000 });
+    ), { duration: 6000 });
   };
 
   // IMPRIMIR APENAS A VISTORIA ATIVA DO MODAL
   const handleImprimirVistoriaAtiva = () => {
     if (!vistoriaAtiva) return;
-    if (!selecionadas.includes(vistoriaAtiva.id)) {
-      toggleSelecionar(vistoriaAtiva.id);
+    const activeId = getIdVistoria(vistoriaAtiva);
+    if (!selecionadas.includes(activeId)) {
+      toggleSelecionar(activeId);
     }
     setVistoriaAtiva(null);
     setTimeout(() => {
@@ -240,7 +239,8 @@ export default function HistoricoVistoria() {
           ) : (
             <div className="divide-y divide-slate-100">
               {vistoriasFiltradas.map((v) => {
-                const isSelected = selecionadas.includes(v.id);
+                const currentId = getIdVistoria(v);
+                const isSelected = selecionadas.includes(currentId);
                 const dataFormatada = v.dataHoraInicio || v.dataHora 
                   ? new Date(v.dataHoraInicio || v.dataHora).toLocaleString("pt-BR") 
                   : "Data não informada";
@@ -248,13 +248,13 @@ export default function HistoricoVistoria() {
 
                 return (
                   <div
-                    key={v.id}
+                    key={currentId}
                     className={`p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all hover:bg-blue-50/30 ${
                       isSelected ? "bg-blue-50/50" : ""
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      <button onClick={() => toggleSelecionar(v.id)} className="cursor-pointer">
+                      <button onClick={() => toggleSelecionar(currentId)} className="cursor-pointer">
                         {isSelected ? (
                           <CheckSquare size={22} className="text-blue-600" />
                         ) : (
@@ -290,9 +290,13 @@ export default function HistoricoVistoria() {
                         Ver Detalhes
                       </button>
 
-                      {/* BOTÃO EXCLUIR VISTORIA */}
+                      {/* BOTÃO EXCLUIR VISTORIA DIRETO */}
                       <button
-                        onClick={(e) => handleExcluir(e, v.id)}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExcluirDireto(currentId);
+                        }}
                         title="Excluir Vistoria"
                         className="p-2.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-sm"
                       >
@@ -366,7 +370,8 @@ export default function HistoricoVistoria() {
 
             <div className="flex justify-between items-center gap-3 border-t border-slate-100 pt-6">
               <button
-                onClick={(e) => handleExcluir(e, vistoriaAtiva.id)}
+                type="button"
+                onClick={() => handleExcluirDireto(getIdVistoria(vistoriaAtiva))}
                 className="flex items-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer"
               >
                 <Trash2 size={16} />
