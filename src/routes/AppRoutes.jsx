@@ -25,6 +25,7 @@ import TelaEtiquetas from "../pages/TelaEtiquetas";
 import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
 import HistoricoVistoria from "../pages/HistoricoVistoria";
 import GerenciarSetor from "../pages/GerenciarSetor";
+import Checklist from "../pages/ChecklistFrota"; // Certifique-se de que o arquivo CheckListFrota.jsx existe em src/pages/
 
 // Importando componentes
 import CadastroChamado from "../components/CadastroChamado";
@@ -152,6 +153,16 @@ export default function AppRoutes({
                   element={
                     <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
                       <TelaVistoriaPatrimonio />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* --- CHECKLIST DE FROTA --- */}
+                <Route
+                  path="/checklist"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("checklist") || temAcesso("frota") || temAcesso("inventario")}>
+                      <Checklist />
                     </ProtectedRoute>
                   }
                 />

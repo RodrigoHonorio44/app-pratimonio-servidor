@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth } from "../services/firebase";
-import api from "../services/api"; // Usa a mesma instância do Axios configurada no projeto
+import api from "../services/api";
 import { toast } from "react-toastify";
 import { 
   X, 
@@ -10,7 +10,11 @@ import {
   CheckCircle,
   Wrench,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Camera,
+  Upload,
+  Trash2,
+  Image as ImageIcon
 } from "lucide-react";
 import ImpressaoLaudoTecnico from "./ImpressaoLaudoTecnico";
 
@@ -18,11 +22,16 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
   const [etapa, setEtapa] = useState("formulario"); 
   const [diagnosticoTecnico, setDiagnosticoTecnico] = useState("");
   const [justificativaSubstituicao, setJustificativaSubstituicao] = useState("");
+  const [fotoUrl, setFotoUrl] = useState(null);
   const [processando, setProcessando] = useState(false);
 
   // Estados para o Histórico de Manutenções
   const [historicoManutencoes, setHistoricoManutencoes] = useState([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+
+  // Refs para acionar os inputs de arquivo/câmera
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && equipamento) {
@@ -34,8 +43,27 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
     setEtapa("formulario");
     setDiagnosticoTecnico("");
     setJustificativaSubstituicao("");
+    setFotoUrl(null);
     setHistoricoManutencoes([]);
     onClose();
+  };
+
+  // Trata o carregamento/conversão de imagem para base64
+  const handleFotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFotoUrl(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removerFoto = () => {
+    setFotoUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   // Função para obter token Firebase atualizado
@@ -54,7 +82,6 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
     try {
       const headers = await getAuthHeader();
       
-      // Normaliza o patrimônio atual do equipamento (ex: "17158" ou "017158")
       const patrimonioAtual = equipamento.patrimonio 
         ? String(equipamento.patrimonio).trim().toLowerCase().replace(/^0+/, "") 
         : "";
@@ -63,7 +90,6 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         equipamento.idAtivo || equipamento.ativoId || equipamento.id || equipamento._id || ""
       ).trim();
 
-      // Busca todos os chamados utilizando a base da API já configurada no projeto
       const resposta = await api.get("/chamados", { headers });
       const dados = resposta.data;
 
@@ -71,7 +97,6 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         ? dados 
         : (dados?.chamados || dados?.dados || []);
       
-      // Filtro flexível: verifica se o chamado pertence ao patrimônio ou ao ID do equipamento
       const chamadosDoAtivo = listaChamados.filter((ch) => {
         const patChamado = ch.patrimonio || ch.patrimonioId || ch.codigoPatrimonio || "";
         const patChamadoLimpo = String(patChamado).trim().toLowerCase().replace(/^0+/, "");
@@ -123,7 +148,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         };
       });
 
-      // 1. Cadastra o laudo na rota POST /laudos
+      // 1. Cadastra o laudo na rota POST /laudos (inclui fotoUrl)
       const payloadLaudo = {
         equipamentoId: idAtivo,
         nomeEquipamento: (equipamento.nome || "").toLowerCase().trim(),
@@ -132,6 +157,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         setor: (equipamento.setor || "").toLowerCase().trim(),
         diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
         justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
+        fotoUrl: fotoUrl || null,
         status: "pendente",
         totalManutencoesAnteriores: historicoManutencoes.length,
         historicoAnexo: historicoTratado
@@ -144,6 +170,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         status: "laudo pendente",
         diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
         justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
+        fotoUrl: fotoUrl || null,
         dataLaudoTecnico: new Date().toISOString(),
         ultimaMovimentacao: new Date().toISOString()
       };
@@ -248,7 +275,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                     Diagnóstico Técnico / Situação do Ativo
                   </label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="Descreva detalhadamente os defeitos encontrados..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none uppercase"
                     value={diagnosticoTecnico}
@@ -261,13 +288,73 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                     Justificativa para Substituição Imediata
                   </label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="Justifique o impacto da falta deste equipamento na unidade..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none uppercase"
                     value={justificativaSubstituicao}
                     onChange={(e) => setJustificativaSubstituicao(e.target.value)}
                   />
                 </div>
+
+                {/* BLOCO DE CAPTURA E UPLOAD DE FOTO */}
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 flex items-center gap-1">
+                    <ImageIcon size={12} className="text-blue-600" /> Anexo Fotográfico
+                  </label>
+
+                  {/* Inputs Ocultos */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleFotoChange}
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    ref={cameraInputRef}
+                    onChange={handleFotoChange}
+                    className="hidden"
+                  />
+
+                  {!fotoUrl ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl p-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer uppercase"
+                      >
+                        <Camera size={15} className="text-blue-600" /> Tirar Foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl p-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer uppercase"
+                      >
+                        <Upload size={15} className="text-slate-600" /> Upload Foto
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 h-28 flex items-center justify-center">
+                      <img
+                        src={fotoUrl}
+                        alt="Preview do Equipamento"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removerFoto}
+                        className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-lg shadow-md hover:bg-red-700 transition-all cursor-pointer"
+                        title="Remover Imagem"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
 
@@ -330,6 +417,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
             equipamento={equipamento}
             diagnosticoTecnico={diagnosticoTecnico}
             justificativaSubstituicao={justificativaSubstituicao}
+            fotoUrl={fotoUrl}
             historicoManutencoes={historicoManutencoes}
           />
 

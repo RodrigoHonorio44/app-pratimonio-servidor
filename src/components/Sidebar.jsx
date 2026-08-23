@@ -23,6 +23,7 @@ import {
   FolderKanban,
   Boxes,
   X,
+  Car,
 } from "lucide-react";
 import { auth } from "../services/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -58,6 +59,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
 
   const temAcesso = (moduloId) => {
     if (isRoot) return true;
+    if (!moduloId) return true;
     return userData?.permissoesExtras?.[moduloId] === true;
   };
 
@@ -274,6 +276,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     label="Laudo Técnico"
                     path="/laudo-inviabilidade"
                     moduloId="laudos"
+                  />
+                  {/* Checklist Veicular / Automotivo Ajustado */}
+                  <NavButton
+                    icon={Car}
+                    label="Checklist Veicular"
+                    path="/checklist"
+                    moduloId="checklist"
                   />
                 </div>
               )}
