@@ -62,6 +62,15 @@ export function useChecklistFrota() {
   const [salvandoVeiculo, setSalvandoVeiculo] = useState(false);
   const [salvandoChecklist, setSalvandoChecklist] = useState(false);
   const [usuarioNome, setUsuarioNome] = useState('analyst ti');
+  
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const dispararToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 4000);
+  };
 
   const [novoVeiculo, setNovoVeiculo] = useState({
     placa: "",
@@ -70,7 +79,7 @@ export function useChecklistFrota() {
     kmAtual: "",
   });
 
-  const [formData, setFormData] = useState({
+  const getInitialFormData = () => ({
     tipoVeiculo: 'usado',
     veiculoId: '',
     placa: '',
@@ -81,12 +90,12 @@ export function useChecklistFrota() {
     marca: '',
     cor: '',
     cidade: '',
-    pneuDianteiro: 'Bom',
-    pneuTraseiro: 'Bom',
-    pneuEstepe: 'Bom',
+    pneuDianteiro: 'b',
+    pneuTraseiro: 'b',
+    pneuEstepe: 'b',
     crlv: 'sim',
     exercicio: new Date().getFullYear().toString(),
-    combustivel: '1/2',
+    combustivel: 'F',
     obs: '',
     condutor: '',
     rg: '',
@@ -94,6 +103,8 @@ export function useChecklistFrota() {
     email: '',
     responsavel: ''
   });
+
+  const [formData, setFormData] = useState(getInitialFormData());
 
   const [itensInspecao, setItensInspecao] = useState(
     listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {})
@@ -165,30 +176,86 @@ export function useChecklistFrota() {
     return () => unsubscribe();
   }, []);
 
-  const handleSelecionarVeiculo = (veiculoId) => {
+  const handleSelecionarVeiculo = async (veiculoId) => {
     if (!veiculoId) {
-      setFormData((prev) => ({
-        ...prev,
-        veiculoId: "",
-        placa: "",
-        modelo: "",
-        marca: "",
-        km: "",
-      }));
+      setFormData(getInitialFormData());
+      setItensInspecao(listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {}));
+      setDanos({});
+      setAcessorios(listaAcessorios.reduce((acc, item) => ({ ...acc, [item]: 'N' }), {}));
       return;
     }
 
     const veiculoEncontrado = veiculos.find((v) => String(v.id) === String(veiculoId) || String(v._id) === String(veiculoId));
+    
     if (veiculoEncontrado) {
-      setFormData((prev) => ({
-        ...prev,
-        veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
-        placa: veiculoEncontrado.placa || "",
-        modelo: veiculoEncontrado.modelo || "",
-        marca: veiculoEncontrado.marca || "",
-        km: veiculoEncontrado.kmAtual || "",
-      }));
+      try {
+        const historico = await apiFetch(`/api/checklist-frota`).catch(() => []);
+        
+        let ultimoChecklist = null;
+        if (Array.isArray(historico) && historico.length > 0) {
+          const checklistsDoVeiculo = historico.filter(item => 
+            String(item.veiculoId) === String(veiculoEncontrado.id || veiculoEncontrado._id) ||
+            (item.placa && item.placa.toLowerCase() === veiculoEncontrado.placa.toLowerCase())
+          );
+
+          if (checklistsDoVeiculo.length > 0) {
+            checklistsDoVeiculo.sort((a, b) => {
+              const dataA = new Date(a.criadoEm?.$date || a.criadoEm || a.data || 0);
+              const dataB = new Date(b.criadoEm?.$date || b.criadoEm || b.data || 0);
+              return dataA - dataB;
+            });
+            ultimoChecklist = checklistsDoVeiculo[checklistsDoVeiculo.length - 1];
+          }
+        }
+
+        if (ultimoChecklist) {
+          setFormData({
+            ...ultimoChecklist,
+            veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+            data: new Date().toISOString().split('T')[0],
+            hora: new Date().toTimeString().slice(0, 5),
+          });
+
+          if (ultimoChecklist.itensInspecao) setItensInspecao(ultimoChecklist.itensInspecao);
+          if (ultimoChecklist.danos) setDanos(ultimoChecklist.danos);
+          if (ultimoChecklist.acessorios) setAcessorios(ultimoChecklist.acessorios);
+
+          dispararToast("Dados do último checklist carregados com sucesso!");
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+            placa: veiculoEncontrado.placa || "",
+            modelo: veiculoEncontrado.modelo || "",
+            marca: veiculoEncontrado.marca || "",
+            km: veiculoEncontrado.kmAtual || "",
+            data: new Date().toISOString().split('T')[0],
+            hora: new Date().toTimeString().slice(0, 5),
+          }));
+          dispararToast("Veículo selecionado. Nenhum checklist anterior encontrado.");
+        }
+      } catch (e) {
+        setFormData((prev) => ({
+          ...prev,
+          veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+          placa: veiculoEncontrado.placa || "",
+          modelo: veiculoEncontrado.modelo || "",
+          marca: veiculoEncontrado.marca || "",
+          km: veiculoEncontrado.kmAtual || "",
+          data: new Date().toISOString().split('T')[0],
+          hora: new Date().toTimeString().slice(0, 5),
+        }));
+      }
     }
+  };
+
+  // Alterado/compatibilizado para ser chamado tanto como handleLimparTudo quanto handleLimparCompleto
+  const handleLimparTudo = () => {
+    setFormData(getInitialFormData());
+    setItensInspecao(listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {}));
+    setDanos({});
+    setAcessorios(listaAcessorios.reduce((acc, item) => ({ ...acc, [item]: 'N' }), {}));
+    dispararToast("Formulário limpo com sucesso!");
   };
 
   const handleChange = (e) => {
@@ -208,19 +275,31 @@ export function useChecklistFrota() {
     setAcessorios((prev) => ({ ...prev, [item]: status }));
   };
 
+  const normalizarParaLowercase = (obj) => {
+    const formatado = {};
+    for (const key in obj) {
+      if (typeof obj[key] === 'string') {
+        formatado[key] = obj[key].toLowerCase();
+      } else {
+        formatado[key] = obj[key];
+      }
+    }
+    return formatado;
+  };
+
   const handleCadastrarVeiculo = async (e) => {
     e.preventDefault();
     if (!novoVeiculo.placa || !novoVeiculo.modelo) {
-      alert("Informe a placa e o modelo do veículo.");
+      dispararToast("Informe a placa e o modelo do veículo.", "error");
       return;
     }
 
     setSalvandoVeiculo(true);
     try {
       const payload = {
-        placa: novoVeiculo.placa,
-        modelo: novoVeiculo.modelo,
-        marca: novoVeiculo.marca || "",
+        placa: novoVeiculo.placa.toLowerCase(),
+        modelo: novoVeiculo.modelo.toLowerCase(),
+        marca: (novoVeiculo.marca || "").toLowerCase(),
         kmAtual: novoVeiculo.kmAtual,
       };
 
@@ -235,10 +314,10 @@ export function useChecklistFrota() {
       handleSelecionarVeiculo(veiculoCadastrado.id);
       setNovoVeiculo({ placa: "", modelo: "", marca: "", kmAtual: "" });
       setModalVeiculoAberto(false);
-      alert("Veículo cadastrado com sucesso no banco!");
+      dispararToast("Veículo cadastrado com sucesso no banco!");
     } catch (error) {
       console.error("Erro ao cadastrar veículo:", error);
-      alert("Erro ao cadastrar veículo: " + error.message);
+      dispararToast("Erro ao cadastrar veículo: " + error.message, "error");
     } finally {
       setSalvandoVeiculo(false);
     }
@@ -247,14 +326,19 @@ export function useChecklistFrota() {
   const handleSalvarChecklist = async (e) => {
     e.preventDefault();
     if (!formData.placa || !formData.condutor) {
-      alert("Por favor, preencha a placa e o nome do motorista/condutor.");
+      dispararToast("Por favor, preencha a placa e o nome do motorista/condutor.", "error");
       return;
     }
 
     setSalvandoChecklist(true);
     try {
+      const { veiculoId, ...dadosChecklist } = formData;
+      
       const payload = {
-        ...formData,
+        ...normalizarParaLowercase(dadosChecklist),
+        veiculoId: veiculoId, 
+        data: new Date().toISOString().split('T')[0],
+        hora: new Date().toTimeString().slice(0, 5),
         itensInspecao,
         danos,
         acessorios,
@@ -265,208 +349,25 @@ export function useChecklistFrota() {
         body: JSON.stringify(payload)
       });
 
-      alert("Checklist salvo com sucesso no Banco de Dados!");
+      dispararToast("Checklist salvo com sucesso! Novo registro gerado.");
+      
+      setFormData(getInitialFormData());
+      setItensInspecao(listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {}));
+      setDanos({});
+      setAcessorios(listaAcessorios.reduce((acc, item) => ({ ...acc, [item]: 'N' }), {}));
+
     } catch (error) {
       console.error("Erro ao salvar checklist:", error);
-      alert("Falha ao salvar a vistoria: " + error.message);
+      dispararToast("Falha ao salvar a vistoria: " + error.message, "error");
     } finally {
       setSalvandoChecklist(false);
     }
   };
 
+  // Substituído para usar o print nativo do navegador sem abrir novas abas bloqueadas por pop-up
   const handleImprimir = () => {
-    const janelaVisualizacao = window.open('', '_blank');
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const baseUrl = window.location.origin;
-
-    let linhasAcessoriosHtml = '';
-    for (let i = 0; i < listaAcessorios.length; i += 3) {
-      const item1 = listaAcessorios[i];
-      const item2 = listaAcessorios[i + 1];
-      const item3 = listaAcessorios[i + 2];
-
-      linhasAcessoriosHtml += `
-        <tr>
-          <td>${item1 || ''}</td>
-          <td style="text-align: center; font-weight: bold;">${item1 ? (acessorios[item1] || 'N') : ''}</td>
-          <td>${item2 || ''}</td>
-          <td style="text-align: center; font-weight: bold;">${item2 ? (acessorios[item2] || 'N') : ''}</td>
-          <td>${item3 || ''}</td>
-          <td style="text-align: center; font-weight: bold;">${item3 ? (acessorios[item3] || 'N') : ''}</td>
-        </tr>
-      `;
-    }
-
-    janelaVisualizacao.document.write(`
-        <html>
-            <head>
-                <title>Checklist Veicular e Relatório de Frota - Rodhon System</title>
-                <style>
-                    @page { size: A4; margin: 8mm 10mm; }
-                    body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #000000; line-height: 1.15; font-size: 8.5px; }
-                    .documento-container { max-width: 800px; margin: 0 auto; }
-                    
-                    /* FAIXA OFICIAL DE LOGOS COM MAIS ESPAÇO E LOGOS MAIORES */
-                    .faixa-logos {
-                        width: 100%;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        padding-top: 6px;
-                        padding-bottom: 6px;
-                        margin-bottom: 6px;
-                        border-bottom: 2px solid rgba(0, 0, 0, 0.2);
-                    }
-                    .logo-box { flex: 1; display: flex; }
-                    .justify-start { justify-content: flex-start; }
-                    .justify-center { justify-content: center; }
-                    .justify-end { justify-content: flex-end; }
-                    .logo-img { height: 34px; object-fit: contain; display: block; }
-                    .logo-img-h8 { height: 24px; object-fit: contain; display: block; }
-
-                    /* CABEÇALHO */
-                    .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 3px; margin-bottom: 5px; }
-                    .header h1 { margin: 0; font-size: 11px; font-weight: 900; text-transform: uppercase; }
-                    .header p { margin: 1px 0 0 0; font-size: 7.5px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 0.1em; }
-
-                    /* TABELAS */
-                    .table-dados { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
-                    .table-dados th, .table-dados td { border: 1px solid #cbd5e1; padding: 2px 4px; font-size: 8.5px; }
-                    .table-dados th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; text-align: left; color: #475569; }
-                    .table-dados td { font-weight: bold; }
-
-                    .section-title { font-weight: bold; font-size: 8.5px; text-transform: uppercase; background: #e2e8f0; padding: 2px 4px; margin: 5px 0 3px 0; border-left: 3px solid #2563eb; }
-
-                    /* DIAGRAMA DE AVARIAS MAIOR */
-                    .diagrama-box { border: 1px solid #cbd5e1; padding: 6px; background: #ffffff; text-align: center; margin-bottom: 6px; }
-                    .diagrama-img { max-height: 165px; width: auto; max-width: 100%; object-fit: contain; display: inline-block; }
-                    .legenda-grid { display: flex; justify-content: space-between; font-size: 7.5px; font-weight: bold; background: #f8fafc; border: 1px solid #cbd5e1; padding: 3px 6px; margin-top: 5px; color: #1e293b; text-transform: uppercase; }
-
-                    /* ASSINATURAS COM ESPAÇAMENTO AMPLIADO */
-                    .assinaturas { margin-top: 35px; display: flex; justify-content: space-between; page-break-inside: avoid; }
-                    .campo-assinatura { width: 45%; text-align: center; }
-                    .linha { border-top: 1px solid #0f172a; margin-bottom: 4px; }
-                </style>
-            </head>
-            <body>
-                <div class="documento-container">
-                    
-                    <!-- FAIXA DE LOGOS AUMENTADA E AFASTADA -->
-                    <div class="faixa-logos">
-                        <div class="logo-box justify-start">
-                            <img src="${baseUrl}/Imagem1.png" alt="Hospital" class="logo-img" />
-                        </div>
-                        <div class="logo-box justify-center">
-                            <img src="${baseUrl}/Imagem2.png" alt="Avante" class="logo-img" />
-                        </div>
-                        <div class="logo-box justify-center">
-                            <img src="${baseUrl}/Imagem3.png" alt="Saúde" class="logo-img-h8" />
-                        </div>
-                        <div class="logo-box justify-end">
-                            <img src="${baseUrl}/Imagem4.png" alt="Maricá" class="logo-img" />
-                        </div>
-                    </div>
-
-                    <div class="header">
-                        <h1>Checklist Veicular e Relatório de Frota</h1>
-                        <p>Data da Inspeção: ${dataAtual} • Rodhon System</p>
-                    </div>
-
-                    <!-- DADOS DO VEÍCULO E CONDUTOR -->
-                    <div class="section-title">1. Identificação do Veículo e Condutor</div>
-                    <table class="table-dados">
-                        <tr>
-                            <th style="width: 15%;">Placa</th>
-                            <td style="width: 35%;">${formData.placa ? formData.placa.toUpperCase() : ''}</td>
-                            <th style="width: 15%;">Modelo</th>
-                            <td style="width: 35%;">${formData.modelo ? formData.modelo.toUpperCase() : ''}</td>
-                        </tr>
-                        <tr>
-                            <th>Condutor</th>
-                            <td>${formData.condutor ? formData.condutor.toUpperCase() : ''}</td>
-                            <th>KM Atual</th>
-                            <td>${formData.km || ''}</td>
-                        </tr>
-                        <tr>
-                            <th>Combustível</th>
-                            <td>${formData.combustivel || ''}</td>
-                            <th>CRLV / Exercício</th>
-                            <td>SIM (${formData.exercicio || 'N/I'})</td>
-                        </tr>
-                    </table>
-
-                    <!-- MAPEAMENTO DE AVARIAS E ESQUEMA DO CARRO -->
-                    <div class="section-title">2. Mapeamento de Avarias e Estado Geral</div>
-                    <table class="table-dados" style="margin-bottom: 4px;">
-                        <tr>
-                            <th style="width: 16%;">Pneu Dianteiro</th>
-                            <td style="width: 17%;">${(formData.pneuDianteiro || 'BOM').toUpperCase()}</td>
-                            <th style="width: 16%;">Pneu Traseiro</th>
-                            <td style="width: 17%;">${(formData.pneuTraseiro || 'BOM').toUpperCase()}</td>
-                            <th style="width: 16%;">Pneu Estepe</th>
-                            <td style="width: 18%;">${(formData.pneuEstepe || 'BOM').toUpperCase()}</td>
-                        </tr>
-                    </table>
-
-                    <div class="diagrama-box">
-                        <!-- DIAGRAMA DO CARRO COM TAMANHO OTIMIZADO -->
-                        <img src="${baseUrl}/carro.jpg" alt="Esquema de Avarias do Veículo" class="diagrama-img" onerror="this.style.display='none'" />
-                        <div class="legenda-grid">
-                            <span>1 - ARRANHADO</span>
-                            <span>2 - AMASSADO</span>
-                            <span>3 - PIQUES</span>
-                            <span>4 - TRINCADO</span>
-                            <span>5 - QUEBRADO</span>
-                            <span>6 - FALTA</span>
-                        </div>
-                    </div>
-
-                    <!-- ACESSÓRIOS / EQUIPAMENTOS -->
-                    <div class="section-title">3. Acessórios e Equipamentos [ (S) Sim | (N) Não | (A) Avariado ]</div>
-                    <table class="table-dados">
-                        <tr>
-                            <th style="width: 28%;">Item</th>
-                            <th style="width: 5%; text-align: center;">Sta</th>
-                            <th style="width: 28%;">Item</th>
-                            <th style="width: 5%; text-align: center;">Sta</th>
-                            <th style="width: 28%;">Item</th>
-                            <th style="width: 6%; text-align: center;">Sta</th>
-                        </tr>
-                        ${linhasAcessoriosHtml}
-                    </table>
-
-                    <!-- OBSERVAÇÕES -->
-                    <div class="section-title">4. Observações e Avarias Identificadas</div>
-                    <div style="border: 1px solid #cbd5e1; padding: 5px; min-height: 25px; font-size: 8.5px; margin-bottom: 8px; background: #f8fafc; font-weight: bold;">
-                        ${formData.obs ? formData.obs.toUpperCase() : 'NENHUMA OBSERVAÇÃO OU AVARIA REGISTRADA.'}
-                    </div>
-
-                    <!-- ASSINATURAS COM ESPAÇAMENTO AMPLIADO -->
-                    <div class="assinaturas">
-                        <div class="campo-assinatura">
-                            <div class="linha"></div>
-                            <p style="font-weight: bold; text-transform: uppercase; font-size: 7.5px; margin: 0;">Responsável pela Frota / TI</p>
-                            <p style="font-size: 6.5px; color: #64748b; margin: 1px 0 0 0;">Rodhon System</p>
-                        </div>
-                        <div class="campo-assinatura">
-                            <div class="linha"></div>
-                            <p style="font-weight: bold; text-transform: uppercase; font-size: 7.5px; margin: 0;">${formData.condutor ? formData.condutor.toUpperCase() : 'CONDUTOR'}</p>
-                            <p style="font-size: 6.5px; color: #64748b; margin: 1px 0 0 0;">Motorista Responsável</p>
-                        </div>
-                    </div>
-
-                </div>
-                <script>
-                    window.onload = function() {
-                        setTimeout(function() {
-                            window.print();
-                        }, 400);
-                    }
-                </script>
-            </body>
-        </html>
-    `);
-    janelaVisualizacao.document.close();
+    window.print();
+    dispararToast("Abrindo painel de impressão do navegador!");
   };
 
   const handleLogout = async () => {
@@ -493,7 +394,10 @@ export function useChecklistFrota() {
     itensInspecao,
     danos,
     acessorios,
+    toast,
     handleSelecionarVeiculo,
+    handleLimparTudo,
+    handleLimparCompleto: handleLimparTudo, // Garante compatibilidade se o componente chamar por qualquer um dos nomes
     handleChange,
     handleInspecaoChange,
     handleDanoChange,

@@ -1,8 +1,12 @@
-import React from 'react';
-import { Printer, Car, Plus, X, Save, CheckCircle2, ArrowLeft, LogOut, User } from 'lucide-react';
-import { useChecklistFrota, listaItensInspecao, listaAcessorios, posicoesVistoria } from '../hooks//useChecklistFrota';
+import React, { useState } from 'react';
+import { Printer, Car, Plus, X, Save, CheckCircle2, ArrowLeft, LogOut, User, RotateCcw } from 'lucide-react';
+import { useChecklistFrota, listaItensInspecao, listaAcessorios, posicoesVistoria } from '../hooks/useChecklistFrota';
+import ImpressaoChecklistFrota from '../components/ImpressaoChecklistFrota';
+import toast from 'react-hot-toast';
 
 export default function ChecklistFrota({ onVoltarDashboard }) {
+  const [exibirImpressao, setExibirImpressao] = useState(false);
+
   const {
     veiculos,
     modalVeiculoAberto,
@@ -24,9 +28,17 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
     handleAcessorioChange,
     handleCadastrarVeiculo,
     handleSalvarChecklist,
-    handleImprimir,
     handleLogout,
+    handleLimparCompleto, // Vamos garantir que o hook chame esta função de limpeza total
   } = useChecklistFrota();
+
+  // Função intermediária para disparar o toast de limpeza
+  const executarLimpeza = () => {
+    if (typeof handleLimparCompleto === 'function') {
+      handleLimparCompleto();
+    }
+    toast.success("Campos limpos com sucesso!");
+  };
 
   return (
     <div className="bg-slate-100 min-h-screen font-sans flex flex-col">
@@ -79,28 +91,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print-container space-y-6">
           
-          {/* CABEÇALHO OFICIAL DE IMPRESSÃO (VISÍVEL APENAS NA IMPRESSÃO) */}
-          <div className="hidden print:flex flex-col items-center w-full mb-4 border-b pb-3">
-            <div className="grid grid-cols-4 items-center justify-between w-full px-2 mb-2 gap-2">
-              <div className="flex justify-center items-center h-8">
-                <img src="/logohospital.png" alt="Hospital" className="max-h-8 w-auto object-contain" />
-              </div>
-              <div className="flex justify-center items-center h-8">
-                <img src="/logoavante.png" alt="Avante Social" className="max-h-8 w-auto object-contain" />
-              </div>
-              <div className="flex justify-center items-center h-8">
-                <img src="/logosaude.png" alt="Secretaria de Saúde" className="max-h-8 w-auto object-contain" />
-              </div>
-              <div className="flex justify-center items-center h-8">
-                <img src="/logomarica.png" alt="Prefeitura de Maricá" className="max-h-8 w-auto object-contain" />
-              </div>
-            </div>
-            <div className="text-center mt-1">
-              <h1 className="text-lg font-black uppercase tracking-wider text-gray-900">CHECKLIST VEICULAR</h1>
-              <p className="text-[10px] text-gray-600 uppercase tracking-tight">RELATÓRIO DE INSPEÇÃO TÉCNICA E AVARIAS DA FROTA</p>
-            </div>
-          </div>
-
           {/* CABEÇALHO DA TELA (MODO WEB) */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl gap-4 no-print">
             <div className="flex items-center gap-3">
@@ -336,7 +326,14 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2 no-print">
               <button
                 type="button"
-                onClick={handleImprimir}
+                onClick={executarLimpeza}
+                className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold px-6 py-3 rounded-xl hover:bg-amber-600 transition cursor-pointer text-xs"
+              >
+                <RotateCcw size={16} /> Limpar Campos
+              </button>
+              <button
+                type="button"
+                onClick={() => setExibirImpressao(true)}
                 className="flex items-center justify-center gap-2 bg-slate-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-700 transition cursor-pointer text-xs"
               >
                 <Printer size={16} /> Imprimir Checklist
@@ -434,6 +431,18 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* COMPONENTE DE IMPRESSÃO EM NOVA ABA */}
+      {exibirImpressao && (
+        <ImpressaoChecklistFrota 
+          formData={formData}
+          danos={danos}
+          acessorios={acessorios}
+          posicoesVistoria={posicoesVistoria}
+          listaAcessorios={listaAcessorios}
+          onConcluido={() => setExibirImpressao(false)}
+        />
       )}
     </div>
   );
