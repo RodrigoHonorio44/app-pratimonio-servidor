@@ -79,8 +79,30 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print-container space-y-6">
           
-          {/* CABEÇALHO DO MÓDULO */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl gap-4">
+          {/* CABEÇALHO OFICIAL DE IMPRESSÃO (VISÍVEL APENAS NA IMPRESSÃO) */}
+          <div className="hidden print:flex flex-col items-center w-full mb-4 border-b pb-3">
+            <div className="grid grid-cols-4 items-center justify-between w-full px-2 mb-2 gap-2">
+              <div className="flex justify-center items-center h-8">
+                <img src="/logohospital.png" alt="Hospital" className="max-h-8 w-auto object-contain" />
+              </div>
+              <div className="flex justify-center items-center h-8">
+                <img src="/logoavante.png" alt="Avante Social" className="max-h-8 w-auto object-contain" />
+              </div>
+              <div className="flex justify-center items-center h-8">
+                <img src="/logosaude.png" alt="Secretaria de Saúde" className="max-h-8 w-auto object-contain" />
+              </div>
+              <div className="flex justify-center items-center h-8">
+                <img src="/logomarica.png" alt="Prefeitura de Maricá" className="max-h-8 w-auto object-contain" />
+              </div>
+            </div>
+            <div className="text-center mt-1">
+              <h1 className="text-lg font-black uppercase tracking-wider text-gray-900">CHECKLIST VEICULAR</h1>
+              <p className="text-[10px] text-gray-600 uppercase tracking-tight">RELATÓRIO DE INSPEÇÃO TÉCNICA E AVARIAS DA FROTA</p>
+            </div>
+          </div>
+
+          {/* CABEÇALHO DA TELA (MODO WEB) */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl gap-4 no-print">
             <div className="flex items-center gap-3">
               <div className="bg-blue-600 text-white p-2.5 rounded-xl">
                 <Car size={24} />
@@ -107,7 +129,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                 <Car size={16} /> Informações Gerais e Veículo
               </h3>
 
-              <div>
+              <div className="no-print">
                 <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Selecione o Veículo Cadastrado (Preenchimento Rápido)</label>
                 <select
                   value={formData.veiculoId}
