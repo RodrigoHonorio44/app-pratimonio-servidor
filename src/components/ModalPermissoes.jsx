@@ -28,7 +28,7 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
   const [permissoes, setPermissoes] = useState(inicializarPermissoes);
   const [salvando, setSalvando] = useState(false);
 
-  // LISTA DE MÓDULOS ATUALIZADA (COM GERENCIAR SETORES)
+  // LISTA DE MÓDULOS ATUALIZADA (COM CHECKLIST FROTA E GERENCIAR SETORES)
   const modulosDisponiveis = [
     {
       id: "dashboard_bi",
@@ -44,6 +44,11 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
       id: "gerenciarSetores",
       nome: "Gerenciar Setores",
       desc: "Controle e gerenciamento de setores da instituição",
+    },
+    {
+      id: "checklist_frota",
+      nome: "Checklist de Frota",
+      desc: "Vistoria e controle de veículos e relatórios de frota",
     },
     {
       id: "laudos",
