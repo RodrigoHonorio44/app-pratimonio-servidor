@@ -116,7 +116,13 @@ export function useChecklistFrota() {
   );
 
   const apiFetch = async (url, options = {}) => {
-    const urlFormatada = encodeURI(url.trim().replace(/\s+/g, '_'));
+    // Configura a URL base para produção caso não esteja no localhost
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const baseURL = isLocal ? '' : 'http://192.168.0.232:3000'; // Substitua pelo IP/Domínio correto da sua API se necessário
+    
+    const urlCompleta = url.startsWith('http') ? url : `${baseURL}${url}`;
+    const urlFormatada = encodeURI(urlCompleta.trim().replace(/\s+/g, '_'));
+
     const auth = getAuth();
     let user = auth.currentUser;
 
@@ -249,7 +255,6 @@ export function useChecklistFrota() {
     }
   };
 
-  // Alterado/compatibilizado para ser chamado tanto como handleLimparTudo quanto handleLimparCompleto
   const handleLimparTudo = () => {
     setFormData(getInitialFormData());
     setItensInspecao(listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {}));
@@ -364,7 +369,6 @@ export function useChecklistFrota() {
     }
   };
 
-  // Substituído para usar o print nativo do navegador sem abrir novas abas bloqueadas por pop-up
   const handleImprimir = () => {
     window.print();
     dispararToast("Abrindo painel de impressão do navegador!");
@@ -397,7 +401,7 @@ export function useChecklistFrota() {
     toast,
     handleSelecionarVeiculo,
     handleLimparTudo,
-    handleLimparCompleto: handleLimparTudo, // Garante compatibilidade se o componente chamar por qualquer um dos nomes
+    handleLimparCompleto: handleLimparTudo,
     handleChange,
     handleInspecaoChange,
     handleDanoChange,
