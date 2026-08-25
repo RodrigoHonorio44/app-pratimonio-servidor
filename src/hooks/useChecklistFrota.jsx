@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
+import api from '../services/api'; // <--- Importado padronizado do projeto
 
 export const listaItensInspecao = [
   { id: 'pneus', label: 'Pneus / Calibragem' },
@@ -117,13 +118,8 @@ export function useChecklistFrota() {
     listaAcessorios.reduce((acc, item) => ({ ...acc, [item]: 'N' }), {})
   );
 
-  const apiFetch = async (url, options = {}) => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const baseURL = isLocal ? '' : 'http://192.168.0.232:3000';
-    
-    const urlCompleta = url.startsWith('http') ? url : `${baseURL}${url}`;
-    const urlFormatada = encodeURI(urlCompleta.trim().replace(/\s+/g, '_'));
-
+  // Função auxiliar para injetar o Token do Firebase no Axios
+  const getAuthHeaders = async () => {
     const auth = getAuth();
     let user = auth.currentUser;
 
@@ -137,28 +133,18 @@ export function useChecklistFrota() {
       });
     }
 
-    let token = '';
     if (user) {
-      token = await user.getIdToken();
+      const token = await user.getIdToken();
+      return { headers: { Authorization: `Bearer ${token}` } };
     }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      ...(options.headers || {})
-    };
-
-    const response = await fetch(urlFormatada, { ...options, headers });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `Erro HTTP ${response.status} na comunicação com o servidor`);
-    }
-    return response.json();
+    return {};
   };
 
   const carregarVeiculos = async () => {
     try {
-      const lista = await apiFetch('/api/veiculos_frota');
+      const config = await getAuthHeaders();
+      const response = await api.get('/veiculos_frota', config);
+      const lista = response.data;
       if (Array.isArray(lista)) {
         lista.sort((a, b) => (a.modelo || '').localeCompare(b.modelo || ''));
         setVeiculos(lista);
@@ -196,7 +182,9 @@ export function useChecklistFrota() {
     
     if (veiculoEncontrado) {
       try {
-        const historico = await apiFetch(`/api/checklist-frota`).catch(() => []);
+        const config = await getAuthHeaders();
+        const response = await api.get('/checklist-frota', config).catch(() => ({ data: [] }));
+        const historico = response.data;
         
         let ultimoChecklist = null;
         if (Array.isArray(historico) && historico.length > 0) {
@@ -311,10 +299,9 @@ export function useChecklistFrota() {
         kmAtual: novoVeiculo.kmAtual,
       };
 
-      const resultado = await apiFetch('/api/veiculos_frota', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      const config = await getAuthHeaders();
+      const res = await api.post('/veiculos_frota', payload, config);
+      const resultado = res.data;
 
       const veiculoCadastrado = { id: resultado.id || resultado._id, ...payload };
       setVeiculos((prev) => [...prev, veiculoCadastrado]);
@@ -325,7 +312,8 @@ export function useChecklistFrota() {
       dispararToast("Veículo cadastrado com sucesso no banco!");
     } catch (error) {
       console.error("Erro ao cadastrar veículo:", error);
-      dispararToast("Erro ao cadastrar veículo: " + error.message, "error");
+      const msg = error.response?.data?.error || error.message;
+      dispararToast("Erro ao cadastrar veículo: " + msg, "error");
     } finally {
       setSalvandoVeiculo(false);
     }
@@ -352,10 +340,8 @@ export function useChecklistFrota() {
         acessorios,
       };
 
-      await apiFetch('/api/checklist-frota', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      const config = await getAuthHeaders();
+      await api.post('/checklist-frota', payload, config);
 
       dispararToast("Checklist salvo com sucesso! Novo registro gerado.");
       
@@ -366,7 +352,8 @@ export function useChecklistFrota() {
 
     } catch (error) {
       console.error("Erro ao salvar checklist:", error);
-      dispararToast("Falha ao salvar a vistoria: " + error.message, "error");
+      const msg = error.response?.data?.error || error.message;
+      dispararToast("Falha ao salvar a vistoria: " + msg, "error");
     } finally {
       setSalvandoChecklist(false);
     }

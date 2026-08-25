@@ -258,7 +258,8 @@ const SETORES_SAMU_PONTA_NEGRA = [
   "Área Externa",
   "Centro de Convivência",
   "Depósito de Material Hospitalar",
-  "DML"
+  "DML",
+  "Sala de Equipamentos"
 ];
 
 // O SEGREDO ESTÁ AQUI: Um mapa chave-valor vinculando a Unidade aos Setores dela.
