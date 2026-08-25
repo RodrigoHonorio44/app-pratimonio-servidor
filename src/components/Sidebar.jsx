@@ -224,7 +224,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
           )}
 
           {/* Operação */}
-          {temAcesso("chamados") && (
+          {(temAcesso("chamados") ||
+            temAcesso("remanejamento") ||
+            temAcesso("laudos") ||
+            temAcesso("checklist_frota")) && (
             <div
               className={`${
                 sidebarOpen || window.innerWidth < 768
@@ -255,16 +258,20 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
               </div>
               {openSections.operacao && (
                 <div className="space-y-1 mt-1.5">
-                  <NavButton
-                    icon={MessageSquarePlus}
-                    label="Abrir Chamado"
-                    path="/cadastro-chamado"
-                  />
-                  <NavButton
-                    icon={ClipboardList}
-                    label="Fila de Trabalho"
-                    path="/painel-analista"
-                  />
+                  {temAcesso("chamados") && (
+                    <>
+                      <NavButton
+                        icon={MessageSquarePlus}
+                        label="Abrir Chamado"
+                        path="/cadastro-chamado"
+                      />
+                      <NavButton
+                        icon={ClipboardList}
+                        label="Fila de Trabalho"
+                        path="/painel-analista"
+                      />
+                    </>
+                  )}
                   <NavButton
                     icon={Repeat}
                     label="Remanejamento"
@@ -277,12 +284,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     path="/laudo-inviabilidade"
                     moduloId="laudos"
                   />
-                  {/* Checklist Veicular / Automotivo Ajustado */}
                   <NavButton
                     icon={Car}
                     label="Checklist Veicular"
                     path="/checklist"
-                    moduloId="checklist"
+                    moduloId="checklist_frota"
                   />
                 </div>
               )}
