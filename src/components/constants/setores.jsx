@@ -133,7 +133,7 @@ const SETORES_HOSPITAL_CONDE = [
   "Sala Epidemiologia",
   "Sala Leito Adulto Saúde Mental",
   "Sala Leito Infanto Juvenil Saúde Mental",
-  "Sala Material Limpeza",
+  
   "Sala Multidisciplinar Saúde Mental",
   "Sala Ouvidoria",
   "Sala Patrimônio Adm",

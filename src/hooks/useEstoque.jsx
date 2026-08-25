@@ -134,10 +134,27 @@ export const useEstoque = () => {
       return;
     }
 
-    const jaExiste = loteSaida.some(item => item.patrimonioMapeado === patrimonioFinal);
+    const itemIdAtual = itemParaAdicionar._id || itemParaAdicionar.id;
+
+    // Validação corrigida: Permite 's/p' em produtos diferentes, 
+    // mas bloqueia se for o EXATO mesmo produto com o mesmo patrimônio no lote.
+    const jaExiste = loteSaida.some(item => {
+      const itemIdNoLote = item._id || item.id;
+      return itemIdNoLote === itemIdAtual && item.patrimonioMapeado === patrimonioFinal;
+    });
+
     if (jaExiste) {
-      toast.error("Este número de patrimônio já foi adicionado ao lote!");
+      toast.error("Este item com este patrimônio já foi adicionado ao lote!");
       return;
+    }
+
+    // Se for um patrimônio real único (diferente de s/p), também impede duplicidade global do patrimônio
+    if (patrimonioFinal !== "s/p" && patrimonioFinal !== "sp") {
+      const patrimonioDuplicadoGlobal = loteSaida.some(item => item.patrimonioMapeado === patrimonioFinal);
+      if (patrimonioDuplicadoGlobal) {
+        toast.error("Este número de patrimônio já foi adicionado ao lote!");
+        return;
+      }
     }
 
     const novoItemLote = {

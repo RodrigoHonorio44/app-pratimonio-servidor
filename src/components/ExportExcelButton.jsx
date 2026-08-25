@@ -14,8 +14,8 @@ export default function ExportExcelButton({
   estatisticas,
   chamados = [],
   baixas = [], // Lista de baixas / pareceres
-  saidas = [], // Nova prop: Lista de saídas / transferências
-  laudos = [], // Nova prop: Lista de laudos técnicos
+  saidas = [], // Lista de saídas / transferências
+  laudos = [], // Lista de laudos técnicos
   unidade,
 }) {
   const [exportando, setExportando] = useState(false);
@@ -206,6 +206,7 @@ export default function ExportExcelButton({
 
       wsDetalhes.columns = [
         { header: "ID Chamado", key: "id", width: 16 },
+        { header: "Número OS", key: "numeroOs", width: 18 },
         { header: "Unidade", key: "unidade", width: 28 },
         { header: "Setor", key: "setor", width: 22 },
         { header: "Equipamento / Ativo", key: "equipamento", width: 35 },
@@ -229,22 +230,25 @@ export default function ExportExcelButton({
       });
 
       (chamados || []).forEach((item) => {
-        const dataAberturaRaw = item.dataAbertura || item.createdAt || item.criadoEm || item.data;
-        const dataFechamentoRaw = item.dataFechamento || item.closedAt || item.concluidoEm || item.dataConclusao;
+        // Mapeia corretamente as datas e o número da OS do banco
+        const dataAberturaRaw = item.criadoEm || item.dataAbertura || item.createdAt || item.data;
+        const dataFechamentoRaw = item.finalizadoEm || item.dataFechamento || item.closedAt || item.concluidoEm || item.dataConclusao;
 
         const row = wsDetalhes.addRow({
-          id: item.id || item.codigo || "N/A",
+          id: item.id || item._id?.$oid || item._id || "N/A",
+          numeroOs: item.numeroOs || "N/A",
           unidade: item.unidade || "N/A",
           setor: item.setor || "N/A",
           equipamento: item.equipamento || item.descricao || "N/A",
           patrimonio: item.patrimonio || "S/P",
           status: item.status || "N/A",
-          solicitante: item.solicitante || item.usuario || "N/A",
+          solicitante: item.solicitante || item.nome || item.emailSolicitante || "N/A",
           dataAbertura: formatarDataHora(dataAberturaRaw),
           dataFechamento: formatarDataHora(dataFechamentoRaw),
         });
 
         row.getCell("id").alignment = { horizontal: "center" };
+        row.getCell("numeroOs").alignment = { horizontal: "center" };
         row.getCell("patrimonio").alignment = { horizontal: "center" };
         row.getCell("status").alignment = { horizontal: "center" };
         row.getCell("dataAbertura").alignment = { horizontal: "center" };
@@ -277,7 +281,7 @@ export default function ExportExcelButton({
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF991B1B" }, // Vermelho Corporativo
+          fgColor: { argb: "FF991B1B" },
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
@@ -308,7 +312,7 @@ export default function ExportExcelButton({
       });
 
       // ==========================================
-      // ABA 4: MOVIMENTAÇÕES E SAÍDAS (NOVA)
+      // ABA 4: MOVIMENTAÇÕES E SAÍDAS
       // ==========================================
       const wsSaidas = workbook.addWorksheet("Movimentações e Saídas");
 
@@ -328,7 +332,7 @@ export default function ExportExcelButton({
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FFD97706" }, // Âmbar/Laranja Corporativo
+          fgColor: { argb: "FFD97706" },
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
@@ -364,7 +368,7 @@ export default function ExportExcelButton({
       });
 
       // ==========================================
-      // ABA 5: LAUDOS TÉCNICOS (NOVA)
+      // ABA 5: LAUDOS TÉCNICOS
       // ==========================================
       const wsLaudos = workbook.addWorksheet("Laudos Técnicos");
 
@@ -383,7 +387,7 @@ export default function ExportExcelButton({
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF0D9488" }, // Teal/Verde Água Corporativo
+          fgColor: { argb: "FF0D9488" },
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
