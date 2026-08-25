@@ -165,12 +165,16 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
                     <div class="section-title">1. Identificação do Veículo e Condutor</div>
                     <table class="table-dados">
                         <tr>
-                            <th style="width: 15%;">Placa</th>
-                            <td style="width: 35%;">${formData.placa ? formData.placa.toUpperCase() : ''}</td>
-                            <th style="width: 15%;">Modelo</th>
-                            <td style="width: 35%;">${formData.modelo ? formData.modelo.toUpperCase() : ''}</td>
+                            <th style="width: 12%;">Placa</th>
+                            <td style="width: 21%;">${formData.placa ? formData.placa.toUpperCase() : ''}</td>
+                            <th style="width: 12%;">Modelo</th>
+                            <td style="width: 22%;">${formData.modelo ? formData.modelo.toUpperCase() : ''}</td>
+                            <th style="width: 10%;">Ano</th>
+                            <td style="width: 23%;">${formData.ano ? formData.ano.toUpperCase() : ''}</td>
                         </tr>
                         <tr>
+                            <th>Cor</th>
+                            <td>${formData.cor ? formData.cor.toUpperCase() : ''}</td>
                             <th>Condutor</th>
                             <td>${formData.condutor ? formData.condutor.toUpperCase() : ''}</td>
                             <th>KM Atual</th>
@@ -180,7 +184,7 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
                             <th>Combustível</th>
                             <td>${formData.combustivel || ''}</td>
                             <th>CRLV / Exercício</th>
-                            <td>SIM (${formData.exercicio || 'N/I'})</td>
+                            <td colspan="3">SIM (${formData.exercicio || 'N/I'})</td>
                         </tr>
                     </table>
 

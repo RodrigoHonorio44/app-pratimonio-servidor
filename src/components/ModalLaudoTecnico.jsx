@@ -148,15 +148,15 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
         };
       });
 
-      // 1. Cadastra o laudo na rota POST /laudos (inclui fotoUrl)
+      // 1. Cadastra o laudo na rota POST /laudos (mantendo o texto original sem forçar lowercase)
       const payloadLaudo = {
         equipamentoId: idAtivo,
         nomeEquipamento: (equipamento.nome || "").toLowerCase().trim(),
         patrimonio: equipamento.patrimonio ? String(equipamento.patrimonio).toLowerCase().trim() : "s/p",
         unidade: (equipamento.unidade || "").toLowerCase().trim(),
         setor: (equipamento.setor || "").toLowerCase().trim(),
-        diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
-        justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
+        diagnosticoDefeito: diagnosticoTecnico.trim(),
+        justificativaLaudo: justificativaSubstituicao.trim(),
         fotoUrl: fotoUrl || null,
         status: "pendente",
         totalManutencoesAnteriores: historicoManutencoes.length,
@@ -168,8 +168,8 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
       // 2. Atualiza o status do ativo na rota PUT /ativos/:id
       const payloadAtivo = {
         status: "laudo pendente",
-        diagnosticoDefeito: diagnosticoTecnico.trim().toLowerCase(),
-        justificativaLaudo: justificativaSubstituicao.trim().toLowerCase(),
+        diagnosticoDefeito: diagnosticoTecnico.trim(),
+        justificativaLaudo: justificativaSubstituicao.trim(),
         fotoUrl: fotoUrl || null,
         dataLaudoTecnico: new Date().toISOString(),
         ultimaMovimentacao: new Date().toISOString()
@@ -277,7 +277,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                   <textarea
                     rows={2}
                     placeholder="Descreva detalhadamente os defeitos encontrados..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none uppercase"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
                     value={diagnosticoTecnico}
                     onChange={(e) => setDiagnosticoTecnico(e.target.value)}
                   />
@@ -290,7 +290,7 @@ const ModalLaudoTecnico = ({ equipamento, isOpen, onClose, onAtualizar }) => {
                   <textarea
                     rows={2}
                     placeholder="Justifique o impacto da falta deste equipamento na unidade..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none uppercase"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
                     value={justificativaSubstituicao}
                     onChange={(e) => setJustificativaSubstituicao(e.target.value)}
                   />

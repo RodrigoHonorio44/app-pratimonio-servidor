@@ -84,7 +84,8 @@ const ImpressaoLaudoTecnico = ({
               <h4 className="font-bold text-[10px] uppercase text-slate-500 tracking-wider mb-0.5">
                 1. Diagnóstico e Parecer do Exame Técnico
               </h4>
-              <p className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 italic whitespace-pre-wrap break-words [word-break:break-word] text-slate-800 uppercase text-[10px] sm:text-[11px]">
+              {/* Removido o 'uppercase' daqui */}
+              <p className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 italic whitespace-pre-wrap break-words [word-break:break-word] text-slate-800 text-[10px] sm:text-[11px]">
                 {diagnosticoTecnico}
               </p>
             </div>
@@ -93,7 +94,8 @@ const ImpressaoLaudoTecnico = ({
               <h4 className="font-bold text-[10px] uppercase text-slate-500 tracking-wider mb-0.5">
                 2. Justificativa para Nexo de Substituição
               </h4>
-              <p className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 italic whitespace-pre-wrap break-words [word-break:break-word] text-slate-800 uppercase text-[10px] sm:text-[11px]">
+              {/* Removido o 'uppercase' daqui */}
+              <p className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 italic whitespace-pre-wrap break-words [word-break:break-word] text-slate-800 text-[10px] sm:text-[11px]">
                 {justificativaSubstituicao}
               </p>
             </div>
@@ -114,10 +116,10 @@ const ImpressaoLaudoTecnico = ({
                         <th className="p-1 w-[35%]">Ação/Solução Aplicada</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700 uppercase">
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
                       {historicoManutencoes.map((os) => (
                         <tr key={os.id} className="hover:bg-slate-50/50">
-                          <td className="p-1 font-mono font-bold text-slate-500">
+                          <td className="p-1 font-mono font-bold text-slate-500 uppercase">
                             #{os.numeroOs || os.id.substring(0, 6)}
                           </td>
                           <td className="p-1 text-slate-500">

@@ -76,6 +76,8 @@ export function useChecklistFrota() {
     placa: "",
     modelo: "",
     marca: "",
+    ano: "",
+    cor: "",
     kmAtual: "",
   });
 
@@ -116,9 +118,8 @@ export function useChecklistFrota() {
   );
 
   const apiFetch = async (url, options = {}) => {
-    // Configura a URL base para produção caso não esteja no localhost
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const baseURL = isLocal ? '' : 'http://192.168.0.232:3000'; // Substitua pelo IP/Domínio correto da sua API se necessário
+    const baseURL = isLocal ? '' : 'http://192.168.0.232:3000';
     
     const urlCompleta = url.startsWith('http') ? url : `${baseURL}${url}`;
     const urlFormatada = encodeURI(urlCompleta.trim().replace(/\s+/g, '_'));
@@ -305,6 +306,8 @@ export function useChecklistFrota() {
         placa: novoVeiculo.placa.toLowerCase(),
         modelo: novoVeiculo.modelo.toLowerCase(),
         marca: (novoVeiculo.marca || "").toLowerCase(),
+        ano: (novoVeiculo.ano || "").toLowerCase(),
+        cor: (novoVeiculo.cor || "").toLowerCase(),
         kmAtual: novoVeiculo.kmAtual,
       };
 
@@ -317,7 +320,7 @@ export function useChecklistFrota() {
       setVeiculos((prev) => [...prev, veiculoCadastrado]);
 
       handleSelecionarVeiculo(veiculoCadastrado.id);
-      setNovoVeiculo({ placa: "", modelo: "", marca: "", kmAtual: "" });
+      setNovoVeiculo({ placa: "", modelo: "", marca: "", ano: "", cor: "", kmAtual: "" });
       setModalVeiculoAberto(false);
       dispararToast("Veículo cadastrado com sucesso no banco!");
     } catch (error) {

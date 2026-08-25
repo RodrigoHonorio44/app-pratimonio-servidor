@@ -29,7 +29,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
     handleCadastrarVeiculo,
     handleSalvarChecklist,
     handleLogout,
-    handleLimparCompleto, // Vamos garantir que o hook chame esta função de limpeza total
+    handleLimparCompleto,
   } = useChecklistFrota();
 
   // Função intermediária para disparar o toast de limpeza
@@ -113,7 +113,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
           <form onSubmit={handleSalvarChecklist} className="space-y-6">
             
-            {/* SEÇÃO: INFORMAÇÕES GERAIS E VEÍCULO */}
+            {/* SEÇÃO: INFORMAÇÕES GERAIS E VEÍCULO (ATUALIZADA COM ANO E COR) */}
             <div className="bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-4">
               <h3 className="text-xs font-black uppercase text-blue-900 tracking-wider flex items-center gap-2">
                 <Car size={16} /> Informações Gerais e Veículo
@@ -135,22 +135,33 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                <div className="sm:col-span-1">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Placa</label>
                   <input type="text" id="placa" required value={formData.placa} onChange={handleChange} placeholder="ABC-1234" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold uppercase" />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Modelo</label>
                   <input type="text" id="modelo" required value={formData.modelo} onChange={handleChange} placeholder="Ex: Sandero 1.6" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
                 </div>
+                <div className="sm:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Ano</label>
+                  <input type="text" id="ano" value={formData.ano || ''} onChange={handleChange} placeholder="Ex: 2022" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
+                </div>
+                <div className="sm:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Cor</label>
+                  <input type="text" id="cor" value={formData.cor || ''} onChange={handleChange} placeholder="Ex: Branco" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
+                </div>
+                <div className="sm:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">KM Atual</label>
+                  <input type="number" id="km" value={formData.km} onChange={handleChange} placeholder="Ex: 125000" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Motorista Responsável</label>
                   <input type="text" id="condutor" required value={formData.condutor} onChange={handleChange} placeholder="Nome do Condutor" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">KM Atual</label>
-                  <input type="number" id="km" value={formData.km} onChange={handleChange} placeholder="Ex: 125000" className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs" />
                 </div>
               </div>
             </div>
@@ -397,6 +408,29 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                     value={novoVeiculo.marca}
                     onChange={(e) => setNovoVeiculo({ ...novoVeiculo, marca: e.target.value })}
                     placeholder="Ex: Renault"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Ano</label>
+                  <input
+                    type="text"
+                    value={novoVeiculo.ano || novoVeiculo.anoVeiculo || ''}
+                    onChange={(e) => setNovoVeiculo({ ...novoVeiculo, ano: e.target.value, anoVeiculo: e.target.value })}
+                    placeholder="Ex: 2022/2023"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Cor</label>
+                  <input
+                    type="text"
+                    value={novoVeiculo.cor || ''}
+                    onChange={(e) => setNovoVeiculo({ ...novoVeiculo, cor: e.target.value })}
+                    placeholder="Ex: Branco"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
                   />
                 </div>
