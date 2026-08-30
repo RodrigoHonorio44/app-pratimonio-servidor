@@ -21,10 +21,12 @@ export const useCadastroChamado = () => {
   const [prioridade, setPrioridade] = useState("média");
   const [naoSeiPatrimonio, setNaoSeiPatrimonio] = useState(false);
 
+  // Altera a unidade mantendo o setor caso tenha sido preenchido por busca manual/automática
   const handleUnidadeChange = (valor) => {
     setUnidade(valor);
-    setSetor("");
-    setSetorManual(false);
+    if (!setorManual) {
+      setSetor("");
+    }
   };
 
   const handleLimparCampos = () => {
@@ -75,7 +77,16 @@ export const useCadastroChamado = () => {
         setEquipamento(ativoEncontrado.nome || ativoEncontrado.equipamento || "");
         setSetor(ativoEncontrado.setor || "");
         setSetorManual(true);
-        setUnidade(ativoEncontrado.unidade || "");
+
+        // Mapeia case-insensitive a unidade do banco para bater com o chave exata do select
+        const unidadeBanco = String(ativoEncontrado.unidade || "").trim().toLowerCase();
+        const chavesUnidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
+        const chaveCorrespondente = chavesUnidades.find(
+          u => u.toLowerCase() === unidadeBanco
+        );
+
+        setUnidade(chaveCorrespondente || ativoEncontrado.unidade || "");
+
         toast.success("equipamento cadastrado");
       } else {
         toast.error("equipamento nao cadastrado");
@@ -102,10 +113,8 @@ export const useCadastroChamado = () => {
       const token = await currentUser.getIdToken();
       const uidExibicao = currentUser.uid;
 
-      // Default inicial com fallback para o e-mail ou displayName
       let nomeParaSalvar = currentUser.displayName || currentUser.email?.split("@")[0] || "Usuário";
 
-      // 1ª Tentativa: Busca o nome do usuário pela API REST
       try {
         const userRes = await api.get(`/usuarios/${uidExibicao}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -115,7 +124,6 @@ export const useCadastroChamado = () => {
           nomeParaSalvar = userRes.data.nome.trim();
         }
       } catch (err) {
-        // 2ª Tentativa: Fallback direto no Firestore se a API falhar
         try {
           const userDocSnap = await getDoc(doc(db, "usuarios", uidExibicao));
           if (userDocSnap.exists() && userDocSnap.data().nome) {
@@ -126,7 +134,6 @@ export const useCadastroChamado = () => {
         }
       }
 
-      // Envio da abertura da OS
       await api.post("/chamados", {
         equipe: equipe.toLowerCase(),
         equipamento: equipamento.toLowerCase(),
@@ -139,9 +146,8 @@ export const useCadastroChamado = () => {
         iniciadoEm: null,
         finalizadoEm: null,
         arquivadoEm: null,
-        emailSolicitante: currentUser.email.toLowerCase(),
+        emailSolicitante: currentUser.email ? currentUser.email.toLowerCase() : "",
         
-        // ✅ Preenche tanto 'solicitante' quanto 'nome' preservando o nome real do usuário
         solicitante: nomeParaSalvar, 
         nome: nomeParaSalvar,
         
@@ -169,14 +175,32 @@ export const useCadastroChamado = () => {
   };
 
   return {
-    loading, buscandoAtivo, sucesso, setSucesso, protocoloGerado,
-    unidade, setUnidade: handleUnidadeChange, 
-    equipe, setEquipe, equipamento, setEquipamento,
-    patrimonio, setPatrimonio, setor, setSetor, 
-    setorManual, setSetorManual,
-    descricao, setDescricao,
-    prioridade, setPrioridade, naoSeiPatrimonio, handleLimparCampos,
-    toggleNaoSei, handleBotaoBusca, handleNovoChamado,
+    loading, 
+    buscandoAtivo, 
+    sucesso, 
+    setSucesso, 
+    protocoloGerado,
+    unidade, 
+    setUnidade: handleUnidadeChange, 
+    equipe, 
+    setEquipe, 
+    equipamento, 
+    setEquipamento,
+    patrimonio, 
+    setPatrimonio, 
+    setor, 
+    setSetor, 
+    setorManual, 
+    setSetorManual,
+    descricao, 
+    setDescricao,
+    prioridade, 
+    setPrioridade, 
+    naoSeiPatrimonio, 
+    handleLimparCampos,
+    toggleNaoSei, 
+    handleBotaoBusca, 
+    handleNovoChamado,
     MAPA_SETORES_POR_UNIDADE
   };
 };

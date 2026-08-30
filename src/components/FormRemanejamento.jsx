@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import api from "../services/api"; // Import do serviço do Axios
+import api from "../services/api";
 import { auth } from "../services/firebase";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 import {
   FiX,
   FiSend,
@@ -16,6 +18,7 @@ import {
   FiAlertCircle,
   FiSearch,
   FiUsers,
+  FiRefreshCw
 } from "react-icons/fi";
 
 const FormRemanejamento = ({ onClose }) => {
@@ -53,7 +56,7 @@ const FormRemanejamento = ({ onClose }) => {
     { value: "engenharia clinica", label: "Engenharia Clínica" },
     { value: "patrimonio", label: "Patrimônio" },
     { value: "manutencao patrimonial", label: "Manutenção Patrimonial" },
-    { value: "ti malta", label: "Ti Malta" },
+    { value: "ti malta", label: "TI Malta" },
     { value: "sistema e redes", label: "Sistema e Redes" },
     { value: "refrigeracao", label: "Refrigeração" },
   ];
@@ -73,7 +76,6 @@ const FormRemanejamento = ({ onClose }) => {
       const user = auth.currentUser;
       if (user) {
         try {
-          // Atualizado para usar Axios (api.get)
           const response = await api.get(`/usuarios/${user.uid}`);
           const data = response.data;
 
@@ -144,7 +146,6 @@ const FormRemanejamento = ({ onClose }) => {
 
     setLoadingAtivo(true);
     try {
-      // Atualizado para usar Axios (api.get)
       const response = await api.get(
         `/ativos?patrimonio=${encodeURIComponent(nPatrimonio)}`
       );
@@ -154,7 +155,7 @@ const FormRemanejamento = ({ onClose }) => {
       if (ativoEncontrado) {
         const unidadeAtivo = (ativoEncontrado.unidade || "").toLowerCase();
         const unidadeCorrespondente =
-          unidades.find((u) => u.toLowerCase() === unidadeAtivo) || "";
+          unidades.find((u) => u.toLowerCase() === unidadeAtivo) || ativoEncontrado.unidade || "";
 
         setFormData((prev) => ({
           ...prev,
@@ -204,7 +205,6 @@ const FormRemanejamento = ({ onClose }) => {
         ...formData,
       };
 
-      // Atualizado para usar Axios (api.post)
       await api.post("/remanejamentos", novoRemanejamento);
 
       setOsGerada(numeroOS);
@@ -220,61 +220,79 @@ const FormRemanejamento = ({ onClose }) => {
 
   const getPrioridadeColor = () => {
     if (formData.prioridade === "urgente")
-      return "text-red-500 border-red-200 bg-red-50";
+      return "text-red-600 border-red-200 bg-red-50";
     if (formData.prioridade === "media")
-      return "text-amber-500 border-amber-200 bg-amber-50";
-    return "text-emerald-500 border-emerald-200 bg-emerald-50";
+      return "text-amber-600 border-amber-200 bg-amber-50";
+    return "text-emerald-600 border-emerald-200 bg-emerald-50";
   };
 
   return (
-    <div className="fixed inset-0 z-10001 flex items-center justify-center p-2 sm:p-4 bg-slate-900/40 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-137.5 rounded-[2.5rem] shadow-2xl relative p-6 sm:p-10 border-t-8 border-orange-400 overflow-y-auto max-h-[90vh]">
-        {sucesso ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in zoom-in">
-            <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center mb-6 animate-bounce">
-              <FiCheckCircle size={48} className="text-orange-400" />
+    <div className="bg-slate-50 min-h-screen font-sans flex flex-col justify-between">
+      {/* HEADER DA APLICAÇÃO */}
+      <Header />
+
+      {/* CONTEÚDO PRINCIPAL CENTRALIZADO */}
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+        
+        {/* CABEÇALHO DA PÁGINA */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-orange-500 text-white p-2.5 rounded-2xl shadow-sm">
+              <FiRefreshCw size={22} />
             </div>
-            <h2 className="text-3xl font-black text-slate-700 uppercase italic mb-2 tracking-tighter">
-              solicitado!
-            </h2>
-            <div className="bg-orange-50 border-2 border-orange-100 rounded-3xl px-10 py-5 mb-8">
-              <span className="text-3xl font-black text-orange-400 tracking-tighter">
-                {osGerada}
-              </span>
+            <div>
+              <h1 className="text-xl font-black text-slate-800 italic uppercase tracking-tight">
+                remanejamento
+              </h1>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                solicitação de mudança de equipamentos e setores
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={handleExit}
-              className="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-xs uppercase hover:bg-slate-900 transition-all cursor-pointer"
-            >
-              concluir e sair
-            </button>
           </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={handleExit}
-              aria-label="Fechar formulário"
-              className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-400 transition-all cursor-pointer"
-            >
-              <FiX size={20} />
-            </button>
+          <button
+            type="button"
+            onClick={handleExit}
+            className="px-3.5 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 transition-all font-bold text-xs flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <FiX size={16} /> fechar
+          </button>
+        </div>
 
-            <div className="mb-8 text-left">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-700 uppercase italic flex flex-col">
-                remanejamento{" "}
-                <span className="h-1.5 w-12 bg-orange-400 mt-1 rounded-full"></span>
+        {/* CARTÃO DO FORMULÁRIO */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8">
+          {sucesso ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in zoom-in">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-4">
+                <FiCheckCircle size={44} className="text-orange-500" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-800 uppercase italic mb-2 tracking-tight">
+                solicitado com sucesso!
               </h2>
-
-              <div className="flex gap-2 mt-6 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl px-8 py-4 mb-6">
+                <span className="text-2xl font-black text-orange-500 tracking-wider">
+                  {osGerada}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleExit}
+                className="w-full max-w-xs bg-slate-800 text-white py-3.5 rounded-xl font-black text-xs uppercase hover:bg-slate-900 transition-all cursor-pointer shadow-xs"
+              >
+                concluir e sair
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              
+              {/* MODO EQUIPAMENTO / SETOR INTEIRO */}
+              <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => modoSetor && alternarModoSetor()}
-                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
                     !modoSetor
-                      ? "bg-white text-orange-400 shadow-sm border border-orange-100"
-                      : "text-slate-400"
+                      ? "bg-white text-orange-500 shadow-xs"
+                      : "text-slate-400 hover:text-slate-600"
                   }`}
                 >
                   equipamento
@@ -282,76 +300,81 @@ const FormRemanejamento = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() => !modoSetor && alternarModoSetor()}
-                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
                     modoSetor
-                      ? "bg-white text-orange-400 shadow-sm border border-orange-100"
-                      : "text-slate-400"
+                      ? "bg-white text-orange-500 shadow-xs"
+                      : "text-slate-400 hover:text-slate-600"
                   }`}
                 >
                   setor inteiro
                 </button>
               </div>
-            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  prioridade
-                </label>
-                <div className="relative">
-                  <FiAlertCircle
-                    className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 ${getPrioridadeColor()}`}
-                  />
-                  <select
-                    name="prioridade"
-                    value={formData.prioridade}
-                    onChange={handleChange}
-                    className={`w-full border-2 rounded-2xl py-4 pl-12 pr-4 text-sm font-black appearance-none focus:outline-none transition-all cursor-pointer ${getPrioridadeColor()}`}
-                  >
-                    <option value="baixa">baixa (planejado)</option>
-                    <option value="media">média (em breve)</option>
-                    <option value="urgente">urgente (imediato)</option>
-                  </select>
+              {/* PRIORIDADE E EQUIPE (LINHA DUPLA) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Prioridade */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                    prioridade
+                  </label>
+                  <div className="relative">
+                    <FiAlertCircle
+                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 z-10 ${getPrioridadeColor()}`}
+                      size={16}
+                    />
+                    <select
+                      name="prioridade"
+                      value={formData.prioridade}
+                      onChange={handleChange}
+                      className={`w-full py-2.5 pl-10 pr-3 border rounded-xl outline-none text-xs font-bold appearance-none transition-all cursor-pointer ${getPrioridadeColor()}`}
+                    >
+                      <option value="baixa">baixa (planejado)</option>
+                      <option value="media">média (em breve)</option>
+                      <option value="urgente">urgente (imediato)</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                  equipe responsável
-                </label>
-                <div className="relative">
-                  <FiUsers className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300 z-10" />
-                  <select
-                    name="equipe"
-                    required
-                    value={formData.equipe}
-                    onChange={handleChange}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all cursor-pointer"
-                  >
-                    <option value="" disabled hidden>
-                      selecione a equipe
-                    </option>
-                    {equipesDisponiveis.map((eq) => (
-                      <option key={eq.value} value={eq.value}>
-                        {eq.label}
+                {/* Equipe Responsável */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                    equipe responsável
+                  </label>
+                  <div className="relative">
+                    <FiUsers className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={16} />
+                    <select
+                      name="equipe"
+                      required
+                      value={formData.equipe}
+                      onChange={handleChange}
+                      className="w-full py-2.5 pl-10 pr-3 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-orange-500 appearance-none text-xs font-bold text-slate-700 transition-all cursor-pointer"
+                    >
+                      <option value="" disabled hidden>
+                        selecione a equipe
                       </option>
-                    ))}
-                  </select>
+                      {equipesDisponiveis.map((eq) => (
+                        <option key={eq.value} value={eq.value}>
+                          {eq.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+              {/* UNIDADE DESTINO */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
                   unidade destino
                 </label>
                 <div className="relative">
-                  <FiHome className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300 z-10" />
+                  <FiHome className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" size={16} />
                   <select
                     name="unidade"
                     required
                     value={formData.unidade}
                     onChange={handleChange}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold appearance-none focus:outline-none transition-all cursor-pointer"
+                    className="w-full py-2.5 pl-10 pr-3 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-orange-500 appearance-none text-xs font-bold text-slate-700 transition-all cursor-pointer"
                   >
                     <option value="">selecione a unidade...</option>
                     {unidades.map((u) => (
@@ -363,24 +386,25 @@ const FormRemanejamento = ({ onClose }) => {
                 </div>
               </div>
 
+              {/* PATRIMÔNIO E EQUIPAMENTO */}
               <div
                 className={`grid gap-4 text-left ${
                   modoSetor ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"
                 }`}
               >
                 {!modoSetor && (
-                  <div className="flex flex-col gap-1.5">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         patrimônio
                       </label>
                       <button
                         type="button"
                         onClick={handleNaoSeiPatrimonio}
-                        className={`text-[9px] px-2 py-0.5 rounded font-black cursor-pointer ${
+                        className={`text-[9px] font-black px-2 py-0.5 rounded-lg transition-all cursor-pointer uppercase ${
                           naoSeiPatrimonio
-                            ? "bg-orange-400 text-white"
-                            : "bg-slate-200"
+                            ? "bg-orange-500 text-white"
+                            : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                         }`}
                       >
                         {naoSeiPatrimonio ? "digitar" : "não sei"}
@@ -389,11 +413,10 @@ const FormRemanejamento = ({ onClose }) => {
                     <div className="relative flex gap-2">
                       <div className="relative flex-1">
                         <FiHash
-                          className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                            naoSeiPatrimonio
-                              ? "text-orange-400"
-                              : "text-slate-300"
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                            naoSeiPatrimonio ? "text-orange-500" : "text-slate-400"
                           }`}
+                          size={16}
                         />
                         <input
                           name="patrimonio"
@@ -403,10 +426,10 @@ const FormRemanejamento = ({ onClose }) => {
                           value={formData.patrimonio}
                           onChange={handleChange}
                           placeholder={naoSeiPatrimonio ? "s/p" : "número"}
-                          className={`w-full rounded-2xl py-4 pl-12 text-sm font-bold focus:outline-none ${
+                          className={`w-full py-2.5 pl-10 pr-3 rounded-xl outline-none text-xs font-bold transition-all ${
                             naoSeiPatrimonio
-                              ? "bg-orange-50 border-2 border-orange-100 text-orange-400"
-                              : "bg-slate-50 border-2 border-transparent focus:border-orange-200"
+                              ? "bg-orange-50 border border-orange-200 text-orange-600"
+                              : "bg-slate-50/70 border border-slate-200/80 focus:bg-white focus:border-orange-500 text-slate-700"
                           }`}
                         />
                       </div>
@@ -415,14 +438,14 @@ const FormRemanejamento = ({ onClose }) => {
                           type="button"
                           disabled={loadingAtivo}
                           onClick={buscarAtivoNaApi}
-                          className="bg-orange-400 hover:bg-orange-500 text-white px-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                          className="bg-orange-500 hover:bg-orange-600 text-white px-3.5 rounded-xl transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-xs"
                           title="buscar ativo"
                           aria-label="Buscar ativo"
                         >
                           {loadingAtivo ? (
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            <FiSearch size={18} />
+                            <FiSearch size={16} />
                           )}
                         </button>
                       )}
@@ -430,12 +453,12 @@ const FormRemanejamento = ({ onClose }) => {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
                     equipamento
                   </label>
                   <div className="relative">
-                    <FiMonitor className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    <FiMonitor className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                     <input
                       name="equipamento"
                       required
@@ -444,23 +467,24 @@ const FormRemanejamento = ({ onClose }) => {
                       type="text"
                       placeholder="ex: monitor"
                       onChange={handleChange}
-                      className={`w-full rounded-2xl py-4 pl-12 text-sm font-bold text-slate-600 focus:outline-none ${
+                      className={`w-full py-2.5 pl-10 pr-3 rounded-xl outline-none text-xs font-bold text-slate-700 transition-all ${
                         modoSetor
                           ? "bg-slate-100 italic"
-                          : "bg-slate-50 border-2 border-transparent focus:border-orange-200"
+                          : "bg-slate-50/70 border border-slate-200/80 focus:bg-white focus:border-orange-500"
                       }`}
                     />
                   </div>
                 </div>
               </div>
 
+              {/* ORIGEM E DESTINO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-red-400 uppercase ml-1">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-1 block">
                     de: (origem)
                   </label>
                   <div className="relative">
-                    <FiMapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-red-300" />
+                    <FiMapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-400" size={16} />
                     <input
                       name="setorOrigem"
                       required
@@ -468,16 +492,16 @@ const FormRemanejamento = ({ onClose }) => {
                       type="text"
                       placeholder="setor atual"
                       onChange={handleChange}
-                      className="w-full bg-red-50/20 border border-red-100 rounded-2xl py-4 pl-12 text-sm font-bold focus:outline-none"
+                      className="w-full py-2.5 pl-10 pr-3 bg-rose-50/30 border border-rose-200/80 rounded-xl outline-none focus:bg-white focus:border-rose-400 text-xs font-bold text-slate-700 transition-all"
                     />
                   </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-green-500 uppercase ml-1">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 block">
                     para: (destino)
                   </label>
                   <div className="relative">
-                    <FiArrowRight className="absolute left-4 top-1/2 -translate-y-1/2 text-green-400" />
+                    <FiArrowRight className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
                     <input
                       name="setorDestino"
                       required
@@ -485,47 +509,52 @@ const FormRemanejamento = ({ onClose }) => {
                       type="text"
                       placeholder="novo setor"
                       onChange={handleChange}
-                      className="w-full bg-green-50/20 border border-green-100 rounded-2xl py-4 pl-12 text-sm font-bold focus:outline-none"
+                      className="w-full py-2.5 pl-10 pr-3 bg-emerald-50/30 border border-emerald-200/80 rounded-xl outline-none focus:bg-white focus:border-emerald-500 text-xs font-bold text-slate-700 transition-all"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">
+              {/* MOTIVO */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
                   motivo
                 </label>
                 <div className="relative">
-                  <FiFileText className="absolute left-4 top-6 text-slate-300" />
+                  <FiFileText className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                   <textarea
                     name="descricao"
                     required
-                    rows="2"
+                    rows="3"
                     value={formData.descricao}
                     placeholder="por que realizar essa mudança?"
                     onChange={handleChange}
-                    className="w-full bg-slate-50 border-2 border-transparent focus:border-orange-100 rounded-3xl py-5 pl-12 pr-6 text-sm font-semibold focus:outline-none resize-none"
+                    className="w-full p-3 pl-10 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-orange-500 text-xs font-medium text-slate-700 resize-none transition-all"
                   />
                 </div>
               </div>
 
+              {/* BOTÃO ENVIAR */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-orange-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-100 cursor-pointer"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 uppercase text-xs active:scale-98 disabled:opacity-70 cursor-pointer"
               >
                 {loading ? (
                   "processando..."
                 ) : (
                   <>
-                    <FiSend /> enviar remanejamento
+                    <FiSend size={15} /> enviar remanejamento
                   </>
                 )}
               </button>
             </form>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
+
+      {/* FOOTER DA APLICAÇÃO */}
+      <Footer />
     </div>
   );
 };
