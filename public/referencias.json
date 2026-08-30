@@ -1,0 +1,195 @@
+[
+  {
+    "id": "ref_aco_16_portas",
+    "categoria": "aco-estantes",
+    "nomeModelo": "Armário Roupeiro De Aço 16 Portas Cinza",
+    "subtitulo": "modelo com grande capacidade",
+    "foto": "/imagens/aco-estantes/Armário_Roupeiro_De_Aço_16_Portas_Cinza.webp",
+    "detalhes": ["16 portas individuais", "pintura epóxi cinza", "sistema para cadeado"]
+  },
+  {
+    "id": "ref_aco_2_portas",
+    "categoria": "aco-estantes",
+    "nomeModelo": "Armário de Aço Com 02 Portas e Fechadura",
+    "subtitulo": "modelo escritório ou hospitalar",
+    "foto": "/imagens/aco-estantes/Armário de Aço Com 02 Portas e Fechadura.webp",
+    "detalhes": ["três prateleiras reguláveis", "pintura epóxi cinza", "fechadura com chave"]
+  },
+  {
+    "id": "ref_aco_4_portas",
+    "categoria": "aco-estantes",
+    "nomeModelo": "Armário Roupeiro Aço 4 Portas Guarda Volume",
+    "subtitulo": "modelo guarda volume",
+    "foto": "/imagens/aco-estantes/Armário_Roupeiro_Aço_4_Portas _GuardaVolume.webp",
+    "detalhes": ["4 portas individuais", "aço reforçado", "ranhuras para ventilação"]
+  },
+  {
+    "id": "ref_estante_6_prateleiras",
+    "categoria": "aco-estantes",
+    "nomeModelo": "Estante de Aço Com 6 Prateleiras",
+    "subtitulo": "modelo para almoxarifado",
+    "foto": "/imagens/aco-estantes/Estante_de_Aço_Com_6_Prateleiras.webp",
+    "detalhes": ["6 bandejas reguláveis", "chapa reforçada", "pintura eletrostática"]
+  },
+  {
+    "id": "ref_roupeiro_8_portas",
+    "categoria": "aco-estantes",
+    "nomeModelo": "Roupeiro De Aço 8 Portas Grandes Para Cadeado",
+    "subtitulo": "modelo de grande porte",
+    "foto": "/imagens/aco-estantes/Roupeiro_De_Aço_8_Portas_Grandes _Para_Cadeado.webp",
+    "detalhes": ["8 compartimentos grandes", "porta com suporte para cadeado", "alta durabilidade"]
+  },
+  {
+    "id": "ref_cadeira_banho_rodas",
+    "categoria": "hospitalar",
+    "nomeModelo": "cadeira de rodas para banho inox",
+    "subtitulo": "modelo higiênico",
+    "foto": "/imagens/hospitalar/cadeira derodas para banho inox.webp",
+    "detalhes": ["estrutura em aço inox", "com rodas e freios", "assento anatômico"]
+  },
+  {
+    "id": "ref_cadeira_transporte",
+    "categoria": "hospitalar",
+    "nomeModelo": "cadeira para transporte de paciente inox",
+    "subtitulo": "modelo de locomoção interna",
+    "foto": "/imagens/hospitalar/cadeira para transporte de paciente inox.webp",
+    "detalhes": ["estrutura em inox", "rodízios resistentes", "apoio para pés e braços"]
+  },
+  {
+    "id": "ref_carro_maca_inox",
+    "categoria": "hospitalar",
+    "nomeModelo": "Carro maca todo em inox",
+    "subtitulo": "modelo hospitalar completo",
+    "foto": "/imagens/hospitalar/Carro maca todo em inox.png",
+    "detalhes": ["totalmente em aço inox", "leito fixo", "fácil higienização"]
+  },
+  {
+    "id": "ref_carro_padiola",
+    "categoria": "hospitalar",
+    "nomeModelo": "carro padiola inox com leito fixo estofado com grades",
+    "subtitulo": "modelo de transporte de emergência",
+    "foto": "/imagens/hospitalar/carro_padiola_inox_com_leito_fixo_estofado_com_grades.webp",
+    "detalhes": ["com rodízios de 5 polegadas", "grade lateral de proteção", "suporte de soro"]
+  },
+  {
+    "id": "ref_escrivaninha_epoxi",
+    "categoria": "hospitalar",
+    "nomeModelo": "Escrivaninha com Duas Gavetas em Pintura Epóxi",
+    "subtitulo": "modelo administrativo clínico",
+    "foto": "/imagens/hospitalar/Escrivaninha com Duas Gavetas em Pintura Epóxi.png",
+    "detalhes": ["duas gavetas com chave", "pintura epóxi branca ou cinza", "estrutura firme"]
+  },
+  {
+    "id": "ref_longarina_3_preta",
+    "categoria": "hospitalar",
+    "nomeModelo": "longarina de 3 lugares preta",
+    "subtitulo": "modelo para recepção de espera",
+    "foto": "/imagens/hospitalar/longarina de 3 lugares preta.webp",
+    "detalhes": ["3 lugares acolchoados ou aço", "cor preta", "alta resistência para tráfego"]
+  },
+  {
+    "id": "ref_longarina_industrial",
+    "categoria": "hospitalar",
+    "nomeModelo": "longarina 3 lugares industrial polipropileno",
+    "subtitulo": "modelo ergonômico de espera",
+    "foto": "/imagens/hospitalar/longarina_3lugares_industrial_polipropileno.webp",
+    "detalhes": ["assentos em polipropileno", "fácil limpeza", "estrutura metálica industrial"]
+  },
+  {
+    "id": "ref_longarina_cromada",
+    "categoria": "hospitalar",
+    "nomeModelo": "longarina 3 lugares cromada prata",
+    "subtitulo": "modelo de recepção premium",
+    "foto": "/imagens/hospitalar/longarina_3lugares_cromadoprata.webp",
+    "detalhes": ["acabamento cromado prateado", "3 lugares estofados/perfurados", "design moderno"]
+  },
+  {
+    "id": "ref_maca_fixa",
+    "categoria": "hospitalar",
+    "nomeModelo": "maca fixa hospitalar",
+    "subtitulo": "modelo padrão com leito estofado",
+    "foto": "/imagens/hospitalar/maca_fixa_hospitalar.webp",
+    "detalhes": ["cabeceira articulável", "estrutura tubular pintada", "estofado preto", "pés fixos com ponteiras"]
+  },
+  {
+    "id": "ref_armario_madeira",
+    "categoria": "mobiliario",
+    "nomeModelo": "Armario alto de madeira com 2 portas",
+    "subtitulo": "modelo executivo de escritório",
+    "foto": "/imagens/mobiliario/Armairo alto de madeira com 2 portas.webp",
+    "detalhes": ["duas portas de madeira", "prateleiras internas", "acabamento em mdf"]
+  },
+  {
+    "id": "ref_armario_baixo_madeira",
+    "categoria": "mobiliario",
+    "nomeModelo": "armario de escritório baixo 2 portas",
+    "subtitulo": "modelo compacto",
+    "foto": "/imagens/mobiliario/armario de escritório baixo 2 portas.webp",
+    "detalhes": ["duas portas baixas", "tampo superior de apoio", "fechadura integrada"]
+  },
+  
+  {
+    "id": "ref_cadeira_presidente",
+    "categoria": "mobiliario",
+    "nomeModelo": "Cadeira de Escritório Presidente Giratória Ergonômica Inclinável Preta",
+    "subtitulo": "modelo executivo alto com apoio de cabeça",
+    "foto": "/imagens/mobiliario/Cadeira de Escritório Presidente Giratória Ergonômica,Inclinável Preta.jpg",
+    "detalhes": ["assento em tecido/mesh", "base giratória", "regulagem de altura", "rodízios anti-risco"]
+  },
+  {
+    "id": "ref_cadeira_ secretaria",
+    "categoria": "mobiliario",
+    "nomeModelo": "Cadeira de Escritório Secretária Giratória com Rodízios",
+    "subtitulo": "modelo operacional",
+    "foto": "/imagens/mobiliario/Cadeira de Escritório Secretária Giratória com Rodízios.webp",
+    "detalhes": ["giratória com rodízios", "ajuste de altura a gás", "encosto anatômico"]
+  },
+  {
+    "id": "ref_cadeira_executiva_fixa",
+    "categoria": "mobiliario",
+    "nomeModelo": "Cadeira Escritório Executiva Fixa",
+    "subtitulo": "modelo fixo para atendimento",
+    "foto": "/imagens/mobiliario/Cadeira Escritório Executiva Fixa.webp",
+    "detalhes": ["base fixa contínua", "assento e encosto estofados", "ideal para reuniões"]
+  },
+  {
+    "id": "ref_cadeira_fixa_corino",
+    "categoria": "mobiliario",
+    "nomeModelo": "Cadeira Para Escritório Fixa Pontual Corino Preto",
+    "subtitulo": "modelo corino de fácil limpeza",
+    "foto": "/imagens/mobiliario/Cadeira Para Escritório Fixa Pontual Corino Preto.webp",
+    "detalhes": ["revestimento em corino preto", "estrutura fixa metálica", "alta durabilidade"]
+  },
+  {
+    "id": "ref_cadeira_secretaria_bracos",
+    "categoria": "mobiliario",
+    "nomeModelo": "Cadeira Para Escritório Secretária Giratória Com Braços",
+    "subtitulo": "modelo operacional com apoios",
+    "foto": "/imagens/mobiliario/Cadeira Para Escritório Secretária Giratória Com Braços.webp",
+    "detalhes": ["com braços laterais", "base giratória", "regulagem milimétrica"]
+  },
+  {
+    "id": "ref_mesa_ferro_gaveteiro",
+    "categoria": "mobiliario",
+    "nomeModelo": "Mesa de Escritório pé ferro com gaveteiro de 2 gavetas",
+    "subtitulo": "modelo de estação de trabalho",
+    "foto": "/imagens/mobiliario/Mesa de Escritório pé ferro com gaveteiro de 2 gavetas.webp",
+    "detalhes": ["pés em estrutura de ferro", "acompanha gaveteiro duplo", "tampo em MDP espaçoso"]
+  },
+  {
+    "id": "ref_mesa_painel",
+    "categoria": "mobiliario",
+    "nomeModelo": "Mesa de Escritório pé painel com gaveteiro de 2 gavetas",
+    "subtitulo": "modelo administrativo fechado",
+    "foto": "/imagens/mobiliario/Mesa de Escritório pé painel com gaveteiro de 2 gavetas.webp",
+    "detalhes": ["pés painel em madeira", "gaveteiro acoplado", "design corporativo"]
+  },
+  {
+    "id": "ref_relogio_parede",
+    "categoria": "mobiliario",
+    "nomeModelo": "Relógio De Parede led Digital luz vermelha",
+    "subtitulo": "modelo digital corporativo",
+    "foto": "/imagens/mobiliario/Relógio De Parede led Digital luz vermelha.webp",
+    "detalhes": ["display LED vermelho de alta visibilidade", "indicador de hora, data e temperatura", "alimentação bivolt"]
+  }
+]

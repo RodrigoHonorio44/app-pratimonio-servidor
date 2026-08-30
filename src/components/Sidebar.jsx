@@ -298,6 +298,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
 
           {/* Patrimônio */}
           {(temAcesso("inventario") ||
+            temAcesso("referencias_patrimonio") ||
             temAcesso("etiquetas") ||
             temAcesso("vistoria") ||
             temAcesso("gerenciarSetores")) && (
@@ -335,7 +336,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     icon={BookOpen}
                     label="Catálogo Referência"
                     path="/referencias-patrimonio"
-                    moduloId="inventario"
+                    moduloId="referencias_patrimonio"
                   />
                   <NavButton
                     icon={PlusCircle}

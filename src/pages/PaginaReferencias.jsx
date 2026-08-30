@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReferencias } from '../hooks/useReferencias';
 import { CardReferencia } from '../components/CardReferencia';
@@ -9,22 +9,40 @@ export function PaginaReferencias({ userData }) {
   const navigate = useNavigate();
   const { referencias, categoriaAtiva, setCategoriaAtiva, busca, setBusca } = useReferencias();
 
+  // Estado para a paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 6;
+
+  // Toda vez que a categoria ou a busca mudam, voltamos para a primeira página
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [categoriaAtiva, busca]);
+
   const categorias = [
     { id: 'todos', label: 'todos' },
     { id: 'hospitalar', label: 'hospitalar' },
     { id: 'mobiliario', label: 'mobiliário' },
-    { id: 'aco', label: 'aço & estantes' }
+    { id: 'aco-estantes', label: 'aço & estantes' }
   ];
 
   const handleSelecionarModelo = (modelo) => {
-    // Redireciona para a rota correta registrada no AppRoutes (/cadastro-equipamento)
     navigate('/cadastro-equipamento', { state: { modeloSelecionado: modelo } });
   };
+
+  // Ordena os itens alfabeticamente pelo nomeModelo
+  const referenciasOrdenadas = [...referencias].sort((a, b) => 
+    a.nomeModelo.localeCompare(b.nomeModelo, 'pt-BR', { sensitivity: 'base' })
+  );
+
+  // Lógica de Paginação
+  const totalPaginas = Math.ceil(referenciasOrdenadas.length / itensPorPagina);
+  const indiceUltimoItem = paginaAtual * itensPorPagina;
+  const indicePrimeiroItem = indiceUltimoItem - itensPorPagina;
+  const itensAtuais = referenciasOrdenadas.slice(indicePrimeiroItem, indiceUltimoItem);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
       <div>
-        {/* Componente Header */}
         <Header userData={userData} />
 
         <main className="p-6">
@@ -38,7 +56,6 @@ export function PaginaReferencias({ userData }) {
               </p>
             </div>
 
-            {/* CONTROLES */}
             <div className="flex flex-col gap-4 mb-8">
               <div className="flex flex-wrap gap-2">
                 {categorias.map((cat) => (
@@ -69,19 +86,49 @@ export function PaginaReferencias({ userData }) {
 
             {/* LISTA DE CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {referencias.map((item) => (
-                <CardReferencia
-                  key={item.id}
-                  item={item}
-                  onSelecionar={handleSelecionarModelo}
-                />
-              ))}
+              {itensAtuais.length > 0 ? (
+                itensAtuais.map((item) => (
+                  <CardReferencia
+                    key={item.id}
+                    item={item}
+                    onSelecionar={handleSelecionarModelo}
+                  />
+                ))
+              ) : (
+                <p className="text-slate-500 col-span-full text-center py-8">
+                  Nenhum modelo encontrado.
+                </p>
+              )}
             </div>
+
+            {/* CONTROLES DE PAGINAÇÃO */}
+            {totalPaginas > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-8">
+                <button
+                  onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                  disabled={paginaAtual === 1}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                >
+                  Anterior
+                </button>
+
+                <span className="text-sm font-medium text-slate-600 px-2">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+
+                <button
+                  onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                  disabled={paginaAtual === totalPaginas}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
           </div>
         </main>
       </div>
 
-      {/* Componente Footer */}
       <Footer />
     </div>
   );

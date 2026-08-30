@@ -28,7 +28,7 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
   const [permissoes, setPermissoes] = useState(inicializarPermissoes);
   const [salvando, setSalvando] = useState(false);
 
-  // LISTA DE MÓDULOS ATUALIZADA (COM CHECKLIST FROTA E GERENCIAR SETORES)
+  // LISTA DE MÓDULOS ATUALIZADA (COM CATÁLOGO DE REFERÊNCIA)
   const modulosDisponiveis = [
     {
       id: "dashboard_bi",
@@ -64,6 +64,11 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
       id: "inventario",
       nome: "Inventário / Patrimônio",
       desc: "Controle de ativos e consulta de patrimônio",
+    },
+    {
+      id: "referencias_patrimonio",
+      nome: "Catálogo de Referência",
+      desc: "Acesso ao catálogo de modelos e referências de patrimônios",
     },
     {
       id: "vistoria",

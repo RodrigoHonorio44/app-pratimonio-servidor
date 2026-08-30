@@ -1,64 +1,25 @@
-import { useState } from 'react';
-
-// dados dos modelos com caminhos para public/modelos/
-const dadosReferencias = [
-  {
-    id: "ref_maca_fixa",
-    categoria: "hospitalar",
-    nomeModelo: "maca fixa tubular",
-    subtitulo: "modelo padrao com leito estofado",
-    foto: "/modelos/maca-fixa.jpg",
-    detalhes: [
-      "cabeceira articulavel",
-      "estrutura tubular pintada",
-      "estofado preto",
-      "pes fixos com ponteiras"
-    ]
-  },
-  {
-    id: "ref_carro_padiola",
-    categoria: "hospitalar",
-    nomeModelo: "carro padiola com rodizios",
-    subtitulo: "modelo de transporte",
-    foto: "/modelos/carro-padiola.jpg",
-    detalhes: [
-      "com rodizio de 5 polegadas",
-      "grade lateral de protecao",
-      "suporte de soro"
-    ]
-  },
-  {
-    id: "ref_cadeira_pres",
-    categoria: "mobiliario",
-    nomeModelo: "cadeira presidente mesh",
-    subtitulo: "modelo executivo alto com apoio de cabeca",
-    foto: "/modelos/cadeira-presidente.jpg",
-    detalhes: [
-      "assento em tecido",
-      "base giratoria",
-      "regulagem de altura",
-      "rodizios anti-risco"
-    ]
-  },
-  {
-    id: "ref_armario_aco",
-    categoria: "aco",
-    nomeModelo: "armario de aco 2 portas",
-    subtitulo: "modelo escritorio ou hospitalar",
-    foto: "/modelos/armario-aco.jpg",
-    detalhes: [
-      "tres prateleiras regulaveis",
-      "pintura epoxi cinza",
-      "fechadura com chave"
-    ]
-  }
-];
+import { useState, useEffect } from 'react';
 
 export function useReferencias() {
+  const [referencias, setReferencias] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState('todos');
   const [busca, setBusca] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const referenciasFiltradas = dadosReferencias.filter((item) => {
+  useEffect(() => {
+    fetch('/referencias.json')
+      .then((res) => res.json())
+      .then((data) => {
+        setReferencias(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar o catálogo de referências:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  const referenciasFiltradas = referencias.filter((item) => {
     const bateCategoria = categoriaAtiva === 'todos' || item.categoria === categoriaAtiva;
     const bateBusca = item.nomeModelo.toLowerCase().includes(busca.toLowerCase()) ||
                       item.subtitulo.toLowerCase().includes(busca.toLowerCase());
@@ -70,6 +31,7 @@ export function useReferencias() {
     categoriaAtiva,
     setCategoriaAtiva,
     busca,
-    setBusca
+    setBusca,
+    loading
   };
 }
