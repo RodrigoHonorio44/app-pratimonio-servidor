@@ -24,6 +24,7 @@ import {
   Boxes,
   X,
   Car,
+  BookOpen,
 } from "lucide-react";
 import { auth } from "../services/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -330,6 +331,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
               </div>
               {openSections.patrimonio && (
                 <div className="space-y-1 mt-1.5">
+                  <NavButton
+                    icon={BookOpen}
+                    label="Catálogo Referência"
+                    path="/referencias-patrimonio"
+                    moduloId="inventario"
+                  />
                   <NavButton
                     icon={PlusCircle}
                     label="Novo Ativo (Estoque)"

@@ -76,10 +76,17 @@ export const useInventario = () => {
         ? dadosBrutos 
         : (dadosBrutos?.ativos || dadosBrutos?.dados || []);
 
-      setItens(todosOsDados);
+      // Ordenação alfabética rigorosa por nome/descrição (A-Z)
+      const ordenados = [...todosOsDados].sort((a, b) => {
+        const nomeA = String(a.nome || a.descricao || "").trim();
+        const nomeB = String(b.nome || b.descricao || "").trim();
+        return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base", numeric: true });
+      });
 
-      if (todosOsDados.length > 0) {
-        toast.success(`${todosOsDados.length} itens encontrados.`);
+      setItens(ordenados);
+
+      if (ordenados.length > 0) {
+        toast.success(`${ordenados.length} itens encontrados.`);
       } else {
         toast.info("Nenhum item encontrado no banco.");
       }
@@ -206,44 +213,50 @@ export const useInventario = () => {
   };
 
   const listaItensSegura = Array.isArray(itens) ? itens : [];
-  const itensFiltrados = listaItensSegura.filter((item) => {
-    const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
-    const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeFiltro);
-    const matchUnidade =
-      unidadeFiltro === "Todas" ||
-      unidadeItemNorm.includes(unidadeSelecionadaNorm);
+  const itensFiltrados = listaItensSegura
+    .filter((item) => {
+      const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
+      const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeFiltro);
+      const matchUnidade =
+        unidadeFiltro === "Todas" ||
+        unidadeItemNorm.includes(unidadeSelecionadaNorm);
 
-    const setorItemNorm = normalizarParaComparacao(item.setor || "");
-    const setorSelecionadoNorm = normalizarParaComparacao(setorFiltro);
-    const matchSetor =
-      setorFiltro === "Todos" ||
-      setorFiltro.trim() === "" ||
-      setorItemNorm === setorSelecionadoNorm;
+      const setorItemNorm = normalizarParaComparacao(item.setor || "");
+      const setorSelecionadoNorm = normalizarParaComparacao(setorFiltro);
+      const matchSetor =
+        setorFiltro === "Todos" ||
+        setorFiltro.trim() === "" ||
+        setorItemNorm === setorSelecionadoNorm;
 
-    const statusItemLower = String(item.status || "operante").toLowerCase().trim();
-    let matchStatus = false;
-    if (statusFiltro === "Todos") {
-      matchStatus = true;
-    } else if (statusFiltro === "Ativo") {
-      matchStatus = statusItemLower === "ativo" || statusItemLower === "operante";
-    } else if (statusFiltro === "Baixado") {
-      matchStatus = 
-        statusItemLower === "baixado" || 
-        statusItemLower === "inutilizado" || 
-        statusItemLower === "inutilizados";
-    }
+      const statusItemLower = String(item.status || "operante").toLowerCase().trim();
+      let matchStatus = false;
+      if (statusFiltro === "Todos") {
+        matchStatus = true;
+      } else if (statusFiltro === "Ativo") {
+        matchStatus = statusItemLower === "ativo" || statusItemLower === "operante";
+      } else if (statusFiltro === "Baixado") {
+        matchStatus = 
+          statusItemLower === "baixado" || 
+          statusItemLower === "inutilizado" || 
+          statusItemLower === "inutilizados";
+      }
 
-    let matchBusca = true;
-    if (buscaPatrimonio.trim() !== "") {
-      const termoNorm = normalizarParaComparacao(buscaPatrimonio);
-      const patItemNorm = normalizarParaComparacao(item.patrimonio || "");
-      const nomeItemNorm = normalizarParaComparacao(item.nome || "");
-      matchBusca =
-        patItemNorm.includes(termoNorm) || nomeItemNorm.includes(termoNorm);
-    }
+      let matchBusca = true;
+      if (buscaPatrimonio.trim() !== "") {
+        const termoNorm = normalizarParaComparacao(buscaPatrimonio);
+        const patItemNorm = normalizarParaComparacao(item.patrimonio || "");
+        const nomeItemNorm = normalizarParaComparacao(item.nome || "");
+        matchBusca =
+          patItemNorm.includes(termoNorm) || nomeItemNorm.includes(termoNorm);
+      }
 
-    return matchUnidade && matchSetor && matchStatus && matchBusca;
-  });
+      return matchUnidade && matchSetor && matchStatus && matchBusca;
+    })
+    .sort((a, b) => {
+      const nomeA = String(a.nome || a.descricao || "").trim();
+      const nomeB = String(b.nome || b.descricao || "").trim();
+      return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base", numeric: true });
+    });
 
   const totalPaginas = Math.ceil(itensFiltrados.length / itensPorPagina);
   const itensExibidos = itensFiltrados.slice(

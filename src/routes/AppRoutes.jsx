@@ -25,15 +25,16 @@ import TelaEtiquetas from "../pages/TelaEtiquetas";
 import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
 import HistoricoVistoria from "../pages/HistoricoVistoria";
 import GerenciarSetor from "../pages/GerenciarSetor";
-import Checklist from "../pages/ChecklistFrota"; // Certifique-se de que o arquivo CheckListFrota.jsx existe em src/pages/
+import Checklist from "../pages/ChecklistFrota";
+import ReferenciasPatrimonio from "../pages/PaginaReferencias";
 
 // Importando componentes
 import CadastroChamado from "../components/CadastroChamado";
 import GestaoChefia from "../pages/GestaoeChefia";
 import PainelGestao from "../pages/PainelGestao";
 import FormRemanejamento from "../components/FormRemanejamento";
-import ConsultaPatrimonio from "../pages/ConsultaPatrimonio"; 
-import SaidaEquipamento from "../pages/SaidaEquipamento"; 
+import ConsultaPatrimonio from "../pages/ConsultaPatrimonio";
+import SaidaEquipamento from "../pages/SaidaEquipamento";
 
 export default function AppRoutes({
   user,
@@ -66,7 +67,7 @@ export default function AppRoutes({
         </>
       ) : (
         <>
-          {/* Rota de Login ajustada para verificar troca de senha ao autenticar */}
+          {/* Rota de Login */}
           <Route
             path="/login"
             element={
@@ -90,7 +91,7 @@ export default function AppRoutes({
               <Route element={<GuardiaoSessao />}>
                 <Route path="/" element={<Navigate to={getHomePath()} replace />} />
 
-                {/* --- TI / ADMIN --- */}
+                {/* --- TI / ADMIN / PATRIMÔNIO --- */}
                 <Route
                   path="/dashboard"
                   element={
@@ -104,6 +105,14 @@ export default function AppRoutes({
                   element={
                     <ProtectedRoute condition={isTiOrAdmin || temAcesso("chamados")}>
                       <PainelAnalista />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/referencias-patrimonio"
+                  element={
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                      <ReferenciasPatrimonio />
                     </ProtectedRoute>
                   }
                 />
@@ -147,11 +156,10 @@ export default function AppRoutes({
                     </ProtectedRoute>
                   }
                 />
-                
                 <Route
                   path="/vistoria-patrimonio"
                   element={
-                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("vistoria")}>
                       <TelaVistoriaPatrimonio />
                     </ProtectedRoute>
                   }
@@ -161,7 +169,7 @@ export default function AppRoutes({
                 <Route
                   path="/checklist"
                   element={
-                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("checklist") || temAcesso("frota") || temAcesso("inventario")}>
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("checklist_frota")}>
                       <Checklist />
                     </ProtectedRoute>
                   }
@@ -171,7 +179,7 @@ export default function AppRoutes({
                 <Route
                   path="/historico-vistorias"
                   element={
-                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("vistoria")}>
                       <HistoricoVistoria />
                     </ProtectedRoute>
                   }
@@ -181,7 +189,7 @@ export default function AppRoutes({
                 <Route
                   path="/gerenciar-setor"
                   element={
-                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("inventario")}>
+                    <ProtectedRoute condition={isTiOrAdmin || temAcesso("gerenciarSetores")}>
                       <GerenciarSetor />
                     </ProtectedRoute>
                   }
@@ -253,7 +261,7 @@ export default function AppRoutes({
                     </ProtectedRoute>
                   }
                 />
-                
+
                 <Route
                   path="/consulta-patrimonio"
                   element={
@@ -262,7 +270,7 @@ export default function AppRoutes({
                     </ProtectedRoute>
                   }
                 />
-                
+
                 <Route
                   path="/usuarios"
                   element={

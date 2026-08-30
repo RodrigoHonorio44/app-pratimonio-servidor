@@ -108,7 +108,7 @@ export const useGerenciarSetor = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Busca de ativos
+  // Busca de ativos com ordenação alfabética garantida
   const buscarAtivos = async () => {
     setLoading(true);
     setMostrarDropdown(false);
@@ -151,10 +151,17 @@ export const useGerenciarSetor = () => {
         return true;
       });
 
-      setAtivos(filtrados);
+      // Ordenação por ordem alfabética (A-Z) com localeCompare e fallback de nome/descrição
+      const ordenados = filtrados.sort((a, b) => {
+        const nomeA = String(a.nome || a.descricao || "").trim();
+        const nomeB = String(b.nome || b.descricao || "").trim();
+        return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base", numeric: true });
+      });
+
+      setAtivos(ordenados);
       setPaginaAtual(1);
 
-      if (filtrados.length === 0) {
+      if (ordenados.length === 0) {
         toast.info("nenhum equipamento encontrado com os filtros informados.");
       }
     } catch (error) {
