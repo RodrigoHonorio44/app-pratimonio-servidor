@@ -199,7 +199,8 @@ const SETORES_UPA_INOA = [
   "Sala Vermelha",
   "SAME / Arquivo",
   "Serviço Social",
-  "Vestiário Feminino"
+  "Vestiário Feminino",
+  "Vestiário Masculino"
 ];
 
 const SETORES_UPA_SANTA_RITA = [

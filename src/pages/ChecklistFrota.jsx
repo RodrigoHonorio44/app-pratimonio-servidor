@@ -264,27 +264,64 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                 </div>
               </div>
 
-              {/* Desenho do Carro */}
-              <div className="bg-white border border-slate-200 p-3 rounded-xl">
-                <div className="relative w-full max-w-3xl mx-auto flex justify-center items-center p-1 overflow-hidden">
-                  <div className="relative inline-block w-full" style={{ minHeight: '260px' }}>
-                    <img src="/carro.jpg" alt="Esquema do Veículo" className="w-full h-auto block mx-auto object-contain select-none pointer-events-none" />
-                    
+              {/* Desenho do Carro / Mapeamento Responsivo */}
+              <div className="bg-white border border-slate-200 p-3 rounded-xl space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-700 text-xs">DIAGRAMA DE AVARIAS</span>
+                  <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-medium sm:hidden">
+                    Modo Celular (Lista Otimizada)
+                  </span>
+                </div>
+
+                {/* VISÃO DESKTOP: Imagem com círculos posicionados */}
+                <div className="hidden sm:block">
+                  <div className="relative w-full max-w-3xl mx-auto flex justify-center items-center p-1 overflow-hidden">
+                    <div className="relative inline-block w-full" style={{ minHeight: '260px' }}>
+                      <img src="/carro.jpg" alt="Esquema do Veículo" className="w-full h-auto block mx-auto object-contain select-none pointer-events-none" />
+                      
+                      {posicoesVistoria.map((pos) => (
+                        <input
+                          key={pos.id}
+                          type="text"
+                          title={pos.label}
+                          maxLength={1}
+                          value={danos[pos.id] || ''}
+                          onChange={(e) => handleDanoChange(pos.id, e.target.value)}
+                          style={{ top: pos.top, left: pos.left }}
+                          className="absolute w-6 h-6 -ml-3 -mt-3 border-2 border-blue-600 rounded-full text-center text-xs font-bold bg-white focus:bg-yellow-200 focus:outline-none shadow-sm z-10"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* VISÃO MOBILE: Lista organizada por peças (Fácil toque no celular) */}
+                <div className="block sm:hidden space-y-2">
+                  <p className="text-[10px] text-slate-500">Selecione o tipo de avaria para cada parte listada abaixo:</p>
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                     {posicoesVistoria.map((pos) => (
-                      <input
-                        key={pos.id}
-                        type="text"
-                        title={pos.label}
-                        maxLength={1}
-                        value={danos[pos.id] || ''}
-                        onChange={(e) => handleDanoChange(pos.id, e.target.value)}
-                        style={{ top: pos.top, left: pos.left }}
-                        className="absolute w-5 h-5 sm:w-6 sm:h-6 -ml-2.5 -mt-2.5 border-2 border-blue-600 rounded-full text-center text-[10px] sm:text-xs font-bold bg-white focus:bg-yellow-200 focus:outline-none shadow-sm z-10"
-                      />
+                      <div key={pos.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                        <span className="text-xs font-semibold text-slate-700 w-1/2">{pos.label}</span>
+                        <select
+                          value={danos[pos.id] || ''}
+                          onChange={(e) => handleDanoChange(pos.id, e.target.value)}
+                          className="bg-white border border-slate-300 rounded-md p-1.5 text-xs font-bold text-slate-800 w-1/2"
+                        >
+                          <option value="">Nenhum (Ok)</option>
+                          <option value="1">1 - Arranhado</option>
+                          <option value="2">2 - Amassado</option>
+                          <option value="3">3 - Piques</option>
+                          <option value="4">4 - Trincado</option>
+                          <option value="5">5 - Quebrado</option>
+                          <option value="6">6 - Falta</option>
+                        </select>
+                      </div>
                     ))}
                   </div>
                 </div>
-                <div className="text-[10px] font-bold flex flex-wrap justify-between px-2 mt-2 bg-slate-100 p-1.5 rounded text-slate-700">
+
+                {/* Legenda Geral */}
+                <div className="text-[10px] font-bold flex flex-wrap justify-between px-2 bg-slate-100 p-2 rounded text-slate-700 gap-1">
                   <span>LEGENDA:</span>
                   <span>1 - ARRANHADO</span>
                   <span>2 - AMASSADO</span>
