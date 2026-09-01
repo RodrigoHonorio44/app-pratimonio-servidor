@@ -26,6 +26,10 @@ import TelaVistoriaPatrimonio from "../pages/TelaVistoriaPatrimonio";
 import HistoricoVistoria from "../pages/HistoricoVistoria";
 import GerenciarSetor from "../pages/GerenciarSetor";
 import Checklist from "../pages/ChecklistFrota";
+import Abastecimento from "../pages/GestaoAbastecimentoPage";
+import Agendamento from "../pages/GestaoAgendamentoPage";
+import AgendaMotorista from "../pages/AgendaMotoristaPage";
+import CadastroMotorista from "../pages/CadastrarMotorista"; // <- IMPORTAÇÃO ADICIONADA
 import ReferenciasPatrimonio from "../pages/PaginaReferencias";
 
 // Importando componentes
@@ -165,12 +169,44 @@ export default function AppRoutes({
                   }
                 />
 
-                {/* --- CHECKLIST DE FROTA --- */}
+                {/* --- GESTÃO DE FROTA --- */}
+                <Route
+                  path="/cadastro-motorista"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("cadastro_motorista")}>
+                      <CadastroMotorista />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/checklist"
                   element={
                     <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("checklist_frota")}>
                       <Checklist />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/abastecimento"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("abastecimento_frota")}>
+                      <Abastecimento />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agendamento"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("agendamento_frota")}>
+                      <Agendamento />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agenda-motorista"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("agenda_motorista")}>
+                      <AgendaMotorista />
                     </ProtectedRoute>
                   }
                 />

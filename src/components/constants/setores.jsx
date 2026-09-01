@@ -196,9 +196,11 @@ const SETORES_UPA_INOA = [
   "Sala de Utilidades",
   "Sala Multiuso (Utilizadores)",
   "Sala Observação Adulto",
+  "Sala da Ti",
   "Sala Vermelha",
   "SAME / Arquivo",
   "Serviço Social",
+  
   "Vestiário Feminino",
   "Vestiário Masculino"
 ];

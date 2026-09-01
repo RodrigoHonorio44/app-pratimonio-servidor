@@ -25,6 +25,10 @@ import {
   X,
   Car,
   BookOpen,
+  Fuel,
+  Calendar,
+  CalendarDays,
+  UserPlus,
 } from "lucide-react";
 import { auth } from "../services/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -37,6 +41,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
     master: true,
     inteligencia: true,
     operacao: true,
+    frota: true,
     patrimonio: true,
   });
 
@@ -227,8 +232,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
           {/* Operação */}
           {(temAcesso("chamados") ||
             temAcesso("remanejamento") ||
-            temAcesso("laudos") ||
-            temAcesso("checklist_frota")) && (
+            temAcesso("laudos")) && (
             <div
               className={`${
                 sidebarOpen || window.innerWidth < 768
@@ -285,11 +289,76 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userData }) {
                     path="/laudo-inviabilidade"
                     moduloId="laudos"
                   />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Frota */}
+          {(temAcesso("checklist_frota") ||
+            temAcesso("abastecimento_frota") ||
+            temAcesso("agendamento_frota") ||
+            temAcesso("agenda_motorista") ||
+            temAcesso("cadastro_motorista")) && (
+            <div
+              className={`${
+                sidebarOpen || window.innerWidth < 768
+                  ? "bg-slate-200/40 border border-slate-200/60 rounded-2xl p-1.5"
+                  : "bg-transparent"
+              } transition-all`}
+            >
+              <div
+                onClick={() => toggleSection("frota")}
+                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none group rounded-xl transition-colors hover:bg-slate-200/70"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Car size={18} className="text-slate-500" />
+                  <span
+                    className={`text-[10px] font-black text-slate-500 uppercase tracking-widest ${
+                      !sidebarOpen ? "md:hidden" : "inline"
+                    }`}
+                  >
+                    Gestão de Frota
+                  </span>
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-slate-400 transition-transform duration-300 ${
+                    openSections.frota ? "rotate-180" : ""
+                  } ${!sidebarOpen ? "md:hidden" : "inline"}`}
+                />
+              </div>
+              {openSections.frota && (
+                <div className="space-y-1 mt-1.5">
+                  <NavButton
+                    icon={UserPlus}
+                    label="Cadastrar Motorista"
+                    path="/cadastro-motorista"
+                    moduloId="cadastro_motorista"
+                  />
                   <NavButton
                     icon={Car}
                     label="Checklist Veicular"
                     path="/checklist"
                     moduloId="checklist_frota"
+                  />
+                  <NavButton
+                    icon={Fuel}
+                    label="Abastecimento"
+                    path="/abastecimento"
+                    moduloId="abastecimento_frota"
+                  />
+                  <NavButton
+                    icon={Calendar}
+                    label="Escala / Agendamento"
+                    path="/agendamento"
+                    moduloId="agendamento_frota"
+                  />
+                  <NavButton
+                    icon={CalendarDays}
+                    label="Minha Agenda"
+                    path="/agenda-motorista"
+                    moduloId="agenda_motorista"
                   />
                 </div>
               )}

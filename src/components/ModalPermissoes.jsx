@@ -28,7 +28,7 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
   const [permissoes, setPermissoes] = useState(inicializarPermissoes);
   const [salvando, setSalvando] = useState(false);
 
-  // LISTA DE MÓDULOS ATUALIZADA (COM CATÁLOGO DE REFERÊNCIA)
+  // LISTA DE MÓDULOS ATUALIZADA (COM MÓDULOS DE FROTA)
   const modulosDisponiveis = [
     {
       id: "dashboard_bi",
@@ -46,9 +46,29 @@ export default function ModalPermissoes({ usuario, aoFechar }) {
       desc: "Controle e gerenciamento de setores da instituição",
     },
     {
+      id: "cadastro_motorista",
+      nome: "Cadastrar Motorista",
+      desc: "Cadastro e gestão de motoristas da frota",
+    },
+    {
       id: "checklist_frota",
       nome: "Checklist de Frota",
       desc: "Vistoria e controle de veículos e relatórios de frota",
+    },
+    {
+      id: "abastecimento_frota",
+      nome: "Abastecimento de Frota",
+      desc: "Lançamento e acompanhamento de abastecimentos",
+    },
+    {
+      id: "agendamento_frota",
+      nome: "Escala / Agendamento Frota",
+      desc: "Agendamento e escala de uso de veículos",
+    },
+    {
+      id: "agenda_motorista",
+      nome: "Minha Agenda (Motorista)",
+      desc: "Visualização das viagens agendadas do motorista",
     },
     {
       id: "laudos",
