@@ -182,6 +182,7 @@ const SETORES_UPA_INOA = [
   "Medicação e Nebulização",
   "NIR",
   "Odontologia",
+  "Oficina",
   "Ouvidoria",
   "Pediatria",
   "Raio-X",
@@ -200,7 +201,6 @@ const SETORES_UPA_INOA = [
   "Sala Vermelha",
   "SAME / Arquivo",
   "Serviço Social",
-  
   "Vestiário Feminino",
   "Vestiário Masculino"
 ];

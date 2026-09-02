@@ -1,23 +1,126 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAgendamentos } from '../hooks/useAgendamentos';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
-export default function AgendaMotoristaPage({ nomeMotorista }) {
+export default function AgendaMotoristaPage() {
   const navigate = useNavigate();
-  const { tarefas, buscarAgendaMotorista, loading } = useAgendamentos();
+  const { tarefas, buscarAgendaMotorista, excluirAgendamento, loading } = useAgendamentos();
+
+  const obterDataLocal = (diasAdicionais = 0) => {
+    const data = new Date();
+    data.setDate(data.getDate() + diasAdicionais);
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  const hojeStr = obterDataLocal(0);
+  const amanhaStr = obterDataLocal(1);
+
+  // Estados dos Filtros
+  const [modoFiltroData, setModoFiltroData] = useState('mes');
+  const [dataSelecionada, setDataSelecionada] = useState(hojeStr);
+  const [inputBusca, setInputBusca] = useState('');
+  const [termoAplicado, setTermoAplicado] = useState('');
+  const [itemParaExcluir, setItemParaExcluir] = useState(null);
 
   const listaTarefas = Array.isArray(tarefas) ? tarefas : [];
 
   useEffect(() => {
-    if (nomeMotorista) {
-      buscarAgendaMotorista(nomeMotorista);
+    if (typeof buscarAgendaMotorista === 'function') {
+      buscarAgendaMotorista();
     }
-  }, [nomeMotorista, buscarAgendaMotorista]);
+  }, [buscarAgendaMotorista]);
 
   const handleVoltarDashboard = () => {
     navigate('/dashboard');
+  };
+
+  const normalizarTexto = (txt) => {
+    if (!txt) return '';
+    return txt
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  };
+
+  // Executa a busca ao clicar no botão ou pressionar Enter
+  const handleBuscar = (e) => {
+    if (e) e.preventDefault();
+    setTermoAplicado(inputBusca);
+  };
+
+  // Limpa o campo de busca
+  const handleLimpar = () => {
+    setInputBusca('');
+    setTermoAplicado('');
+  };
+
+  // Lógica de Filtragem
+  const tarefasFiltradas = listaTarefas.filter((t) => {
+    const dataAgendada = t.dataAgendamento || '';
+
+    // 1. Filtro por Mês ou Dia
+    let matchData = false;
+    if (modoFiltroData === 'mes') {
+      const mesAnoReferencia = (dataSelecionada || hojeStr).substring(0, 7);
+      matchData = dataAgendada.startsWith(mesAnoReferencia);
+    } else {
+      matchData = dataAgendada === dataSelecionada;
+    }
+
+    // 2. Filtro Textual (somente se houver termo aplicado)
+    const busca = normalizarTexto(termoAplicado);
+    if (!busca) return matchData;
+
+    const motorista = normalizarTexto(t.motorista);
+    const modelo = normalizarTexto(t.modelo);
+    const placa = normalizarTexto(t.placa);
+    const origem = normalizarTexto(t.origem);
+    const destino = normalizarTexto(t.destino);
+    const tipo = normalizarTexto(t.tipoTarefa);
+    const obs = normalizarTexto(t.observacoes);
+
+    const palavrasBusca = busca.split(' ').filter(Boolean);
+    const matchTexto = palavrasBusca.every((palavra) =>
+      motorista.includes(palavra) ||
+      modelo.includes(palavra) ||
+      placa.includes(palavra) ||
+      origem.includes(palavra) ||
+      destino.includes(palavra) ||
+      tipo.includes(palavra) ||
+      obs.includes(palavra)
+    );
+
+    return matchData && matchTexto;
+  });
+
+  const tarefasOrdenadas = [...tarefasFiltradas].sort((a, b) => {
+    const dtA = `${a.dataAgendamento || ''}T${a.horaInicio || '00:00'}`;
+    const dtB = `${b.dataAgendamento || ''}T${b.horaInicio || '00:00'}`;
+    return new Date(dtA) - new Date(dtB);
+  });
+
+  const handleEditar = (tarefa) => {
+    const id = tarefa._id?.$oid || tarefa._id || tarefa.id;
+    navigate(`/agendamentos/editar/${id}`, { state: { tarefa } });
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!itemParaExcluir) return;
+    const id = itemParaExcluir._id?.$oid || itemParaExcluir._id || itemParaExcluir.id;
+
+    if (typeof excluirAgendamento === 'function') {
+      await excluirAgendamento(id);
+      if (typeof buscarAgendaMotorista === 'function') {
+        buscarAgendaMotorista();
+      }
+    }
+    setItemParaExcluir(null);
   };
 
   return (
@@ -25,8 +128,7 @@ export default function AgendaMotoristaPage({ nomeMotorista }) {
       <Header />
 
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
-        {/* Link superior para voltar à Dashboard */}
-        <div className="w-full max-w-2xl mb-4 flex justify-start">
+        <div className="w-full max-w-3xl mb-4 flex justify-between items-center">
           <button
             type="button"
             onClick={handleVoltarDashboard}
@@ -36,77 +138,233 @@ export default function AgendaMotoristaPage({ nomeMotorista }) {
           </button>
         </div>
 
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
           {/* Cabeçalho */}
-          <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100">
+          <div className="p-6 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-md text-white">
+              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-md text-white shrink-0">
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
                 </svg>
               </div>
               <div>
                 <h1 className="text-xl font-black text-slate-800 uppercase tracking-wide">
-                  Afazeres de Hoje
+                  Cronograma de Operações
                 </h1>
                 <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-                  {nomeMotorista ? (
-                    <span>Motorista: <strong className="text-slate-600">{nomeMotorista}</strong></span>
-                  ) : (
-                    'Escala do Motorista'
-                  )}
+                  Gestão Geral de Agendamentos e Afazeres
                 </p>
               </div>
             </div>
 
-            {/* Botão de fechar */}
             <button
               type="button"
               onClick={handleVoltarDashboard}
-              className="px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition border border-slate-200 flex items-center gap-1"
+              className="self-start sm:self-auto px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition border border-slate-200 flex items-center gap-1"
             >
               ✕ Fechar
             </button>
           </div>
 
-          {/* Conteúdo */}
+          {/* Painel de Controle e Filtros */}
+          <div className="p-6 pb-4 bg-slate-50/50 border-b border-slate-100 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl text-xs font-bold w-fit">
+                <button
+                  type="button"
+                  onClick={() => setModoFiltroData('mes')}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    modoFiltroData === 'mes'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Tudo do Mês
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoFiltroData('dia');
+                    setDataSelecionada(hojeStr);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    modoFiltroData === 'dia' && dataSelecionada === hojeStr
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Hoje
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoFiltroData('dia');
+                    setDataSelecionada(amanhaStr);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    modoFiltroData === 'dia' && dataSelecionada === amanhaStr
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Amanhã
+                </button>
+              </div>
+
+              <span className="text-xs font-bold text-slate-500">
+                {tarefasOrdenadas.length} agendamento(s) encontrado(s)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  Filtrar por Dia Específico
+                </label>
+                <input
+                  type="date"
+                  value={dataSelecionada}
+                  onChange={(e) => {
+                    setDataSelecionada(e.target.value);
+                    if (e.target.value) {
+                      setModoFiltroData('dia');
+                    } else {
+                      setModoFiltroData('mes');
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  Buscar por Texto
+                </label>
+                <form onSubmit={handleBuscar} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ex: Coleta, Hospital, Spin..."
+                    value={inputBusca}
+                    onChange={(e) => setInputBusca(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shrink-0"
+                  >
+                    Buscar
+                  </button>
+                  {inputBusca && (
+                    <button
+                      type="button"
+                      onClick={handleLimpar}
+                      className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold rounded-xl transition shrink-0"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Listagem do Cronograma */}
           <div className="p-6">
             {loading ? (
               <div className="py-12 text-center text-slate-400 font-bold text-sm tracking-wider uppercase">
                 carregando tarefas...
               </div>
-            ) : listaTarefas.length === 0 ? (
+            ) : tarefasOrdenadas.length === 0 ? (
               <div className="bg-[#f8fafc] border border-slate-200 p-8 rounded-2xl text-center text-slate-500 font-semibold text-sm">
-                Nenhuma tarefa agendada para você hoje.
+                Nenhum agendamento encontrado para o filtro selecionado.
               </div>
             ) : (
               <div className="space-y-4">
-                {listaTarefas.map((t) => {
+                {tarefasOrdenadas.map((t) => {
                   const id = t._id?.$oid || t._id || t.id;
+                  const dataFormatada = t.dataAgendamento
+                    ? t.dataAgendamento.split('-').reverse().join('/')
+                    : '-';
+
                   return (
-                    <div key={id} className="bg-[#f8fafc] p-5 rounded-2xl border border-slate-200 hover:border-blue-200 transition">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold uppercase text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
-                          {t.tipoTarefa}
-                        </span>
-                        <span className="text-xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
-                          {t.horaInicio} - {t.horaFim}
-                        </span>
+                    <div
+                      key={id}
+                      className="bg-[#f8fafc] p-5 rounded-2xl border border-slate-200 hover:border-blue-200 transition space-y-3"
+                    >
+                      {/* Topo do Card */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold uppercase text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
+                            {t.tipoTarefa?.toLowerCase()}
+                          </span>
+                          <span className="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                            Data: {dataFormatada}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                            {t.horaInicio} às {t.horaFim}
+                          </span>
+                        </div>
+
+                        {/* Botões de Ação */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditar(t)}
+                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-lg border border-amber-200 transition"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setItemParaExcluir(t)}
+                            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition"
+                          >
+                            Excluir
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="space-y-1 mb-3">
-                        <p className="text-sm font-bold text-slate-800">
-                          Veículo: <span className="text-blue-600">{t.modelo?.toLowerCase()}</span> ({t.placa?.toUpperCase()})
-                        </p>
-                        <p className="text-xs font-medium text-slate-600">
-                          <strong>De:</strong> {t.origem?.toLowerCase()} <br />
-                          <strong>Para:</strong> {t.destino?.toLowerCase()}
-                        </p>
+                      {/* Informações Principais */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="font-bold text-slate-400 text-[10px] uppercase block">
+                            Motorista
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {t.motorista?.toLowerCase()}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="font-bold text-slate-400 text-[10px] uppercase block">
+                            Veículo
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {t.modelo?.toLowerCase()} ({t.placa?.toLowerCase()})
+                          </span>
+                        </div>
                       </div>
 
+                      {/* Rota */}
+                      <div className="text-xs font-medium text-slate-600 bg-white p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div>
+                          <strong className="text-slate-500">De:</strong>{' '}
+                          {t.origem?.toLowerCase()}
+                        </div>
+                        <div className="hidden sm:block text-slate-300">→</div>
+                        <div>
+                          <strong className="text-slate-500">Para:</strong>{' '}
+                          {t.destino?.toLowerCase()}
+                        </div>
+                      </div>
+
+                      {/* Observações */}
                       {t.observacoes && (
-                        <div className="text-xs bg-white p-3 rounded-xl text-slate-600 border border-slate-200 font-medium">
-                          <strong className="text-slate-500">Obs:</strong> {t.observacoes?.toLowerCase()}
+                        <div className="text-xs bg-amber-50/60 p-3 rounded-xl text-slate-600 border border-amber-100 font-medium">
+                          <strong className="text-amber-800">Obs:</strong>{' '}
+                          {t.observacoes?.toLowerCase()}
                         </div>
                       )}
                     </div>
@@ -117,6 +375,45 @@ export default function AgendaMotoristaPage({ nomeMotorista }) {
           </div>
         </div>
       </main>
+
+      {/* Modal de Confirmação de Exclusão */}
+      {itemParaExcluir && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl border border-slate-100">
+            <h3 className="text-base font-bold text-slate-800 uppercase">
+              Excluir Tarefa
+            </h3>
+            <p className="text-xs text-slate-600 font-medium">
+              Tem certeza que deseja remover o agendamento de{' '}
+              <strong className="text-slate-800">
+                {itemParaExcluir.tipoTarefa?.toLowerCase()}
+              </strong>{' '}
+              para o motorista{' '}
+              <strong className="text-slate-800">
+                {itemParaExcluir.motorista?.toLowerCase()}
+              </strong>
+              ?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setItemParaExcluir(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarExclusao}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

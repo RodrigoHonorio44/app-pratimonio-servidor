@@ -22,18 +22,39 @@ export function useAgendamentos() {
   };
 
   const buscarAgendaMotorista = useCallback(async (nomeMotorista) => {
-    if (!nomeMotorista) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/agendamentos/motorista/${nomeMotorista.toLowerCase()}`);
+      // Se um motorista for informado explicitamente, filtra por ele.
+      // Caso contrário, busca a lista completa de agendamentos para a gestão.
+      const url = nomeMotorista
+        ? `/api/agendamentos/motorista/${nomeMotorista.toLowerCase()}`
+        : '/api/agendamentos';
+
+      const res = await fetch(url);
       const data = await res.json();
-      setTarefas(data);
+      setTarefas(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('erro ao buscar agenda:', err);
+      setTarefas([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { tarefas, salvarAgendamento, buscarAgendaMotorista, loading };
+  const excluirAgendamento = async (id) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/agendamentos/${id}`, {
+        method: 'DELETE'
+      });
+      setLoading(false);
+      return res.ok;
+    } catch (err) {
+      console.error('erro ao excluir agendamento:', err);
+      setLoading(false);
+      return false;
+    }
+  };
+
+  return { tarefas, salvarAgendamento, buscarAgendaMotorista, excluirAgendamento, loading };
 }

@@ -70,14 +70,19 @@ export const useInventario = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Validação segura para evitar quebra de layout/tela em branco caso o retorno mude de formato
       const dadosBrutos = resposta.data;
       const todosOsDados = Array.isArray(dadosBrutos) 
         ? dadosBrutos 
         : (dadosBrutos?.ativos || dadosBrutos?.dados || []);
 
-      // Ordenação alfabética rigorosa por nome/descrição (A-Z)
+      // Ordenação primária por Setor (A-Z) e secundária por Equipamento/Nome (A-Z)
       const ordenados = [...todosOsDados].sort((a, b) => {
+        const setorA = String(a.setor || "").trim();
+        const setorB = String(b.setor || "").trim();
+        
+        const compSetor = setorA.localeCompare(setorB, "pt-BR", { sensitivity: "base", numeric: true });
+        if (compSetor !== 0) return compSetor;
+
         const nomeA = String(a.nome || a.descricao || "").trim();
         const nomeB = String(b.nome || b.descricao || "").trim();
         return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base", numeric: true });
@@ -93,16 +98,12 @@ export const useInventario = () => {
     } catch (error) {
       console.error("Erro ao carregar:", error);
       toast.error("Erro ao consultar dados.");
-      setItens([]); // Fallback seguro em caso de erro na requisição
+      setItens([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Função atualizada para processar a Baixa Definitiva do Patrimônio via API
-   * recebendo todos os detalhes avançados definidos no ModalInventario.
-   */
   const confirmarBaixaPatrimonio = async (equipamentoParaBaixar, dadosBaixaAvulsa) => {
     const itemTarget = equipamentoParaBaixar || equipamentoSelecionado;
 
@@ -111,7 +112,6 @@ export const useInventario = () => {
       return;
     }
 
-    // Procura o ID correto do ativo (prevenindo passar ID de OS)
     const idAtivo = itemTarget.idAtivo || itemTarget.ativoId || itemTarget.id || itemTarget._id;
 
     if (!idAtivo) {
@@ -131,7 +131,6 @@ export const useInventario = () => {
       const processoFinal = dadosBaixaAvulsa?.numeroProcesso || `LAUDO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const parecerFinal = dadosBaixaAvulsa?.parecerTecnico || "";
 
-      // Atualiza diretamente na sua API REST enviando todos os novos campos
       await api.put(
         `/ativos/${idAtivo}`,
         {
@@ -153,7 +152,6 @@ export const useInventario = () => {
       toast.success("Baixa do patrimônio realizada com sucesso!");
       setModalAberto(false);
       
-      // Recarrega os dados do inventário para refletir o novo status
       await carregarDados();
 
     } catch (error) {
@@ -252,7 +250,14 @@ export const useInventario = () => {
 
       return matchUnidade && matchSetor && matchStatus && matchBusca;
     })
+    // Ordenação combinada: Setor (A-Z) -> Nome/Equipamento (A-Z)
     .sort((a, b) => {
+      const setorA = String(a.setor || "").trim();
+      const setorB = String(b.setor || "").trim();
+      
+      const compSetor = setorA.localeCompare(setorB, "pt-BR", { sensitivity: "base", numeric: true });
+      if (compSetor !== 0) return compSetor;
+
       const nomeA = String(a.nome || a.descricao || "").trim();
       const nomeB = String(b.nome || b.descricao || "").trim();
       return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base", numeric: true });
