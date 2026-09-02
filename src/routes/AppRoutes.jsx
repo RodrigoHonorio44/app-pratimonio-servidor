@@ -29,7 +29,7 @@ import Checklist from "../pages/ChecklistFrota";
 import Abastecimento from "../pages/GestaoAbastecimentoPage";
 import Agendamento from "../pages/GestaoAgendamentoPage";
 import AgendaMotorista from "../pages/AgendaMotoristaPage";
-import CadastroMotorista from "../pages/CadastrarMotorista"; // <- IMPORTAÇÃO ADICIONADA
+import CadastroMotorista from "../pages/CadastrarMotorista";
 import ReferenciasPatrimonio from "../pages/PaginaReferencias";
 
 // Importando componentes
@@ -196,6 +196,14 @@ export default function AppRoutes({
                 />
                 <Route
                   path="/agendamento"
+                  element={
+                    <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("agendamento_frota")}>
+                      <Agendamento />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agendamentos/editar/:id"
                   element={
                     <ProtectedRoute condition={role === "root" || isTiOrAdmin || temAcesso("agendamento_frota")}>
                       <Agendamento />

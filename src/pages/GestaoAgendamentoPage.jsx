@@ -176,10 +176,12 @@ export default function GestaoAgendamentoPage() {
                   onChange={(e) => setForm({ ...form, tipoTarefa: e.target.value })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 >
-                  <option value="entrega">Entrega</option>
-                  <option value="coleta">Coleta</option>
-                  <option value="manutencao">Manutenção</option>
-                  <option value="servico_externo">Serviço Externo</option>
+                  <option value="entrega">entrega padrão (medicamentos)</option>
+<option value="entrega_urgente">entrega urgente (uso imediato)</option>
+<option value="transporte_pessoas">transporte de pessoas</option>
+<option value="coleta">coleta</option>
+<option value="manutencao">manutenção</option>
+<option value="servico_externo">serviço externo</option>
                 </select>
               </div>
 
@@ -217,7 +219,7 @@ export default function GestaoAgendamentoPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: galpão central"
+                  placeholder="ex: farmácia central"
                   value={form.origem}
                   onChange={(e) => setForm({ ...form, origem: e.target.value.toLowerCase() })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
@@ -230,7 +232,7 @@ export default function GestaoAgendamentoPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: cliente x"
+                  placeholder="ex: UTI neonatal"
                   value={form.destino}
                   onChange={(e) => setForm({ ...form, destino: e.target.value.toLowerCase() })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
@@ -244,7 +246,7 @@ export default function GestaoAgendamentoPage() {
               </label>
               <textarea
                 rows="3"
-                placeholder="ex: detalhar instruções adicionais da entrega..."
+                placeholder="ex: manter controle de temperatura entre 2°C e 8°C..."
                 value={form.observacoes}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value.toLowerCase() })}
                 className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"

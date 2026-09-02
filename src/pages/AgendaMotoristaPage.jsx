@@ -288,6 +288,27 @@ export default function AgendaMotoristaPage() {
                     ? t.dataAgendamento.split('-').reverse().join('/')
                     : '-';
 
+                  const tipoLower = (t.tipoTarefa || '').toLowerCase();
+                  let badgeClass = 'bg-blue-100 text-blue-700 border-blue-200';
+                  let tipoExibicao = tipoLower;
+
+                  if (tipoLower === 'entrega_urgente') {
+                    badgeClass = 'bg-red-100 text-red-700 border-red-200';
+                    tipoExibicao = 'Entrega Urgente';
+                  } else if (tipoLower === 'termolabeis') {
+                    badgeClass = 'bg-cyan-100 text-cyan-700 border-cyan-200';
+                    tipoExibicao = 'Carga Termolábil';
+                  } else if (tipoLower === 'coleta') {
+                    badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                    tipoExibicao = 'Coleta';
+                  } else if (tipoLower === 'manutencao') {
+                    badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+                    tipoExibicao = 'Manutenção';
+                  } else if (tipoLower === 'servico_externo') {
+                    badgeClass = 'bg-purple-100 text-purple-700 border-purple-200';
+                    tipoExibicao = 'Serviço Externo';
+                  }
+
                   return (
                     <div
                       key={id}
@@ -296,8 +317,8 @@ export default function AgendaMotoristaPage() {
                       {/* Topo do Card */}
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold uppercase text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
-                            {t.tipoTarefa?.toLowerCase()}
+                          <span className={`font-bold uppercase text-xs px-3 py-1 rounded-full border ${badgeClass}`}>
+                            {tipoExibicao}
                           </span>
                           <span className="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                             Data: {dataFormatada}
