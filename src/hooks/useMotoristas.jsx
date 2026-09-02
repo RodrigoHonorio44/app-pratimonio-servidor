@@ -6,33 +6,10 @@ export function useMotoristas() {
   const [motoristas, setMotoristas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Função auxiliar para aguardar e obter os cabeçalhos com Token JWT do Firebase
-  const getAuthHeaders = async () => {
-    const auth = getAuth();
-    let user = auth.currentUser;
-
-    if (!user) {
-      await new Promise((resolve) => {
-        const unsubscribe = onAuthStateChanged(auth, (u) => {
-          user = u;
-          unsubscribe();
-          resolve();
-        });
-      });
-    }
-
-    if (user) {
-      const token = await user.getIdToken();
-      return { headers: { Authorization: `Bearer ${token}` } };
-    }
-    return {};
-  };
-
   const buscarMotoristas = useCallback(async () => {
     setLoading(true);
     try {
-      const config = await getAuthHeaders();
-      const response = await api.get('/motoristas', config);
+      const response = await api.get('/motoristas');
       setMotoristas(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erro ao buscar motoristas:', error);
@@ -45,8 +22,6 @@ export function useMotoristas() {
   const salvarMotorista = async (dados) => {
     setLoading(true);
     try {
-      const config = await getAuthHeaders();
-
       const payload = {
         ...dados,
         nome: dados.nome ? dados.nome.toLowerCase().trim() : '',
@@ -54,7 +29,7 @@ export function useMotoristas() {
         telefone: dados.telefone ? String(dados.telefone).replace(/\D/g, '') : ''
       };
 
-      const response = await api.post('/motoristas', payload, config);
+      const response = await api.post('/motoristas', payload);
 
       if (response.status === 200 || response.status === 201) {
         await buscarMotoristas();
@@ -72,8 +47,6 @@ export function useMotoristas() {
   const atualizarMotorista = async (id, dados) => {
     setLoading(true);
     try {
-      const config = await getAuthHeaders();
-
       const payload = {
         ...dados,
         nome: dados.nome ? dados.nome.toLowerCase().trim() : '',
@@ -81,7 +54,7 @@ export function useMotoristas() {
         telefone: dados.telefone ? String(dados.telefone).replace(/\D/g, '') : ''
       };
 
-      const response = await api.put(`/motoristas/${id}`, payload, config);
+      const response = await api.put(`/motoristas/${id}`, payload);
 
       if (response.status === 200) {
         await buscarMotoristas();
@@ -99,8 +72,7 @@ export function useMotoristas() {
   const excluirMotorista = async (id) => {
     setLoading(true);
     try {
-      const config = await getAuthHeaders();
-      const response = await api.delete(`/motoristas/${id}`, config);
+      const response = await api.delete(`/motoristas/${id}`);
 
       if (response.status === 200 || response.status === 204) {
         await buscarMotoristas();

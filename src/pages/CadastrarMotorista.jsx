@@ -82,8 +82,8 @@ export default function CadastrarMotoristaPage() {
     }
 
     const dados = {
-      nome: nome.trim(),
-      matricula: matricula.trim(),
+      nome: nome.trim().toLowerCase(),
+      matricula: matricula.trim().toLowerCase(),
       telefone: digitosTelefone
     };
 
@@ -152,7 +152,7 @@ export default function CadastrarMotoristaPage() {
               </label>
               <input
                 type="text"
-                placeholder="ex: Caio Bom Carvalho"
+                placeholder="ex: caio bom carvalho"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
@@ -167,7 +167,7 @@ export default function CadastrarMotoristaPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: MAT-12345"
+                  placeholder="ex: mat-12345"
                   value={matricula}
                   onChange={(e) => setMatricula(e.target.value)}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
