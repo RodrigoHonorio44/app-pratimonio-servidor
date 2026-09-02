@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Printer, Car, Plus, X, Save, CheckCircle2, ArrowLeft, LogOut, User, RotateCcw } from 'lucide-react';
+import { 
+  Printer, Car, Plus, X, Save, CheckCircle2, ArrowLeft, 
+  LogOut, User, RotateCcw, Calendar as CalendarIcon, 
+  ChevronLeft, ChevronRight, Trash2, FileText, ChevronDown, ChevronUp 
+} from 'lucide-react';
 import { useChecklistFrota, listaItensInspecao, listaAcessorios, posicoesVistoria } from '../hooks/useChecklistFrota';
 import ImpressaoChecklistFrota from '../components/ImpressaoChecklistFrota';
 import Footer from '../components/Footer';
@@ -7,6 +11,13 @@ import toast from 'react-hot-toast';
 
 export default function ChecklistFrota({ onVoltarDashboard }) {
   const [exibirImpressao, setExibirImpressao] = useState(false);
+  const [dataSelecionadaCalendario, setDataSelecionadaCalendario] = useState(new Date());
+  
+  // ARMAZENA TODOS OS CHECKLISTS DO DIA SELECIONADO (ARRAY)
+  const [listaChecklistsDoDiaModal, setListaChecklistsDoDiaModal] = useState(null);
+  
+  // ESTADO PARA CONTROLAR A EXPANSÃO DO CALENDÁRIO
+  const [calendarioExpandido, setCalendarioExpandido] = useState(false);
 
   const {
     veiculos,
@@ -22,6 +33,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
     itensInspecao,
     danos,
     acessorios,
+    historicoChecklists = [],
     handleSelecionarVeiculo,
     handleChange,
     handleInspecaoChange,
@@ -31,14 +43,58 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
     handleSalvarChecklist,
     handleLogout,
     handleLimparCompleto,
+    handleExcluirChecklist,
   } = useChecklistFrota();
 
-  // Função intermediária para disparar o toast de limpeza
+  // LÓGICA DO CALENDÁRIO MENSAL
+  const anoAtual = dataSelecionadaCalendario.getFullYear();
+  const mesAtual = dataSelecionadaCalendario.getMonth();
+
+  const primeiroDiaMes = new Date(anoAtual, mesAtual, 1).getDay();
+  const totalDiasMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+
+  const navegarMes = (e, direcao) => {
+    e.stopPropagation();
+    setDataSelecionadaCalendario(new Date(anoAtual, mesAtual + direcao, 1));
+  };
+
+  const nomesMeses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const obterChecklistsDoDia = (dia) => {
+    const dataFormatada = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    return historicoChecklists.filter((item) => {
+      if (!item.created_at && !item.data) return false;
+      const dataItem = (item.created_at || item.data).split('T')[0];
+      return dataItem === dataFormatada;
+    });
+  };
+
+  const totalChecklistsMes = historicoChecklists.filter((item) => {
+    if (!item.created_at && !item.data) return false;
+    const dataItem = new Date(item.created_at || item.data);
+    return dataItem.getFullYear() === anoAtual && dataItem.getMonth() === mesAtual;
+  }).length;
+
   const executarLimpeza = () => {
     if (typeof handleLimparCompleto === 'function') {
       handleLimparCompleto();
     }
-    toast.success("Campos limpos com sucesso!");
+    toast.success("campos limpos com sucesso!");
+  };
+
+  const confirmarExclusao = (id) => {
+    if (window.confirm("Deseja realmente excluir este checklist permanentemente?")) {
+      if (typeof handleExcluirChecklist === 'function') {
+        handleExcluirChecklist(id);
+        // Atualiza o modal removendo o item excluído
+        setListaChecklistsDoDiaModal((prev) => prev.filter(c => (c.id || c._id) !== id));
+      } else {
+        toast.error("função de exclusão não configurada no hook.");
+      }
+    }
   };
 
   return (
@@ -52,7 +108,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         }
       `}</style>
 
-      {/* BARRA DE TOPO PADRÃO - RODHON SYSTEM */}
+      {/* BARRA DE TOPO */}
       <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between no-print shadow-xs">
         <div className="flex flex-col">
           <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">● Rodhon System</span>
@@ -76,8 +132,8 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         </div>
       </header>
 
-      {/* CONTEÚDO PRINCIPAL COM CONTAINER EXPANDIDO */}
-      <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-6">
+      {/* CONTEÚDO PRINCIPAL */}
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-4">
         
         {/* NAVEGAÇÃO DE RETORNO */}
         <div className="no-print">
@@ -90,9 +146,117 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
           </button>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print-container space-y-6">
+        {/* CALENDÁRIO COMPACTO / EXPANSÍVEL */}
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 no-print transition-all duration-300 overflow-hidden">
           
-          {/* CABEÇALHO DA TELA */}
+          <div 
+            onClick={() => setCalendarioExpandido(!calendarioExpandido)}
+            className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition select-none"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 text-blue-700 p-2 rounded-xl">
+                <CalendarIcon size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-black uppercase text-slate-800">Calendário de Histórico</h3>
+                  <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100">
+                    {totalChecklistsMes} registro(s) em {nomesMeses[mesAtual]}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {calendarioExpandido ? 'Clique para recolher a exibição.' : 'Clique aqui para expandir o calendário e ver os dias gravados.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {calendarioExpandido && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={(e) => navegarMes(e, -1)}
+                    className="p-1 hover:bg-white rounded-lg text-slate-600 transition"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-[11px] font-black uppercase text-slate-700 px-2 min-w-[100px] text-center">
+                    {nomesMeses[mesAtual]} {anoAtual}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => navegarMes(e, 1)}
+                    className="p-1 hover:bg-white rounded-lg text-slate-600 transition"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+
+              <div className="bg-slate-100 p-2 rounded-xl text-slate-600">
+                {calendarioExpandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+            </div>
+          </div>
+
+          {calendarioExpandido && (
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 space-y-3">
+              <p className="text-[11px] text-slate-500">
+                Dias com bolinha azul possuem vistorias. Clique no dia para selecionar qual vistoria deseja abrir.
+              </p>
+
+              <div className="grid grid-cols-7 gap-1.5 text-center">
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
+                  <div key={dia} className="text-[10px] font-black uppercase text-slate-400 py-1">
+                    {dia}
+                  </div>
+                ))}
+
+                {Array.from({ length: primeiroDiaMes }).map((_, index) => (
+                  <div key={`empty-${index}`} className="h-10 bg-slate-50/40 rounded-lg" />
+                ))}
+
+                {Array.from({ length: totalDiasMes }).map((_, index) => {
+                  const dia = index + 1;
+                  const checklistsDoDia = obterChecklistsDoDia(dia);
+                  const possuiChecklist = checklistsDoDia.length > 0;
+
+                  return (
+                    <div
+                      key={dia}
+                      className={`h-11 border rounded-xl p-1 flex flex-col justify-between items-center transition ${
+                        possuiChecklist
+                          ? 'bg-blue-50/70 border-blue-300 hover:bg-blue-100 cursor-pointer shadow-xs'
+                          : 'bg-white border-slate-100 text-slate-600'
+                      }`}
+                      onClick={() => {
+                        if (possuiChecklist) {
+                          // PASSA O ARRAY COMPLETO DO DIA PARA O MODAL
+                          setListaChecklistsDoDiaModal(checklistsDoDia);
+                        }
+                      }}
+                    >
+                      <span className="text-xs font-bold text-slate-700">{dia}</span>
+                      
+                      {possuiChecklist && (
+                        <div className="flex items-center gap-0.5 mb-0.5">
+                          <span className="w-2 h-2 bg-blue-600 rounded-full inline-block" title={`${checklistsDoDia.length} vistoria(s)`} />
+                          {checklistsDoDia.length > 1 && (
+                            <span className="text-[8px] font-black text-blue-800">x{checklistsDoDia.length}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* CONTAINER DO FORMULÁRIO PRINCIPAL */}
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 print-container space-y-6">
+          
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl gap-4 no-print">
             <div className="flex items-center gap-3">
               <div className="bg-blue-600 text-white p-2.5 rounded-xl">
@@ -114,10 +278,9 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
           <form onSubmit={handleSalvarChecklist} className="space-y-6">
             
-            {/* LINHA 1: INFORMAÇÕES DO VEÍCULO + INSPEÇÃO DOS ITENS */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* SEÇÃO: INFORMAÇÕES GERAIS E VEÍCULO (4 Colunas) */}
+              {/* INFORMAÇÕES VEÍCULO */}
               <div className="lg:col-span-4 bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-4 h-full">
                 <h3 className="text-xs font-black uppercase text-blue-900 tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
                   <Car size={16} /> Informações Gerais e Veículo
@@ -169,7 +332,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                 </div>
               </div>
 
-              {/* SEÇÃO: INSPEÇÃO DOS ITENS DA VISTORIA (8 Colunas) */}
+              {/* INSPEÇÃO */}
               <div className="lg:col-span-8 bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-4 h-full">
                 <h3 className="text-xs font-black uppercase text-blue-900 tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
                   <CheckCircle2 size={16} /> Inspeção dos Itens da Vistoria
@@ -218,10 +381,9 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
             </div>
 
-            {/* LINHA 2: DETALHES TÉCNICOS/DIAGRAMA + ACESSÓRIOS */}
+            {/* MAPEAMENTO E ACESSÓRIOS */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* SEÇÃO: DETALHES TÉCNICOS & DESENHO INTERATIVO (7 Colunas) */}
               <div className="lg:col-span-7 bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-4">
                 <h3 className="text-xs font-black uppercase text-blue-900 tracking-wider border-b border-slate-200 pb-2">
                   Mapeamento de Avarias e Estado Geral
@@ -274,21 +436,15 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                   </div>
                 </div>
 
-                {/* Desenho do Carro / Mapeamento Responsivo */}
                 <div className="bg-white border border-slate-200 p-3 rounded-xl space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-700 text-xs">DIAGRAMA DE AVARIAS</span>
-                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-medium sm:hidden">
-                      Modo Celular (Lista Otimizada)
-                    </span>
                   </div>
 
-                  {/* VISÃO DESKTOP: Imagem com círculos posicionados */}
                   <div className="hidden sm:block">
                     <div className="relative w-full max-w-2xl mx-auto flex justify-center items-center p-1 overflow-hidden">
                       <div className="relative inline-block w-full" style={{ minHeight: '220px' }}>
                         <img src="/carro.jpg" alt="Esquema do Veículo" className="w-full h-auto block mx-auto object-contain select-none pointer-events-none" />
-                        
                         {posicoesVistoria.map((pos) => (
                           <input
                             key={pos.id}
@@ -305,9 +461,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                     </div>
                   </div>
 
-                  {/* VISÃO MOBILE: Lista organizada por peças */}
                   <div className="block sm:hidden space-y-2">
-                    <p className="text-[10px] text-slate-500">Selecione o tipo de avaria para cada parte listada abaixo:</p>
                     <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                       {posicoesVistoria.map((pos) => (
                         <div key={pos.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded-lg">
@@ -330,7 +484,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                     </div>
                   </div>
 
-                  {/* Legenda Geral */}
                   <div className="text-[9px] font-bold flex flex-wrap justify-between px-2 bg-slate-100 p-1.5 rounded text-slate-700 gap-1">
                     <span>LEGENDA:</span>
                     <span>1 - ARRANHADO</span>
@@ -343,7 +496,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                 </div>
               </div>
 
-              {/* SEÇÃO: ACESSÓRIOS (5 Colunas) */}
               <div className="lg:col-span-5 bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-3 h-full">
                 <span className="font-black text-xs block uppercase text-blue-900 border-b border-slate-200 pb-2">
                   Acessórios / Equipamentos [(S) SIM | (N) NÃO | (A) AVARIADO]
@@ -371,7 +523,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
 
             </div>
 
-            {/* SEÇÃO: OBSERVAÇÕES */}
             <div className="bg-slate-50/50 border border-slate-200 p-4 rounded-xl space-y-2">
               <label className="font-black text-xs uppercase block text-blue-900">Observações / Avarias Identificadas</label>
               <textarea
@@ -384,7 +535,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
               />
             </div>
 
-            {/* BOTÕES DE AÇÃO */}
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2 no-print">
               <button
                 type="button"
@@ -412,7 +562,77 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         </div>
       </main>
 
-      {/* MODAL DE CADASTRO DE VEÍCULO */}
+      {/* MODAL SUPORTANDO MÚLTIPLOS CHECKLISTS NO MESMO DIA */}
+      {listaChecklistsDoDiaModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-sm uppercase">
+                <FileText className="text-blue-600" size={18} />
+                Vistorias do Dia ({listaChecklistsDoDiaModal.length})
+              </h3>
+              <button 
+                onClick={() => setListaChecklistsDoDiaModal(null)} 
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+              {listaChecklistsDoDiaModal.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-4">Nenhum registro encontrado.</p>
+              ) : (
+                listaChecklistsDoDiaModal.map((item, index) => (
+                  <div key={item.id || item._id || index} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                    <div className="flex justify-between items-start text-xs border-b border-slate-200 pb-2">
+                      <div>
+                        <span className="font-black text-blue-900 block text-sm">
+                          {item.modelo || formData.modelo} - Placa: {item.placa || formData.placa}
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          Motorista: <strong>{item.condutor || formData.condutor}</strong> | KM: <strong>{item.km || formData.km}</strong>
+                        </span>
+                      </div>
+                      <span className="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded text-[10px]">
+                        #{index + 1}
+                      </span>
+                    </div>
+
+                    {item.obs && (
+                      <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-amber-900 text-xs">
+                        <strong>Observações:</strong> {item.obs}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => confirmarExclusao(item.id || item._id)}
+                        className="flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition cursor-pointer"
+                      >
+                        <Trash2 size={13} /> Excluir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExibirImpressao(true);
+                          setListaChecklistsDoDiaModal(null);
+                        }}
+                        className="flex items-center gap-1 bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition cursor-pointer"
+                      >
+                        <Printer size={13} /> Imprimir
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL NOVO VEÍCULO */}
       {modalVeiculoAberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4">
@@ -518,7 +738,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         </div>
       )}
 
-      {/* COMPONENTE DE IMPRESSÃO EM NOVA ABA */}
+      {/* IMPRESSÃO */}
       {exibirImpressao && (
         <ImpressaoChecklistFrota 
           formData={formData}
@@ -530,7 +750,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         />
       )}
 
-      {/* RODAPÉ IMPORTADO */}
       <Footer />
     </div>
   );

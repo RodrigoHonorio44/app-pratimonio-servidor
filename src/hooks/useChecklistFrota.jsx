@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
-import api from '../services/api'; // <--- Importado padronizado do projeto
+import api from '../services/api';
 
 export const listaItensInspecao = [
   { id: 'pneus', label: 'Pneus / Calibragem' },
@@ -59,6 +59,7 @@ export const posicoesVistoria = [
 
 export function useChecklistFrota() {
   const [veiculos, setVeiculos] = useState([]);
+  const [historicoChecklists, setHistoricoChecklists] = useState([]);
   const [modalVeiculoAberto, setModalVeiculoAberto] = useState(false);
   const [salvandoVeiculo, setSalvandoVeiculo] = useState(false);
   const [salvandoChecklist, setSalvandoChecklist] = useState(false);
@@ -118,7 +119,6 @@ export function useChecklistFrota() {
     listaAcessorios.reduce((acc, item) => ({ ...acc, [item]: 'N' }), {})
   );
 
-  // Função auxiliar para injetar o Token do Firebase no Axios
   const getAuthHeaders = async () => {
     const auth = getAuth();
     let user = auth.currentUser;
@@ -154,6 +154,18 @@ export function useChecklistFrota() {
     }
   };
 
+  const carregarHistoricoChecklists = async () => {
+    try {
+      const config = await getAuthHeaders();
+      const response = await api.get('/checklist-frota', config);
+      if (Array.isArray(response.data)) {
+        setHistoricoChecklists(response.data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar histórico de checklists:", error);
+    }
+  };
+
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -164,6 +176,7 @@ export function useChecklistFrota() {
           setUsuarioNome(user.email.split('@')[0]);
         }
         carregarVeiculos();
+        carregarHistoricoChecklists();
       }
     });
     return () => unsubscribe();
@@ -182,25 +195,19 @@ export function useChecklistFrota() {
     
     if (veiculoEncontrado) {
       try {
-        const config = await getAuthHeaders();
-        const response = await api.get('/checklist-frota', config).catch(() => ({ data: [] }));
-        const historico = response.data;
-        
-        let ultimoChecklist = null;
-        if (Array.isArray(historico) && historico.length > 0) {
-          const checklistsDoVeiculo = historico.filter(item => 
-            String(item.veiculoId) === String(veiculoEncontrado.id || veiculoEncontrado._id) ||
-            (item.placa && item.placa.toLowerCase() === veiculoEncontrado.placa.toLowerCase())
-          );
+        const checklistsDoVeiculo = historicoChecklists.filter(item => 
+          String(item.veiculoId) === String(veiculoEncontrado.id || veiculoEncontrado._id) ||
+          (item.placa && item.placa.toLowerCase() === veiculoEncontrado.placa.toLowerCase())
+        );
 
-          if (checklistsDoVeiculo.length > 0) {
-            checklistsDoVeiculo.sort((a, b) => {
-              const dataA = new Date(a.criadoEm?.$date || a.criadoEm || a.data || 0);
-              const dataB = new Date(b.criadoEm?.$date || b.criadoEm || b.data || 0);
-              return dataA - dataB;
-            });
-            ultimoChecklist = checklistsDoVeiculo[checklistsDoVeiculo.length - 1];
-          }
+        let ultimoChecklist = null;
+        if (checklistsDoVeiculo.length > 0) {
+          checklistsDoVeiculo.sort((a, b) => {
+            const dataA = new Date(a.criadoEm?.$date || a.criadoEm || a.data || 0);
+            const dataB = new Date(b.criadoEm?.$date || b.criadoEm || b.data || 0);
+            return dataA - dataB;
+          });
+          ultimoChecklist = checklistsDoVeiculo[checklistsDoVeiculo.length - 1];
         }
 
         if (ultimoChecklist) {
@@ -341,10 +348,14 @@ export function useChecklistFrota() {
       };
 
       const config = await getAuthHeaders();
-      await api.post('/checklist-frota', payload, config);
+      const res = await api.post('/checklist-frota', payload, config);
 
       dispararToast("Checklist salvo com sucesso! Novo registro gerado.");
       
+      // Atualiza o histórico localmente para sincronizar instantaneamente com o calendário
+      const novoRegistro = res.data?.id || res.data?._id ? res.data : { ...payload, id: res.data?.id || Date.now() };
+      setHistoricoChecklists((prev) => [...prev, novoRegistro]);
+
       setFormData(getInitialFormData());
       setItensInspecao(listaItensInspecao.reduce((acc, item) => ({ ...acc, [item.id]: 'ok' }), {}));
       setDanos({});
@@ -356,6 +367,20 @@ export function useChecklistFrota() {
       dispararToast("Falha ao salvar a vistoria: " + msg, "error");
     } finally {
       setSalvandoChecklist(false);
+    }
+  };
+
+  const handleExcluirChecklist = async (id) => {
+    try {
+      const config = await getAuthHeaders();
+      await api.delete(`/checklist-frota/${id}`, config);
+      setHistoricoChecklists((prev) => prev.filter((item) => (item.id || item._id) !== id));
+      dispararToast("Checklist excluído com sucesso!");
+    } catch (error) {
+      console.error("Erro ao excluir checklist:", error);
+      const msg = error.response?.data?.error || error.message;
+      dispararToast("Falha ao excluir o checklist: " + msg, "error");
+      throw error;
     }
   };
 
@@ -376,6 +401,7 @@ export function useChecklistFrota() {
 
   return {
     veiculos,
+    historicoChecklists,
     modalVeiculoAberto,
     setModalVeiculoAberto,
     salvandoVeiculo,
@@ -386,8 +412,11 @@ export function useChecklistFrota() {
     formData,
     setFormData,
     itensInspecao,
+    setItensInspecao,
     danos,
+    setDanos,
     acessorios,
+    setAcessorios,
     toast,
     handleSelecionarVeiculo,
     handleLimparTudo,
@@ -398,7 +427,10 @@ export function useChecklistFrota() {
     handleAcessorioChange,
     handleCadastrarVeiculo,
     handleSalvarChecklist,
+    handleExcluirChecklist,
     handleImprimir,
     handleLogout,
   };
 }
+
+export default useChecklistFrota;

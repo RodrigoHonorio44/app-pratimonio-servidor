@@ -28,6 +28,10 @@ export default function AgendaMotoristaPage() {
   const [itemParaExcluir, setItemParaExcluir] = useState(null);
   const [toast, setToast] = useState({ exibe: false, mensagem: '', tipo: 'sucesso' });
 
+  // Estados de Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 5;
+
   const mostrarToast = (mensagem, tipo = 'sucesso') => {
     setToast({ exibe: true, mensagem, tipo });
     setTimeout(() => {
@@ -43,6 +47,11 @@ export default function AgendaMotoristaPage() {
     }
   }, [buscarAgendaMotorista]);
 
+  // Reseta para a primeira página sempre que alterar os filtros de busca/data
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [modoFiltroData, dataSelecionada, termoAplicado]);
+
   const handleVoltarDashboard = () => {
     navigate('/dashboard');
   };
@@ -54,6 +63,15 @@ export default function AgendaMotoristaPage() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim();
+  };
+
+  const formatarNomeExibicao = (str) => {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map((palavra) => palavra.charAt(0).toUpperCase() + palavra.slice(1))
+      .join(' ');
   };
 
   // Executa a busca ao clicar no botão ou pressionar Enter
@@ -113,6 +131,11 @@ export default function AgendaMotoristaPage() {
     return new Date(dtA) - new Date(dtB);
   });
 
+  // Cálculo da Paginação
+  const totalPaginas = Math.ceil(tarefasOrdenadas.length / itensPorPagina) || 1;
+  const indiceInicial = (paginaAtual - 1) * itensPorPagina;
+  const tarefasPaginadas = tarefasOrdenadas.slice(indiceInicial, indiceInicial + itensPorPagina);
+
   const handleEditar = (tarefa) => {
     const id = tarefa._id?.$oid || tarefa._id || tarefa.id;
     navigate(`/agendamentos/editar/${id}`, { state: { tarefa } });
@@ -125,12 +148,12 @@ export default function AgendaMotoristaPage() {
     if (typeof excluirAgendamento === 'function') {
       const sucesso = await excluirAgendamento(id);
       if (sucesso !== false) {
-        mostrarToast('Agendamento excluído com sucesso!', 'sucesso');
+        mostrarToast('agendamento excluído com sucesso!', 'sucesso');
         if (typeof buscarAgendaMotorista === 'function') {
           buscarAgendaMotorista();
         }
       } else {
-        mostrarToast('Erro ao excluir o agendamento. Tente novamente.', 'erro');
+        mostrarToast('erro ao excluir o agendamento. tente novamente.', 'erro');
       }
     }
     setItemParaExcluir(null);
@@ -143,7 +166,7 @@ export default function AgendaMotoristaPage() {
       {/* Toast Flutuante */}
       {toast.exibe && (
         <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all transform duration-300 ${
+          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-xs font-semibold transition-all transform duration-300 ${
             toast.tipo === 'sucesso' ? 'bg-emerald-600' : 'bg-rose-600'
           }`}
         >
@@ -161,7 +184,7 @@ export default function AgendaMotoristaPage() {
       )}
 
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
-        <div className="w-full max-w-3xl mb-4 flex justify-between items-center">
+        <div className="w-full max-w-4xl mb-4 flex justify-between items-center">
           <button
             type="button"
             onClick={handleVoltarDashboard}
@@ -171,7 +194,7 @@ export default function AgendaMotoristaPage() {
           </button>
         </div>
 
-        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
           {/* Cabeçalho */}
           <div className="p-6 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100">
             <div className="flex items-center gap-4">
@@ -315,7 +338,7 @@ export default function AgendaMotoristaPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {tarefasOrdenadas.map((t) => {
+                {tarefasPaginadas.map((t) => {
                   const id = t._id?.$oid || t._id || t.id;
                   const dataFormatada = t.dataAgendamento
                     ? t.dataAgendamento.split('-').reverse().join('/')
@@ -390,7 +413,7 @@ export default function AgendaMotoristaPage() {
                             Motorista
                           </span>
                           <span className="font-bold text-slate-800">
-                            {t.motorista?.toLowerCase()}
+                            {formatarNomeExibicao(t.motorista)}
                           </span>
                         </div>
 
@@ -399,7 +422,7 @@ export default function AgendaMotoristaPage() {
                             Veículo
                           </span>
                           <span className="font-bold text-slate-800">
-                            {t.modelo?.toLowerCase()} ({t.placa?.toLowerCase()})
+                            {formatarNomeExibicao(t.modelo)} ({t.placa?.toUpperCase()})
                           </span>
                         </div>
                       </div>
@@ -408,12 +431,12 @@ export default function AgendaMotoristaPage() {
                       <div className="text-xs font-medium text-slate-600 bg-white p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                         <div>
                           <strong className="text-slate-500">De:</strong>{' '}
-                          {t.origem?.toLowerCase()}
+                          {formatarNomeExibicao(t.origem)}
                         </div>
                         <div className="hidden sm:block text-slate-300">→</div>
                         <div>
                           <strong className="text-slate-500">Para:</strong>{' '}
-                          {t.destino?.toLowerCase()}
+                          {formatarNomeExibicao(t.destino)}
                         </div>
                       </div>
 
@@ -427,6 +450,33 @@ export default function AgendaMotoristaPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Componente de Paginação */}
+            {totalPaginas > 1 && (
+              <div className="flex items-center justify-between pt-6 mt-4 border-t border-slate-100 text-xs font-semibold text-slate-500">
+                <span>
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={paginaAtual === 1}
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paginaAtual === totalPaginas}
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition"
+                  >
+                    Próxima
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -447,7 +497,7 @@ export default function AgendaMotoristaPage() {
               </strong>{' '}
               para o motorista{' '}
               <strong className="text-slate-800">
-                {itemParaExcluir.motorista?.toLowerCase()}
+                {formatarNomeExibicao(itemParaExcluir.motorista)}
               </strong>
               ?
             </p>
