@@ -1,23 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
-import { auth } from '../services/firebase';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import api from '../services/api';
 
 export function useMotoristas() {
   const [motoristas, setMotoristas] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Função auxiliar para aguardar e obter os cabeçalhos com Token JWT do Firebase
+  const getAuthHeaders = async () => {
+    const auth = getAuth();
+    let user = auth.currentUser;
+
+    if (!user) {
+      await new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+          user = u;
+          unsubscribe();
+          resolve();
+        });
+      });
+    }
+
+    if (user) {
+      const token = await user.getIdToken();
+      return { headers: { Authorization: `Bearer ${token}` } };
+    }
+    return {};
+  };
+
   const buscarMotoristas = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/motoristas', {
-        headers: {
-          'Authorization': `Bearer ${token || ''}`
-        }
-      });
-      const data = await response.json();
-      setMotoristas(Array.isArray(data) ? data : []);
+      const config = await getAuthHeaders();
+      const response = await api.get('/motoristas', config);
+      setMotoristas(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erro ao buscar motoristas:', error);
+      setMotoristas([]);
     } finally {
       setLoading(false);
     }
@@ -26,7 +45,7 @@ export function useMotoristas() {
   const salvarMotorista = async (dados) => {
     setLoading(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
+      const config = await getAuthHeaders();
 
       const payload = {
         ...dados,
@@ -35,16 +54,9 @@ export function useMotoristas() {
         telefone: dados.telefone ? String(dados.telefone).replace(/\D/g, '') : ''
       };
 
-      const response = await fetch('/api/motoristas', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || ''}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post('/motoristas', payload, config);
 
-      if (response.ok) {
+      if (response.status === 200 || response.status === 201) {
         await buscarMotoristas();
         return true;
       }
@@ -60,7 +72,7 @@ export function useMotoristas() {
   const atualizarMotorista = async (id, dados) => {
     setLoading(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
+      const config = await getAuthHeaders();
 
       const payload = {
         ...dados,
@@ -69,16 +81,9 @@ export function useMotoristas() {
         telefone: dados.telefone ? String(dados.telefone).replace(/\D/g, '') : ''
       };
 
-      const response = await fetch(`/api/motoristas/${id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || ''}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.put(`/motoristas/${id}`, payload, config);
 
-      if (response.ok) {
+      if (response.status === 200) {
         await buscarMotoristas();
         return true;
       }
@@ -94,16 +99,10 @@ export function useMotoristas() {
   const excluirMotorista = async (id) => {
     setLoading(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
+      const config = await getAuthHeaders();
+      const response = await api.delete(`/motoristas/${id}`, config);
 
-      const response = await fetch(`/api/motoristas/${id}`, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${token || ''}`
-        }
-      });
-
-      if (response.ok) {
+      if (response.status === 200 || response.status === 204) {
         await buscarMotoristas();
         return true;
       }
@@ -117,8 +116,24 @@ export function useMotoristas() {
   };
 
   useEffect(() => {
-    buscarMotoristas();
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        buscarMotoristas();
+      } else {
+        setMotoristas([]);
+      }
+    });
+
+    return () => unsubscribe();
   }, [buscarMotoristas]);
 
-  return { motoristas, loading, buscarMotoristas, salvarMotorista, atualizarMotorista, excluirMotorista };
+  return { 
+    motoristas, 
+    loading, 
+    buscarMotoristas, 
+    salvarMotorista, 
+    atualizarMotorista, 
+    excluirMotorista 
+  };
 }
