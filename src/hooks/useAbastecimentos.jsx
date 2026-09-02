@@ -61,7 +61,10 @@ export function useAbastecimentos() {
         ...dados,
         motorista: dados.motorista ? dados.motorista.toLowerCase().trim() : '',
         placa: dados.placa ? dados.placa.toLowerCase().trim() : '',
-        modelo: dados.modelo ? dados.modelo.toLowerCase().trim() : ''
+        modelo: dados.modelo ? dados.modelo.toLowerCase().trim() : '',
+        posto: dados.posto ? dados.posto.toLowerCase().trim() : '',
+        combustivel: dados.combustivel ? dados.combustivel.toLowerCase().trim() : '',
+        observacoes: dados.observacoes ? dados.observacoes.toLowerCase().trim() : ''
       };
 
       const res = await api.post('/abastecimentos', dadosNormalizados, config);
@@ -89,7 +92,10 @@ export function useAbastecimentos() {
         ...dados,
         motorista: dados.motorista ? dados.motorista.toLowerCase().trim() : '',
         placa: dados.placa ? dados.placa.toLowerCase().trim() : '',
-        modelo: dados.modelo ? dados.modelo.toLowerCase().trim() : ''
+        modelo: dados.modelo ? dados.modelo.toLowerCase().trim() : '',
+        posto: dados.posto ? dados.posto.toLowerCase().trim() : '',
+        combustivel: dados.combustivel ? dados.combustivel.toLowerCase().trim() : '',
+        observacoes: dados.observacoes ? dados.observacoes.toLowerCase().trim() : ''
       };
 
       const res = await api.put(`/abastecimentos/${id}`, dadosNormalizados, config);

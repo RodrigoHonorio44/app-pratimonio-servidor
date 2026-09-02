@@ -27,6 +27,14 @@ export default function GestaoAgendamentoPage() {
   };
 
   const [form, setForm] = useState(estadoInicial);
+  const [toast, setToast] = useState({ exibe: false, mensagem: '', tipo: 'sucesso' });
+
+  const mostrarToast = (mensagem, tipo = 'sucesso') => {
+    setToast({ exibe: true, mensagem, tipo });
+    setTimeout(() => {
+      setToast({ exibe: false, mensagem: '', tipo: 'sucesso' });
+    }, 3500);
+  };
 
   const handleSelectVeiculo = (e) => {
     const id = e.target.value;
@@ -39,8 +47,8 @@ export default function GestaoAgendamentoPage() {
       setForm((prev) => ({
         ...prev,
         veiculoId: id,
-        placa: veiculo.placa || '',
-        modelo: veiculo.modelo || ''
+        placa: (veiculo.placa || '').toLowerCase(),
+        modelo: (veiculo.modelo || '').toLowerCase()
       }));
     } else {
       setForm((prev) => ({ ...prev, veiculoId: '', placa: '', modelo: '' }));
@@ -57,16 +65,48 @@ export default function GestaoAgendamentoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const sucesso = await salvarAgendamento(form);
+
+    const dadosParaSalvar = {
+      ...form,
+      motorista: form.motorista.trim().toLowerCase(),
+      origem: form.origem.trim().toLowerCase(),
+      destino: form.destino.trim().toLowerCase(),
+      observacoes: form.observacoes.trim().toLowerCase()
+    };
+
+    const sucesso = await salvarAgendamento(dadosParaSalvar);
+
     if (sucesso) {
-      alert('agendamento salvo com sucesso!');
+      mostrarToast('Agendamento salvo com sucesso!', 'sucesso');
       setForm(estadoInicial);
+    } else {
+      mostrarToast('Erro ao realizar o agendamento. Tente novamente.', 'erro');
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc]">
+    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc] relative">
       <Header />
+
+      {/* Toast Flutuante */}
+      {toast.exibe && (
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all transform duration-300 ${
+            toast.tipo === 'sucesso' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}
+        >
+          {toast.tipo === 'sucesso' ? (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span>{toast.mensagem}</span>
+        </div>
+      )}
 
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
         {/* Link superior para voltar à Dashboard */}
@@ -81,7 +121,6 @@ export default function GestaoAgendamentoPage() {
         </div>
 
         <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-          
           {/* Cabeçalho */}
           <div className="p-6 pb-2 flex items-center justify-between border-b border-slate-100">
             <div className="flex items-center gap-4">
@@ -134,7 +173,7 @@ export default function GestaoAgendamentoPage() {
                   type="text"
                   placeholder="ex: joão da silva"
                   value={form.motorista}
-                  onChange={(e) => setForm({ ...form, motorista: e.target.value.toLowerCase() })}
+                  onChange={(e) => setForm({ ...form, motorista: e.target.value })}
                   required
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
                 />
@@ -177,11 +216,11 @@ export default function GestaoAgendamentoPage() {
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 >
                   <option value="entrega">entrega padrão (medicamentos)</option>
-<option value="entrega_urgente">entrega urgente (uso imediato)</option>
-<option value="transporte_pessoas">transporte de pessoas</option>
-<option value="coleta">coleta</option>
-<option value="manutencao">manutenção</option>
-<option value="servico_externo">serviço externo</option>
+                  <option value="entrega_urgente">entrega urgente (uso imediato)</option>
+                  <option value="transporte_pessoas">transporte de pessoas</option>
+                  <option value="coleta">coleta</option>
+                  <option value="manutencao">manutenção</option>
+                  <option value="servico_externo">serviço externo</option>
                 </select>
               </div>
 
@@ -221,7 +260,7 @@ export default function GestaoAgendamentoPage() {
                   type="text"
                   placeholder="ex: farmácia central"
                   value={form.origem}
-                  onChange={(e) => setForm({ ...form, origem: e.target.value.toLowerCase() })}
+                  onChange={(e) => setForm({ ...form, origem: e.target.value })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
                 />
               </div>
@@ -234,7 +273,7 @@ export default function GestaoAgendamentoPage() {
                   type="text"
                   placeholder="ex: UTI neonatal"
                   value={form.destino}
-                  onChange={(e) => setForm({ ...form, destino: e.target.value.toLowerCase() })}
+                  onChange={(e) => setForm({ ...form, destino: e.target.value })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
                 />
               </div>
@@ -248,7 +287,7 @@ export default function GestaoAgendamentoPage() {
                 rows="3"
                 placeholder="ex: manter controle de temperatura entre 2°C e 8°C..."
                 value={form.observacoes}
-                onChange={(e) => setForm({ ...form, observacoes: e.target.value.toLowerCase() })}
+                onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                 className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
               ></textarea>
             </div>

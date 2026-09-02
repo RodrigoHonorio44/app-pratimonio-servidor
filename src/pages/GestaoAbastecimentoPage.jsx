@@ -39,7 +39,7 @@ export default function GestaoAbastecimentoPage() {
   const [form, setForm] = useState(estadoInicial);
   const [editandoId, setEditandoId] = useState(null);
   const [toast, setToast] = useState({ exibe: false, mensagem: '', tipo: 'sucesso' });
-  
+
   // Estados de Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
@@ -106,8 +106,8 @@ export default function GestaoAbastecimentoPage() {
       setForm((prev) => ({
         ...prev,
         veiculoId: id,
-        placa: veiculo.placa || '',
-        modelo: veiculo.modelo || '',
+        placa: veiculo.placa ? veiculo.placa.toLowerCase() : '',
+        modelo: veiculo.modelo ? veiculo.modelo.toLowerCase() : '',
         kmAtual: kmReferencia
       }));
     } else {
@@ -142,12 +142,12 @@ export default function GestaoAbastecimentoPage() {
     setForm({
       id,
       veiculoId: item.veiculoId?.$oid || item.veiculoId || item.veiculo_id || '',
-      placa: item.placa || '',
-      modelo: item.modelo || '',
+      placa: item.placa ? item.placa.toLowerCase() : '',
+      modelo: item.modelo ? item.modelo.toLowerCase() : '',
       motorista: item.motorista ? item.motorista.toLowerCase() : '',
       dataAbastecimento: dataVal,
       kmAtual: item.kmAtual || '',
-      tipoCombustivel: item.tipoCombustivel || 'gasolina',
+      tipoCombustivel: item.tipoCombustivel ? item.tipoCombustivel.toLowerCase() : 'gasolina',
       litros: item.litros || '',
       valorTotal: item.valorTotal || '',
       tanqueCheio: item.tanqueCheio !== undefined ? item.tanqueCheio : true
@@ -160,17 +160,17 @@ export default function GestaoAbastecimentoPage() {
   const handleConfirmarExcluir = async () => {
     if (!itemExcluir) return;
     const id = itemExcluir._id?.$oid || itemExcluir._id || itemExcluir.id;
-    
+
     let sucesso = false;
     if (excluirAbastecimento) {
       sucesso = await excluirAbastecimento(id);
     }
 
     if (sucesso) {
-      mostrarToast('Abastecimento excluído com sucesso!', 'sucesso');
+      mostrarToast('abastecimento excluído com sucesso!', 'sucesso');
       if (editandoId === id) handleLimpar();
     } else {
-      mostrarToast('Erro ao excluir abastecimento.', 'erro');
+      mostrarToast('erro ao excluir abastecimento.', 'erro');
     }
     setItemExcluir(null);
   };
@@ -179,26 +179,34 @@ export default function GestaoAbastecimentoPage() {
     e.preventDefault();
 
     if (!form.motorista) {
-      mostrarToast('Por favor, selecione o motorista.', 'alerta');
+      mostrarToast('por favor, selecione o motorista.', 'alerta');
       return;
     }
+
+    const payloadNormalizado = {
+      ...form,
+      placa: form.placa ? form.placa.toLowerCase() : '',
+      modelo: form.modelo ? form.modelo.toLowerCase() : '',
+      motorista: form.motorista ? form.motorista.toLowerCase() : '',
+      tipoCombustivel: form.tipoCombustivel ? form.tipoCombustivel.toLowerCase() : 'gasolina'
+    };
 
     let sucesso = false;
 
     if (editandoId && atualizarAbastecimento) {
-      sucesso = await atualizarAbastecimento(editandoId, form);
+      sucesso = await atualizarAbastecimento(editandoId, payloadNormalizado);
     } else {
-      sucesso = await salvarAbastecimento(form);
+      sucesso = await salvarAbastecimento(payloadNormalizado);
     }
 
     if (sucesso) {
       mostrarToast(
-        editandoId ? 'Abastecimento atualizado com sucesso!' : 'Abastecimento salvo com sucesso!',
+        editandoId ? 'abastecimento atualizado com sucesso!' : 'abastecimento salvo com sucesso!',
         'sucesso'
       );
       handleLimpar();
     } else {
-      mostrarToast('Erro ao processar solicitação.', 'erro');
+      mostrarToast('erro ao processar solicitação.', 'erro');
     }
   };
 
@@ -258,7 +266,9 @@ export default function GestaoAbastecimentoPage() {
             </h3>
             <p className="text-sm text-slate-600 mb-6">
               Deseja realmente remover o registro de abastecimento do veículo{' '}
-              <span className="font-bold text-slate-800">{itemExcluir.modelo?.toUpperCase()} - {itemExcluir.placa?.toUpperCase()}</span>?
+              <span className="font-bold text-slate-800">
+                {formatarNomeExibicao(itemExcluir.modelo)} - {itemExcluir.placa?.toUpperCase()}
+              </span>?
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -338,7 +348,7 @@ export default function GestaoAbastecimentoPage() {
                   const id = v._id?.$oid || v._id || v.id;
                   return (
                     <option key={id} value={id}>
-                      {v.marca?.toUpperCase()} {v.modelo?.toUpperCase()} — PLACA: {v.placa?.toUpperCase()}
+                      {formatarNomeExibicao(v.marca)} {formatarNomeExibicao(v.modelo)} — PLACA: {v.placa?.toUpperCase()}
                     </option>
                   );
                 })}
@@ -406,7 +416,7 @@ export default function GestaoAbastecimentoPage() {
                 </label>
                 <select
                   value={form.tipoCombustivel}
-                  onChange={(e) => setForm({ ...form, tipoCombustivel: e.target.value })}
+                  onChange={(e) => setForm({ ...form, tipoCombustivel: e.target.value.toLowerCase() })}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 >
                   <option value="gasolina">Gasolina</option>
@@ -530,7 +540,7 @@ export default function GestaoAbastecimentoPage() {
                           {formatarDataExibicao(item.dataAbastecimento || item.criadoEm || item.data)}
                         </td>
                         <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800 uppercase">{item.modelo || '-'}</div>
+                          <div className="font-bold text-slate-800 uppercase">{formatarNomeExibicao(item.modelo) || '-'}</div>
                           <div className="text-[10px] font-bold text-blue-600 uppercase">{item.placa || '-'}</div>
                         </td>
                         <td className="py-3.5 px-4 font-semibold text-slate-800">

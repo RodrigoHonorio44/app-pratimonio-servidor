@@ -13,7 +13,18 @@ export default function CadastrarMotoristaPage() {
   const [telefone, setTelefone] = useState('');
   const [idEditando, setIdEditando] = useState(null);
 
+  // Estados para gerenciar Toast e Modal de Confirmação
+  const [toast, setToast] = useState({ exibe: false, mensagem: '', tipo: 'sucesso' });
+  const [confirmModal, setConfirmModal] = useState({ exibe: false, id: null, nome: '' });
+
   const listaMotoristas = Array.isArray(motoristas) ? motoristas : [];
+
+  const mostrarToast = (mensagem, tipo = 'sucesso') => {
+    setToast({ exibe: true, mensagem, tipo });
+    setTimeout(() => {
+      setToast({ exibe: false, mensagem: '', tipo: 'sucesso' });
+    }, 3500);
+  };
 
   const aplicarMascaraTelefone = (valor) => {
     const apenasNumeros = String(valor || '').replace(/\D/g, '').slice(0, 11);
@@ -59,15 +70,25 @@ export default function CadastrarMotoristaPage() {
     setTelefone(m.telefone ? aplicarMascaraTelefone(m.telefone) : '');
   };
 
-  const handleExcluir = async (id, nomeMotorista) => {
-    const nomeFormatado = formatarNomeExibicao(nomeMotorista);
-    if (window.confirm(`Tem certeza que deseja excluir o motorista ${nomeFormatado}?`)) {
-      const sucesso = await excluirMotorista(id);
-      if (sucesso) {
-        if (idEditando === id) resetFormulario();
-      } else {
-        alert('Erro ao excluir motorista.');
-      }
+  // Abre o modal customizado em vez do window.confirm
+  const solicitarExclusao = (id, nomeMotorista) => {
+    setConfirmModal({
+      exibe: true,
+      id,
+      nome: formatarNomeExibicao(nomeMotorista)
+    });
+  };
+
+  const confirmarExclusao = async () => {
+    const { id } = confirmModal;
+    setConfirmModal({ exibe: false, id: null, nome: '' });
+
+    const sucesso = await excluirMotorista(id);
+    if (sucesso) {
+      mostrarToast('Motorista excluído com sucesso!', 'sucesso');
+      if (idEditando === id) resetFormulario();
+    } else {
+      mostrarToast('Erro ao excluir motorista.', 'erro');
     }
   };
 
@@ -77,7 +98,7 @@ export default function CadastrarMotoristaPage() {
 
     const digitosTelefone = telefone.replace(/\D/g, '');
     if (digitosTelefone && digitosTelefone.length !== 11) {
-      alert('O telefone deve conter exatamente 11 dígitos no padrão de celular com DDD: (XX) XXXXX-XXXX');
+      mostrarToast('O telefone deve conter exatamente 11 dígitos no padrão (XX) XXXXX-XXXX', 'erro');
       return;
     }
 
@@ -90,22 +111,75 @@ export default function CadastrarMotoristaPage() {
     let sucesso = false;
     if (idEditando) {
       sucesso = await atualizarMotorista(idEditando, dados);
-      if (sucesso) alert('Motorista atualizado com sucesso!');
+      if (sucesso) mostrarToast('Motorista atualizado com sucesso!', 'sucesso');
     } else {
       sucesso = await salvarMotorista(dados);
-      if (sucesso) alert('Motorista cadastrado com sucesso!');
+      if (sucesso) mostrarToast('Motorista cadastrado com sucesso!', 'sucesso');
     }
 
     if (sucesso) {
       resetFormulario();
     } else {
-      alert('Erro ao processar solicitação.');
+      mostrarToast('Erro ao processar solicitação.', 'erro');
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc]">
+    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc] relative">
       <Header />
+
+      {/* Componente Toast Flutuante */}
+      {toast.exibe && (
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all transform duration-300 ${
+            toast.tipo === 'sucesso' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}
+        >
+          {toast.tipo === 'sucesso' ? (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span>{toast.mensagem}</span>
+        </div>
+      )}
+
+      {/* Modal Customizado de Confirmação de Exclusão */}
+      {confirmModal.exibe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in duration-200">
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-slate-800 mb-1">Confirmar Exclusão</h3>
+            <p className="text-xs text-slate-500 mb-6">
+              Deseja realmente remover o motorista <strong className="text-slate-700">{confirmModal.nome}</strong>?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal({ exibe: false, id: null, nome: '' })}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarExclusao}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-500/20"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
         <div className="w-full max-w-2xl mb-4 flex justify-start">
@@ -247,7 +321,7 @@ export default function CadastrarMotoristaPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleExcluir(id, m.nome)}
+                          onClick={() => solicitarExclusao(id, m.nome)}
                           title="Excluir motorista"
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                         >

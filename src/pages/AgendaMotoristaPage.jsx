@@ -26,6 +26,14 @@ export default function AgendaMotoristaPage() {
   const [inputBusca, setInputBusca] = useState('');
   const [termoAplicado, setTermoAplicado] = useState('');
   const [itemParaExcluir, setItemParaExcluir] = useState(null);
+  const [toast, setToast] = useState({ exibe: false, mensagem: '', tipo: 'sucesso' });
+
+  const mostrarToast = (mensagem, tipo = 'sucesso') => {
+    setToast({ exibe: true, mensagem, tipo });
+    setTimeout(() => {
+      setToast({ exibe: false, mensagem: '', tipo: 'sucesso' });
+    }, 3500);
+  };
 
   const listaTarefas = Array.isArray(tarefas) ? tarefas : [];
 
@@ -115,17 +123,42 @@ export default function AgendaMotoristaPage() {
     const id = itemParaExcluir._id?.$oid || itemParaExcluir._id || itemParaExcluir.id;
 
     if (typeof excluirAgendamento === 'function') {
-      await excluirAgendamento(id);
-      if (typeof buscarAgendaMotorista === 'function') {
-        buscarAgendaMotorista();
+      const sucesso = await excluirAgendamento(id);
+      if (sucesso !== false) {
+        mostrarToast('Agendamento excluído com sucesso!', 'sucesso');
+        if (typeof buscarAgendaMotorista === 'function') {
+          buscarAgendaMotorista();
+        }
+      } else {
+        mostrarToast('Erro ao excluir o agendamento. Tente novamente.', 'erro');
       }
     }
     setItemParaExcluir(null);
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc]">
+    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc] relative">
       <Header />
+
+      {/* Toast Flutuante */}
+      {toast.exibe && (
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all transform duration-300 ${
+            toast.tipo === 'sucesso' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}
+        >
+          {toast.tipo === 'sucesso' ? (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span>{toast.mensagem}</span>
+        </div>
+      )}
 
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
         <div className="w-full max-w-3xl mb-4 flex justify-between items-center">
@@ -247,8 +280,8 @@ export default function AgendaMotoristaPage() {
                     type="text"
                     placeholder="Ex: Coleta, Hospital, Spin..."
                     value={inputBusca}
-                    onChange={(e) => setInputBusca(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:outline-none focus:border-blue-500"
+                    onChange={(e) => setInputBusca(e.target.value.toLowerCase())}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:outline-none focus:border-blue-500 placeholder:text-slate-400"
                   />
                   <button
                     type="submit"
@@ -294,19 +327,22 @@ export default function AgendaMotoristaPage() {
 
                   if (tipoLower === 'entrega_urgente') {
                     badgeClass = 'bg-red-100 text-red-700 border-red-200';
-                    tipoExibicao = 'Entrega Urgente';
+                    tipoExibicao = 'entrega urgente';
                   } else if (tipoLower === 'termolabeis') {
                     badgeClass = 'bg-cyan-100 text-cyan-700 border-cyan-200';
-                    tipoExibicao = 'Carga Termolábil';
+                    tipoExibicao = 'carga termolábil';
                   } else if (tipoLower === 'coleta') {
                     badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                    tipoExibicao = 'Coleta';
+                    tipoExibicao = 'coleta';
                   } else if (tipoLower === 'manutencao') {
                     badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
-                    tipoExibicao = 'Manutenção';
+                    tipoExibicao = 'manutenção';
                   } else if (tipoLower === 'servico_externo') {
                     badgeClass = 'bg-purple-100 text-purple-700 border-purple-200';
-                    tipoExibicao = 'Serviço Externo';
+                    tipoExibicao = 'serviço externo';
+                  } else if (tipoLower === 'entrega') {
+                    badgeClass = 'bg-blue-100 text-blue-700 border-blue-200';
+                    tipoExibicao = 'entrega padrão';
                   }
 
                   return (
@@ -317,7 +353,7 @@ export default function AgendaMotoristaPage() {
                       {/* Topo do Card */}
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`font-bold uppercase text-xs px-3 py-1 rounded-full border ${badgeClass}`}>
+                          <span className={`font-bold lowercase text-xs px-3 py-1 rounded-full border ${badgeClass}`}>
                             {tipoExibicao}
                           </span>
                           <span className="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-md border border-slate-200">
