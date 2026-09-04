@@ -12,7 +12,30 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
       return;
     }
 
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    // Tratamento para exibir a data e hora originais da vistoria ou a atual do sistema
+    const dataBruta = formData.created_at || formData.data;
+    let dataFormatada = '';
+    
+    if (dataBruta) {
+      const dataObj = new Date(dataBruta);
+      if (!isNaN(dataObj)) {
+        const dia = String(dataObj.getDate()).padStart(2, '0');
+        const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+        const ano = dataObj.getFullYear();
+        const hora = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        dataFormatada = `${dia}/${mes}/${ano} às ${hora}`;
+      }
+    }
+    
+    if (!dataFormatada) {
+      const dataAtualObj = new Date();
+      const dia = String(dataAtualObj.getDate()).padStart(2, '0');
+      const mes = String(dataAtualObj.getMonth() + 1).padStart(2, '0');
+      const ano = dataAtualObj.getFullYear();
+      const hora = dataAtualObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      dataFormatada = `${dia}/${mes}/${ano} às ${hora}`;
+    }
+
     const baseUrl = window.location.origin;
 
     let linhasAcessoriosHtml = '';
@@ -159,7 +182,7 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
 
                     <div class="header">
                         <h1>Checklist Veicular e Relatório de Frota</h1>
-                        <p>Data da Inspeção: ${dataAtual} • Rodhon System</p>
+                        <p>Data e Hora da Inspeção: ${dataFormatada} • Rodhon System</p>
                     </div>
 
                     <div class="section-title">1. Identificação do Veículo e Condutor</div>
@@ -168,21 +191,21 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
                             <th style="width: 12%;">Placa</th>
                             <td style="width: 21%;">${formData.placa ? formData.placa.toUpperCase() : ''}</td>
                             <th style="width: 12%;">Modelo</th>
-                            <td style="width: 22%;">${formData.modelo ? formData.modelo.toUpperCase() : ''}</td>
+                            <td style="width: 22%;">${formData.modelo ? formData.modelo.toLowerCase() : ''}</td>
                             <th style="width: 10%;">Ano</th>
-                            <td style="width: 23%;">${formData.ano ? formData.ano.toUpperCase() : ''}</td>
+                            <td style="width: 23%;">${formData.ano ? formData.ano.toLowerCase() : ''}</td>
                         </tr>
                         <tr>
                             <th>Cor</th>
-                            <td>${formData.cor ? formData.cor.toUpperCase() : ''}</td>
+                            <td>${formData.cor ? formData.cor.toLowerCase() : ''}</td>
                             <th>Condutor</th>
-                            <td>${formData.condutor ? formData.condutor.toUpperCase() : ''}</td>
+                            <td>${formData.condutor ? formData.condutor.toLowerCase() : ''}</td>
                             <th>KM Atual</th>
                             <td>${formData.km || ''}</td>
                         </tr>
                         <tr>
                             <th>Combustível</th>
-                            <td>${formData.combustivel || ''}</td>
+                            <td>${formData.combustivel ? formData.combustivel.toLowerCase() : ''}</td>
                             <th>CRLV / Exercício</th>
                             <td colspan="3">SIM (${formData.exercicio || 'N/I'})</td>
                         </tr>
@@ -192,11 +215,11 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
                     <table class="table-dados" style="margin-bottom: 4px;">
                         <tr>
                             <th style="width: 16%;">Pneu Dianteiro</th>
-                            <td style="width: 17%;">${(formData.pneuDianteiro || 'BOM').toUpperCase()}</td>
+                            <td style="width: 17%;">${(formData.pneuDianteiro || 'bom').toLowerCase()}</td>
                             <th style="width: 16%;">Pneu Traseiro</th>
-                            <td style="width: 17%;">${(formData.pneuTraseiro || 'BOM').toUpperCase()}</td>
+                            <td style="width: 17%;">${(formData.pneuTraseiro || 'bom').toLowerCase()}</td>
                             <th style="width: 16%;">Pneu Estepe</th>
-                            <td style="width: 18%;">${(formData.pneuEstepe || 'BOM').toUpperCase()}</td>
+                            <td style="width: 18%;">${(formData.pneuEstepe || 'bom').toLowerCase()}</td>
                         </tr>
                     </table>
 
@@ -230,7 +253,7 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
 
                     <div class="section-title">4. Observações e Avarias Identificadas</div>
                     <div style="border: 1px solid #cbd5e1; padding: 5px; min-height: 25px; font-size: 8.5px; margin-bottom: 6px; background: #f8fafc; font-weight: bold;">
-                        ${formData.obs ? formData.obs.toUpperCase() : 'NENHUMA OBSERVAÇÃO OU AVARIA REGISTRADA.'}
+                        ${formData.obs ? formData.obs.toLowerCase() : 'nenhuma observação ou avaria registrada.'}
                     </div>
 
                     <div class="assinaturas">
@@ -241,7 +264,7 @@ export default function ImpressaoChecklistFrota({ formData = {}, danos = {}, ace
                         </div>
                         <div class="campo-assinatura">
                             <div class="linha"></div>
-                            <p style="font-weight: bold; text-transform: uppercase; font-size: 7.5px; margin: 0;">${formData.condutor ? formData.condutor.toUpperCase() : 'CONDUTOR'}</p>
+                            <p style="font-weight: bold; font-size: 7.5px; margin: 0;">${formData.condutor ? formData.condutor.toLowerCase() : 'condutor'}</p>
                             <p style="font-size: 6.5px; color: #64748b; margin: 1px 0 0 0;">Motorista Responsável</p>
                         </div>
                     </div>

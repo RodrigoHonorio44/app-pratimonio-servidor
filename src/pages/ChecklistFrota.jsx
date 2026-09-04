@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { 
   Printer, Car, Plus, X, Save, CheckCircle2, ArrowLeft, 
-  LogOut, User, RotateCcw, Calendar as CalendarIcon, 
-  ChevronLeft, ChevronRight, Trash2, FileText, ChevronDown, ChevronUp 
+  LogOut, User, RotateCcw, FileText, Trash2 
 } from 'lucide-react';
 import { useChecklistFrota, listaItensInspecao, listaAcessorios, posicoesVistoria } from '../hooks/useChecklistFrota';
 import ImpressaoChecklistFrota from '../components/ImpressaoChecklistFrota';
+import CalendarioChecklists from '../components/CalendarioChecklists';
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 
@@ -82,17 +82,16 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
     if (typeof handleLimparCompleto === 'function') {
       handleLimparCompleto();
     }
-    toast.success("campos limpos com sucesso!");
+    toast.success("Campos limpos com sucesso!");
   };
 
   const confirmarExclusao = (id) => {
     if (window.confirm("Deseja realmente excluir este checklist permanentemente?")) {
       if (typeof handleExcluirChecklist === 'function') {
         handleExcluirChecklist(id);
-        // Atualiza o modal removendo o item excluído
-        setListaChecklistsDoDiaModal((prev) => prev.filter(c => (c.id || c._id) !== id));
+        setListaChecklistsDoDiaModal((prev) => prev ? prev.filter(c => (c.id || c._id) !== id) : null);
       } else {
-        toast.error("função de exclusão não configurada no hook.");
+        toast.error("Função de exclusão não configurada no hook.");
       }
     }
   };
@@ -146,117 +145,23 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
           </button>
         </div>
 
-        {/* CALENDÁRIO COMPACTO / EXPANSÍVEL */}
-        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 no-print transition-all duration-300 overflow-hidden">
-          
-          <div 
-            onClick={() => setCalendarioExpandido(!calendarioExpandido)}
-            className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition select-none"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-100 text-blue-700 p-2 rounded-xl">
-                <CalendarIcon size={18} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-black uppercase text-slate-800">Calendário de Histórico</h3>
-                  <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100">
-                    {totalChecklistsMes} registro(s) em {nomesMeses[mesAtual]}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  {calendarioExpandido ? 'Clique para recolher a exibição.' : 'Clique aqui para expandir o calendário e ver os dias gravados.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {calendarioExpandido && (
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={(e) => navegarMes(e, -1)}
-                    className="p-1 hover:bg-white rounded-lg text-slate-600 transition"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <span className="text-[11px] font-black uppercase text-slate-700 px-2 min-w-[100px] text-center">
-                    {nomesMeses[mesAtual]} {anoAtual}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => navegarMes(e, 1)}
-                    className="p-1 hover:bg-white rounded-lg text-slate-600 transition"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-
-              <div className="bg-slate-100 p-2 rounded-xl text-slate-600">
-                {calendarioExpandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-            </div>
-          </div>
-
-          {calendarioExpandido && (
-            <div className="px-6 pb-6 pt-2 border-t border-slate-100 space-y-3">
-              <p className="text-[11px] text-slate-500">
-                Dias com bolinha azul possuem vistorias. Clique no dia para selecionar qual vistoria deseja abrir.
-              </p>
-
-              <div className="grid grid-cols-7 gap-1.5 text-center">
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
-                  <div key={dia} className="text-[10px] font-black uppercase text-slate-400 py-1">
-                    {dia}
-                  </div>
-                ))}
-
-                {Array.from({ length: primeiroDiaMes }).map((_, index) => (
-                  <div key={`empty-${index}`} className="h-10 bg-slate-50/40 rounded-lg" />
-                ))}
-
-                {Array.from({ length: totalDiasMes }).map((_, index) => {
-                  const dia = index + 1;
-                  const checklistsDoDia = obterChecklistsDoDia(dia);
-                  const possuiChecklist = checklistsDoDia.length > 0;
-
-                  return (
-                    <div
-                      key={dia}
-                      className={`h-11 border rounded-xl p-1 flex flex-col justify-between items-center transition ${
-                        possuiChecklist
-                          ? 'bg-blue-50/70 border-blue-300 hover:bg-blue-100 cursor-pointer shadow-xs'
-                          : 'bg-white border-slate-100 text-slate-600'
-                      }`}
-                      onClick={() => {
-                        if (possuiChecklist) {
-                          // PASSA O ARRAY COMPLETO DO DIA PARA O MODAL
-                          setListaChecklistsDoDiaModal(checklistsDoDia);
-                        }
-                      }}
-                    >
-                      <span className="text-xs font-bold text-slate-700">{dia}</span>
-                      
-                      {possuiChecklist && (
-                        <div className="flex items-center gap-0.5 mb-0.5">
-                          <span className="w-2 h-2 bg-blue-600 rounded-full inline-block" title={`${checklistsDoDia.length} vistoria(s)`} />
-                          {checklistsDoDia.length > 1 && (
-                            <span className="text-[8px] font-black text-blue-800">x{checklistsDoDia.length}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* CALENDÁRIO SEPARADO EM COMPONENTE */}
+        <CalendarioChecklists 
+          calendarioExpandido={calendarioExpandido}
+          setCalendarioExpandido={setCalendarioExpandido}
+          anoAtual={anoAtual}
+          mesAtual={mesAtual}
+          nomesMeses={nomesMeses}
+          totalChecklistsMes={totalChecklistsMes}
+          navegarMes={navegarMes}
+          primeiroDiaMes={primeiroDiaMes}
+          totalDiasMes={totalDiasMes}
+          obterChecklistsDoDia={obterChecklistsDoDia}
+          setListaChecklistsDoDiaModal={setListaChecklistsDoDiaModal}
+        />
 
         {/* CONTAINER DO FORMULÁRIO PRINCIPAL */}
         <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 print-container space-y-6">
-          
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 border border-slate-200 p-4 rounded-xl gap-4 no-print">
             <div className="flex items-center gap-3">
               <div className="bg-blue-600 text-white p-2.5 rounded-xl">
@@ -277,7 +182,6 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
           </div>
 
           <form onSubmit={handleSalvarChecklist} className="space-y-6">
-            
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
               {/* INFORMAÇÕES VEÍCULO */}
@@ -562,7 +466,7 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
         </div>
       </main>
 
-      {/* MODAL SUPORTANDO MÚLTIPLOS CHECKLISTS NO MESMO DIA */}
+      {/* MODAL DE VISTORIAS DO DIA */}
       {listaChecklistsDoDiaModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4 max-h-[85vh] flex flex-col">
@@ -627,6 +531,16 @@ export default function ChecklistFrota({ onVoltarDashboard }) {
                   </div>
                 ))
               )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setListaChecklistsDoDiaModal(null)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
