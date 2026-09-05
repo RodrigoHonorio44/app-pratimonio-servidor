@@ -5,6 +5,9 @@ import { useMotoristas } from '../hooks/useMotoristas';
 import { useAbastecimentos } from '../hooks/useAbastecimentos';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import GastosEconsumo from '../components/GastosEconsumo';
+import HistoricoAbastecimento from '../components/HistoricoAbastecimento';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Fuel, Plus, BarChart2, History } from 'lucide-react';
 
 export default function GestaoAbastecimentoPage() {
   const navigate = useNavigate();
@@ -15,6 +18,15 @@ export default function GestaoAbastecimentoPage() {
   const listaVeiculos = Array.isArray(veiculos) ? veiculos : [];
   const listaMotoristas = Array.isArray(motoristas) ? motoristas : [];
   const listaAbastecimentos = Array.isArray(abastecimentos) ? abastecimentos : [];
+
+  // Aba ativa para visualização Mobile ("lancar", "relatorios", "historico")
+  const [abaAtivaMobile, setAbaAtivaMobile] = useState('lancar');
+
+  // Estados do Calendário e Relatório
+  const [dataSelecionadaCalendario, setDataSelecionadaCalendario] = useState(new Date());
+  const [calendarioExpandido, setCalendarioExpandido] = useState(false);
+  const [listaAbastecimentosDoDiaModal, setListaAbastecimentosDoDiaModal] = useState(null);
+  const [veiculoFiltroRelatorio, setVeiculoFiltroRelatorio] = useState('');
 
   const obterDataHoraAtual = () => {
     const agora = new Date();
@@ -75,6 +87,42 @@ export default function GestaoAbastecimentoPage() {
       minute: '2-digit'
     });
   };
+
+  // Lógica do Calendário de Abastecimentos
+  const anoAtual = dataSelecionadaCalendario.getFullYear();
+  const mesAtual = dataSelecionadaCalendario.getMonth();
+  const primeiroDiaMes = new Date(anoAtual, mesAtual, 1).getDay();
+  const totalDiasMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+  const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  const navegarMes = (e, direcao) => {
+    e.stopPropagation();
+    setDataSelecionadaCalendario(new Date(anoAtual, mesAtual + direcao, 1));
+  };
+
+  const obterAbastecimentosDoDia = (dia) => {
+    const dataFormatada = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    return listaAbastecimentos.filter((item) => {
+      const dataItem = (item.dataAbastecimento || item.criadoEm || item.data || '').split('T')[0];
+      return dataItem === dataFormatada;
+    });
+  };
+
+  const totalAbastecimentosMes = listaAbastecimentos.filter((item) => {
+    const dataItem = new Date(item.dataAbastecimento || item.criadoEm || item.data);
+    return dataItem.getFullYear() === anoAtual && dataItem.getMonth() === mesAtual;
+  }).length;
+
+  // Cálculos do Relatório de Consumo (KM/L e Gastos)
+  const abastecimentosFiltradosRelatorio = veiculoFiltroRelatorio 
+    ? listaAbastecimentos.filter(a => {
+        const aId = a.veiculoId?.$oid || a.veiculoId || a.veiculo_id;
+        return String(aId) === String(veiculoFiltroRelatorio);
+      })
+    : listaAbastecimentos;
+
+  const custoTotalGasto = abastecimentosFiltradosRelatorio.reduce((acc, curr) => acc + Number(curr.valorTotal || curr.valor || 0), 0);
+  const litrosTotaisAbastecidos = abastecimentosFiltradosRelatorio.reduce((acc, curr) => acc + Number(curr.litros || 0), 0);
 
   const handleSelectVeiculo = (e) => {
     const id = e.target.value;
@@ -154,6 +202,7 @@ export default function GestaoAbastecimentoPage() {
     });
 
     setEditandoId(id);
+    setAbaAtivaMobile('lancar');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -167,10 +216,10 @@ export default function GestaoAbastecimentoPage() {
     }
 
     if (sucesso) {
-      mostrarToast('abastecimento excluído com sucesso!', 'sucesso');
+      mostrarToast('Abastecimento excluído com sucesso!', 'sucesso');
       if (editandoId === id) handleLimpar();
     } else {
-      mostrarToast('erro ao excluir abastecimento.', 'erro');
+      mostrarToast('Erro ao excluir abastecimento.', 'erro');
     }
     setItemExcluir(null);
   };
@@ -179,7 +228,7 @@ export default function GestaoAbastecimentoPage() {
     e.preventDefault();
 
     if (!form.motorista) {
-      mostrarToast('por favor, selecione o motorista.', 'alerta');
+      mostrarToast('Por favor, selecione o motorista.', 'alerta');
       return;
     }
 
@@ -201,12 +250,13 @@ export default function GestaoAbastecimentoPage() {
 
     if (sucesso) {
       mostrarToast(
-        editandoId ? 'abastecimento atualizado com sucesso!' : 'abastecimento salvo com sucesso!',
+        editandoId ? 'Abastecimento atualizado com sucesso!' : 'Abastecimento salvo com sucesso!',
         'sucesso'
       );
       handleLimpar();
+      setAbaAtivaMobile('historico');
     } else {
-      mostrarToast('erro ao processar solicitação.', 'erro');
+      mostrarToast('Erro ao processar solicitação.', 'erro');
     }
   };
 
@@ -222,7 +272,7 @@ export default function GestaoAbastecimentoPage() {
   const abastecimentosPaginados = historicoOrdenado.slice(indiceInicial, indiceInicial + itensPorPagina);
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc] relative">
+    <div className="min-h-screen flex flex-col justify-between bg-[#f8fafc] relative pb-20 md:pb-0">
       <Header />
 
       {/* Toast Notification */}
@@ -290,8 +340,49 @@ export default function GestaoAbastecimentoPage() {
         </div>
       )}
 
-      <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center gap-8">
-        <div className="w-full max-w-4xl flex justify-start">
+      {/* Modal Abastecimentos do Dia */}
+      {listaAbastecimentosDoDiaModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-sm uppercase">
+                Abastecimentos do Dia ({listaAbastecimentosDoDiaModal.length})
+              </h3>
+              <button onClick={() => setListaAbastecimentosDoDiaModal(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {listaAbastecimentosDoDiaModal.map((item, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-bold text-blue-900 block uppercase">{formatarNomeExibicao(item.modelo) || item.placa}</span>
+                    <span className="text-slate-500">Motorista: {formatarNomeExibicao(item.motorista)} | KM: {item.kmAtual}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-slate-800 block">{item.litros} L</span>
+                    <span className="text-emerald-600 font-bold">R$ {Number(item.valorTotal || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setListaAbastecimentosDoDiaModal(null)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-grow container mx-auto px-4 py-6 flex flex-col items-center gap-6">
+        <div className="w-full max-w-7xl flex justify-between items-center">
           <button
             type="button"
             onClick={handleVoltarDashboard}
@@ -301,63 +392,101 @@ export default function GestaoAbastecimentoPage() {
           </button>
         </div>
 
-        {/* Form Container */}
-        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-          <div className="p-6 pb-2 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-md text-white">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11C16.17 7 15.5 7.9 15.5 9c0 1.22.8 2.25 1.91 2.61l-.91 5.91c-.06.39.07.78.34 1.06.27.28.66.42 1.05.38l.11-.01c.71-.09 1.25-.69 1.25-1.41V11c1.1 0 2-.9 2-2 0-.55-.22-1.05-.58-1.41zM18.5 9.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM12 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 10H5V8h7v5z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-800 uppercase tracking-wide">
-                  {editandoId ? 'Editar Abastecimento' : 'Lançamento de Abastecimento'}
-                </h1>
-                <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-                  Registro de Consumo e Controle da Frota
-                </p>
+        {/* NAVEGAÇÃO / ABAS EXCLUSIVAS PARA MOBILE */}
+        <div className="w-full max-w-7xl flex md:hidden bg-slate-200/70 p-1 rounded-2xl gap-1">
+          <button
+            type="button"
+            onClick={() => setAbaAtivaMobile('lancar')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+              abaAtivaMobile === 'lancar'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Plus size={15} />
+            <span>Lançar</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setAbaAtivaMobile('relatorios')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+              abaAtivaMobile === 'relatorios'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BarChart2 size={15} />
+            <span>Relatórios</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtivaMobile('historico')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+              abaAtivaMobile === 'historico'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <History size={15} />
+            <span>Histórico</span>
+          </button>
+        </div>
+
+        {/* ESTRUTURA PRINCIPAL EM DUAS COLUNAS (DESKTOP) / ABAS (MOBILE) */}
+        <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+          
+          {/* COLUNA ESQUERDA: Formulário de Lançamento */}
+          <div className={`md:col-span-5 w-full bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden ${
+            abaAtivaMobile === 'lancar' ? 'block' : 'hidden md:block'
+          }`}>
+            <div className="p-6 pb-2 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-md text-white">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11C16.17 7 15.5 7.9 15.5 9c0 1.22.8 2.25 1.91 2.61l-.91 5.91c-.06.39.07.78.34 1.06.27.28.66.42 1.05.38l.11-.01c.71-.09 1.25-.69 1.25-1.41V11c1.1 0 2-.9 2-2 0-.55-.22-1.05-.58-1.41zM18.5 9.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM12 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 10H5V8h7v5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-base font-black text-slate-800 uppercase tracking-wide">
+                    {editandoId ? 'Editar Abastecimento' : 'Novo Abastecimento'}
+                  </h1>
+                  <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
+                    Controle de Frota
+                  </p>
+                </div>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleVoltarDashboard}
-              className="px-4 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition border border-slate-200 flex items-center gap-1"
-            >
-              ✕ Fechar
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            <div>
-              <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
-                Selecione o Veículo <span className="text-blue-600">*</span>
-              </label>
-              <select
-                value={form.veiculoId}
-                onChange={handleSelectVeiculo}
-                required
-                disabled={loadingVeiculos}
-                className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              >
-                <option value="">
-                  {loadingVeiculos ? 'Carregando veículos...' : 'Escolha um veículo...'}
-                </option>
-                {listaVeiculos.map((v) => {
-                  const id = v._id?.$oid || v._id || v.id;
-                  return (
-                    <option key={id} value={id}>
-                      {formatarNomeExibicao(v.marca)} {formatarNomeExibicao(v.modelo)} — PLACA: {v.placa?.toUpperCase()}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
+                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
+                  Selecione o Veículo <span className="text-blue-600">*</span>
+                </label>
+                <select
+                  value={form.veiculoId}
+                  onChange={handleSelectVeiculo}
+                  required
+                  disabled={loadingVeiculos}
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                >
+                  <option value="">
+                    {loadingVeiculos ? 'Carregando veículos...' : 'Escolha um veículo...'}
+                  </option>
+                  {listaVeiculos.map((v) => {
+                    const id = v._id?.$oid || v._id || v.id;
+                    return (
+                      <option key={id} value={id}>
+                        {formatarNomeExibicao(v.marca)} {formatarNomeExibicao(v.modelo)} — PLACA: {v.placa?.toUpperCase()}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
                   Nome do Motorista <span className="text-blue-600">*</span>
                 </label>
                 <select
@@ -365,7 +494,7 @@ export default function GestaoAbastecimentoPage() {
                   onChange={(e) => setForm({ ...form, motorista: e.target.value.toLowerCase() })}
                   required
                   disabled={loadingMotoristas}
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 >
                   <option value="">
                     {loadingMotoristas ? 'Carregando motoristas...' : 'Selecione o motorista...'}
@@ -382,7 +511,7 @@ export default function GestaoAbastecimentoPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
+                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
                   Data e Hora do Abastecimento <span className="text-blue-600">*</span>
                 </label>
                 <input
@@ -390,225 +519,247 @@ export default function GestaoAbastecimentoPage() {
                   value={form.dataAbastecimento}
                   onChange={(e) => setForm({ ...form, dataAbastecimento: e.target.value })}
                   required
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
-                  KM Atual <span className="text-blue-600">*</span>
-                </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
+                    KM Atual <span className="text-blue-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="20000"
+                    value={form.kmAtual}
+                    onChange={(e) => setForm({ ...form, kmAtual: e.target.value })}
+                    required
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
+                    Combustível
+                  </label>
+                  <select
+                    value={form.tipoCombustivel}
+                    onChange={(e) => setForm({ ...form, tipoCombustivel: e.target.value.toLowerCase() })}
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    <option value="gasolina">Gasolina</option>
+                    <option value="etanol">Etanol</option>
+                    <option value="diesel">Diesel</option>
+                    <option value="gnv">GNV</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
+                    Litros <span className="text-blue-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.litros}
+                    onChange={(e) => setForm({ ...form, litros: e.target.value })}
+                    required
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1">
+                    Valor Total (R$) <span className="text-blue-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.valorTotal}
+                    onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
+                    required
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center bg-[#f8fafc] p-3 rounded-xl border border-slate-200">
                 <input
-                  type="number"
-                  placeholder="20000"
-                  value={form.kmAtual}
-                  onChange={(e) => setForm({ ...form, kmAtual: e.target.value })}
-                  required
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
+                  type="checkbox"
+                  id="tanqueCheio"
+                  checked={form.tanqueCheio}
+                  onChange={(e) => setForm({ ...form, tanqueCheio: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
-                  Combustível
+                <label htmlFor="tanqueCheio" className="ml-2 text-[11px] font-bold text-slate-700 cursor-pointer select-none">
+                  Tanque Cheio (Cálculo preciso KM/L)
                 </label>
-                <select
-                  value={form.tipoCombustivel}
-                  onChange={(e) => setForm({ ...form, tipoCombustivel: e.target.value.toLowerCase() })}
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                >
-                  <option value="gasolina">Gasolina</option>
-                  <option value="etanol">Etanol</option>
-                  <option value="diesel">Diesel</option>
-                  <option value="gnv">GNV</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
-                  Litros Abastecidos <span className="text-blue-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={form.litros}
-                  onChange={(e) => setForm({ ...form, litros: e.target.value })}
-                  required
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
-                />
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase mb-1.5">
-                  Valor Total (R$) <span className="text-blue-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={form.valorTotal}
-                  onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
-                  required
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition placeholder:text-slate-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center bg-[#f8fafc] p-3.5 rounded-2xl border border-slate-200">
-              <input
-                type="checkbox"
-                id="tanqueCheio"
-                checked={form.tanqueCheio}
-                onChange={(e) => setForm({ ...form, tanqueCheio: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
-              />
-              <label htmlFor="tanqueCheio" className="ml-3 text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                Tanque foi totalmente cheio
-              </label>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleLimpar}
-                className="w-1/3 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition"
-              >
-                {editandoId ? 'Cancelar Edição' : 'Limpar'}
-              </button>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-2/3 bg-blue-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11C16.17 7 15.5 7.9 15.5 9c0 1.22.8 2.25 1.91 2.61l-.91 5.91c-.06.39.07.78.34 1.06.27.28.66.42 1.05.38l.11-.01c.71-.09 1.25-.69 1.25-1.41V11c1.1 0 2-.9 2-2 0-.55-.22-1.05-.58-1.41zM18.5 9.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM12 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 10H5V8h7v5z" />
-                </svg>
-                {loading ? 'Salvando...' : editandoId ? 'Atualizar Abastecimento' : 'Salvar Abastecimento'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Histórico / Tabela com Paginação */}
-        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-black text-slate-800 uppercase tracking-wide">
-                Histórico de Abastecimentos
-              </h2>
-              <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-                Listagem completa dos últimos registros
-              </p>
-            </div>
-            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-              Total: {historicoOrdenado.length}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider bg-slate-50/50">
-                  <th className="py-3 px-4">Data / Hora</th>
-                  <th className="py-3 px-4">Veículo</th>
-                  <th className="py-3 px-4">Motorista</th>
-                  <th className="py-3 px-4">KM</th>
-                  <th className="py-3 px-4">Litros</th>
-                  <th className="py-3 px-4">Valor Total</th>
-                  <th className="py-3 px-4 text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                {abastecimentosPaginados.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="py-8 text-center text-slate-400 font-semibold">
-                      Nenhum abastecimento registrado até o momento.
-                    </td>
-                  </tr>
-                ) : (
-                  abastecimentosPaginados.map((item) => {
-                    const id = item._id?.$oid || item._id || item.id;
-                    return (
-                      <tr key={id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-3.5 px-4 font-bold text-slate-600">
-                          {formatarDataExibicao(item.dataAbastecimento || item.criadoEm || item.data)}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800 uppercase">{formatarNomeExibicao(item.modelo) || '-'}</div>
-                          <div className="text-[10px] font-bold text-blue-600 uppercase">{item.placa || '-'}</div>
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-slate-800">
-                          {formatarNomeExibicao(item.motorista)}
-                        </td>
-                        <td className="py-3.5 px-4">{item.kmAtual ? `${item.kmAtual} KM` : '-'}</td>
-                        <td className="py-3.5 px-4">{item.litros ? `${item.litros} L` : '-'}</td>
-                        <td className="py-3.5 px-4 font-bold text-emerald-600">
-                          {item.valorTotal ? `R$ ${Number(item.valorTotal).toFixed(2)}` : '-'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditar(item)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                              title="Editar Abastecimento"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setItemExcluir(item)}
-                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                              title="Excluir Abastecimento"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+              <div className="flex items-center justify-end gap-2 pt-2">
+                {editandoId && (
+                  <button
+                    type="button"
+                    onClick={handleLimpar}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 transition"
+                  >
+                    Cancelar
+                  </button>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Paginação */}
-          {totalPaginas > 1 && (
-            <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-100 text-xs font-semibold text-slate-500">
-              <span>
-                Página {paginaAtual} de {totalPaginas}
-              </span>
-              <div className="flex items-center gap-1">
                 <button
-                  type="button"
-                  disabled={paginaAtual === 1}
-                  onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition"
+                  type="submit"
+                  disabled={loading}
+                  className="w-full px-5 py-3 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition shadow-md shadow-blue-600/20 disabled:opacity-50"
                 >
-                  Anterior
-                </button>
-                <button
-                  type="button"
-                  disabled={paginaAtual === totalPaginas}
-                  onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition"
-                >
-                  Próxima
+                  {loading ? 'Salvando...' : editandoId ? 'Atualizar Abastecimento' : 'Salvar Abastecimento'}
                 </button>
               </div>
+            </form>
+          </div>
+
+          {/* COLUNA DIREITA: Calendário, Painel de Consumo e Histórico */}
+          <div className={`md:col-span-7 w-full flex flex-col gap-6 ${
+            abaAtivaMobile === 'relatorios' || abaAtivaMobile === 'historico' ? 'block' : 'hidden md:flex'
+          }`}>
+            
+            {/* 1. Calendário de Abastecimentos */}
+            <div className="w-full bg-white rounded-2xl shadow-xs border border-slate-200 no-print transition-all duration-300 overflow-hidden">
+              <div 
+                onClick={() => setCalendarioExpandido(!calendarioExpandido)}
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition select-none"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-100 text-blue-700 p-2 rounded-xl">
+                    <Fuel size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-black uppercase text-slate-800">Calendário</h3>
+                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100">
+                        {totalAbastecimentosMes} em {nomesMeses[mesAtual]}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      {calendarioExpandido ? 'Recolher calendário' : 'Expandir para ver dias'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {calendarioExpandido && (
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={(e) => navegarMes(e, -1)}
+                        className="p-1 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="text-[11px] font-black uppercase text-slate-700 px-2 min-w-[90px] text-center">
+                        {nomesMeses[mesAtual]} {anoAtual}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => navegarMes(e, 1)}
+                        className="p-1 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="bg-slate-100 p-2 rounded-xl text-slate-600">
+                    {calendarioExpandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+              </div>
+
+              {calendarioExpandido && (
+                <div className="px-5 pb-5 pt-2 border-t border-slate-100 space-y-3">
+                  <p className="text-[11px] text-slate-500">
+                    Dias em azul possuem registros. Clique neles para ver detalhes.
+                  </p>
+
+                  <div className="grid grid-cols-7 gap-1.5 text-center">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
+                      <div key={dia} className="text-[10px] font-black uppercase text-slate-400 py-1">
+                        {dia}
+                      </div>
+                    ))}
+
+                    {Array.from({ length: primeiroDiaMes }).map((_, index) => (
+                      <div key={`empty-${index}`} className="h-9 bg-slate-50/40 rounded-lg" />
+                    ))}
+
+                    {Array.from({ length: totalDiasMes }).map((_, index) => {
+                      const dia = index + 1;
+                      const abastecimentosDoDia = obterAbastecimentosDoDia(dia);
+                      const possuiAbastecimento = abastecimentosDoDia.length > 0;
+
+                      return (
+                        <div
+                          key={dia}
+                          className={`h-10 border rounded-xl p-1 flex flex-col justify-between items-center transition ${
+                            possuiAbastecimento
+                              ? 'bg-blue-50/70 border-blue-300 hover:bg-blue-100 cursor-pointer shadow-xs'
+                              : 'bg-white border-slate-100 text-slate-600'
+                          }`}
+                          onClick={() => {
+                            if (possuiAbastecimento) {
+                              setListaAbastecimentosDoDiaModal(abastecimentosDoDia);
+                            }
+                          }}
+                        >
+                          <span className="text-xs font-bold text-slate-700">{dia}</span>
+                          {possuiAbastecimento && (
+                            <div className="flex items-center gap-0.5 mb-0.5">
+                              <span className="w-2 h-2 bg-blue-600 rounded-full inline-block" title={`${abastecimentosDoDia.length} abastecimento(s)`} />
+                              {abastecimentosDoDia.length > 1 && (
+                                <span className="text-[8px] font-black text-blue-800">x{abastecimentosDoDia.length}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* 2. Painel de Relatório e Análise de Consumo */}
+            <div className="w-full">
+              <GastosEconsumo
+                listaVeiculos={listaVeiculos}
+                veiculoFiltroRelatorio={veiculoFiltroRelatorio}
+                setVeiculoFiltroRelatorio={setVeiculoFiltroRelatorio}
+                custoTotalGasto={custoTotalGasto}
+                litrosTotaisAbastecidos={litrosTotaisAbastecidos}
+                formatarNomeExibicao={formatarNomeExibicao}
+              />
+            </div>
+
+            {/* 3. Histórico de Abastecimentos */}
+            <div className="w-full">
+              <HistoricoAbastecimento
+                abastecimentosPaginados={abastecimentosPaginados}
+                totalAbastecimentos={listaAbastecimentos.length}
+                paginaAtual={paginaAtual}
+                totalPaginas={totalPaginas}
+                onMudarPagina={setPaginaAtual}
+                onEditar={handleEditar}
+                onExcluir={setItemExcluir}
+                formatarNomeExibicao={formatarNomeExibicao}
+                formatarDataExibicao={formatarDataExibicao}
+              />
+            </div>
+
+          </div>
+
         </div>
       </main>
 
