@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useEstoque } from "../hooks/useEstoque";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -53,33 +53,73 @@ const Estoque = () => {
   const itensPorPagina = 5;
 
   // Estado para o Modal Personalizado de Confirmação
-  const [saidaParaConfirmar, setSaidaParaConfirmar] = useState(null);
+  const [loteParaConfirmar, setLoteParaConfirmar] = useState(null);
   const [nomeConfirmacao, setNomeConfirmacao] = useState("");
   const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
 
-  // Filtra apenas registros com o formato novo (status explicitamente igual a "pendente")
-  const pendentesFiltrados = saidasPendentes.filter(
-    (saida) => String(saida.status || "").toLowerCase() === "pendente"
-  );
+  // Agrupa saídas pendentes por lote (unidade, setor, motivo, responsável e data)
+  const pendentesAgrupados = useMemo(() => {
+    const pendentes = saidasPendentes.filter(
+      (saida) => String(saida.status || "").toLowerCase() === "pendente"
+    );
+
+    const grupos = new Map();
+
+    pendentes.forEach((saida) => {
+      const dataFormatada = saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data";
+      // Chave única para agrupar o mesmo lote de movimentação
+      const chaveGrupo = saida.termoId || saida.loteId || `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
+
+      if (!grupos.has(chaveGrupo)) {
+        grupos.set(chaveGrupo, {
+          idGrupo: chaveGrupo,
+          dataSaida: dataFormatada,
+          unidadeDestino: saida.unidadeDestino,
+          setorDestino: saida.setorDestino,
+          motivo: saida.motivo,
+          responsavelRecebimento: saida.responsavelRecebimento,
+          status: saida.status,
+          itens: [],
+        });
+      }
+
+      grupos.get(chaveGrupo).itens.push(saida);
+    });
+
+    return Array.from(grupos.values());
+  }, [saidasPendentes]);
 
   const indiceUltimoItem = paginaAtual * itensPorPagina;
   const indicePrimeiroItem = indiceUltimoItem - itensPorPagina;
   const itensPaginados = itensEstoque.slice(indicePrimeiroItem, indiceUltimoItem);
   const totalPaginas = Math.ceil(itensEstoque.length / itensPorPagina);
 
-  const handleAbrirConfirmacao = (saida) => {
-    setSaidaParaConfirmar(saida);
-    setNomeConfirmacao(saida.responsavelRecebimento || "");
+  const handleAbrirConfirmacao = (lote) => {
+    setLoteParaConfirmar(lote);
+    setNomeConfirmacao(lote.responsavelRecebimento || "");
     setDeixarEmBrancoConfirmacao(false);
   };
 
-  const handleExecutarConfirmacao = () => {
-    if (!saidaParaConfirmar) return;
+  const handleExecutarConfirmacao = async () => {
+    if (!loteParaConfirmar) return;
     const responsavelFinal = deixarEmBrancoConfirmacao ? "" : nomeConfirmacao.trim();
-    confirmarSaidaPendente(saidaParaConfirmar, responsavelFinal);
-    setSaidaParaConfirmar(null);
+
+    // Executa a confirmação para todos os itens do lote agrupado
+    for (const item of loteParaConfirmar.itens) {
+      await confirmarSaidaPendente(item, responsavelFinal);
+    }
+
+    setLoteParaConfirmar(null);
     setNomeConfirmacao("");
     setDeixarEmBrancoConfirmacao(false);
+  };
+
+  const handleExecutarExclusao = async (lote) => {
+    if (recusarTermoPendente) {
+      for (const item of lote.itens) {
+        await recusarTermoPendente(item);
+      }
+    }
   };
 
   return (
@@ -408,64 +448,65 @@ const Estoque = () => {
                   </div>
                 </div>
                 <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full">
-                  {pendentesFiltrados.length} pendente(s)
+                  {pendentesAgrupados.length} lote(s) pendente(s)
                 </span>
               </div>
 
-              {pendentesFiltrados.length === 0 ? (
+              {pendentesAgrupados.length === 0 ? (
                 <div className="text-center p-8 bg-slate-50/50 rounded-2xl text-xs font-bold text-slate-400 border border-dashed border-slate-200">
                   nenhuma saída pendente encontrada na base de dados.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {pendentesFiltrados.map((saida) => (
+                  {pendentesAgrupados.map((lote) => (
                     <div
-                      key={saida._id || saida.id}
+                      key={lote.idGrupo}
                       className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-amber-300 transition-all"
                     >
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div className="flex justify-between items-start">
                           <span className="text-[10px] font-mono font-bold text-slate-400">
-                            {saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data"}
+                            {lote.dataSaida}
                           </span>
                           <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded">
-                            {saida.status || "pendente"}
+                            {lote.status || "pendente"}
                           </span>
                         </div>
                         
                         <p className="text-xs font-black text-slate-800">
-                          {saida.unidadeDestino} - {saida.setorDestino}
+                          {lote.unidadeDestino} - {lote.setorDestino}
                         </p>
                         
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
-                          <p className="text-xs font-bold text-blue-700">
-                            {saida.nomeEquipamento || "equipamento sem nome"}
-                          </p>
-                          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                            <span>patrimônio: {saida.patrimonio || "sp"}</span>
-                            <span>qtd: {saida.quantidadeRetirada || 1}</span>
-                          </div>
+                        {/* LISTA DE EQUIPAMENTOS DO MESMO LOTE/CARD */}
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-2 max-h-48 overflow-y-auto">
+                          {lote.itens.map((item, idx) => (
+                            <div key={item._id || item.id || idx} className="border-b border-slate-100 last:border-b-0 pb-1.5 last:pb-0">
+                              <p className="text-xs font-bold text-blue-700">
+                                {item.nomeEquipamento || "equipamento sem nome"}
+                              </p>
+                              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                                <span>patrimônio: {item.patrimonio || "sp"}</span>
+                                <span>qtd: {item.quantidadeRetirada || 1}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
                         <p className="text-[11px] font-medium text-slate-500">
-                          motivo: {saida.motivo || "não informado"}
+                          motivo: {lote.motivo || "não informado"}
                         </p>
                         <p className="text-[10px] font-medium text-slate-400">
-                          responsável: {saida.responsavelRecebimento || "não informado"}
+                          responsável: {lote.responsavelRecebimento || "não informado"}
                         </p>
                       </div>
 
-                      {/* AÇÕES: CONFIRMAR OU EXCLUIR */}
+                      {/* AÇÕES: CONFIRMAR OU EXCLUIR O LOTE COMPLETO */}
                       <div className="flex gap-2 pt-2 border-t border-slate-200/60">
                         {recusarTermoPendente && (
                           <button
-                            onClick={() => {
-                              if (window.confirm("deseja realmente excluir/cancelar esta saída pendente?")) {
-                                recusarTermoPendente(saida);
-                              }
-                            }}
+                            onClick={() => handleExecutarExclusao(lote)}
                             className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer border border-red-200"
-                            title="excluir / cancelar saída"
+                            title="excluir / cancelar saída do lote"
                           >
                             <Trash2 size={14} /> excluir
                           </button>
@@ -473,7 +514,7 @@ const Estoque = () => {
 
                         {confirmarSaidaPendente && (
                           <button
-                            onClick={() => handleAbrirConfirmacao(saida)}
+                            onClick={() => handleAbrirConfirmacao(lote)}
                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                           >
                             <CheckCircle size={14} /> confirmar
@@ -489,7 +530,7 @@ const Estoque = () => {
         </div>
 
         {/* MODAL PERSONALIZADO DE CONFIRMAÇÃO DE BAIXA */}
-        {saidaParaConfirmar && (
+        {loteParaConfirmar && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -497,7 +538,7 @@ const Estoque = () => {
                   <CheckCircle size={18} className="text-emerald-600" /> confirmar baixa no estoque
                 </h3>
                 <button
-                  onClick={() => setSaidaParaConfirmar(null)}
+                  onClick={() => setLoteParaConfirmar(null)}
                   className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   <X size={18} />
@@ -506,7 +547,7 @@ const Estoque = () => {
 
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 font-medium">
-                  digite o nome do responsável pelo recebimento para dar baixa definitiva:
+                  digite o nome do responsável pelo recebimento para dar baixa definitiva no(s) {loteParaConfirmar.itens.length} item(ns):
                 </p>
 
                 <div>
@@ -544,7 +585,7 @@ const Estoque = () => {
               <div className="flex gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setSaidaParaConfirmar(null)}
+                  onClick={() => setLoteParaConfirmar(null)}
                   className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   cancelar
