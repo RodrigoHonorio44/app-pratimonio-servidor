@@ -2,21 +2,21 @@ import React, { useState } from "react";
 import { useEstoque } from "../hooks/useEstoque";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { ModalPatrimonio, ModalPreviewTermo } from "../components/ModalEstoque";
 import {
   Box,
   ArrowLeft,
   RefreshCw,
   Truck,
-  AlertTriangle,
   Plus,
   Trash2,
-  Eye,
-  Printer,
+  Clock,
+  CheckCircle,
+  FileText,
   X,
 } from "lucide-react";
 
 const Estoque = () => {
-  // Destruturação limpa de todos os controles fornecidos pelo hook customizado
   const {
     itensEstoque,
     loading,
@@ -42,94 +42,112 @@ const Estoque = () => {
     adicionarAoLote,
     removerDoLote,
     efetivarTransferenciaESalvar,
+    saidasPendentes = [],
+    confirmarSaidaPendente,
+    recusarTermoPendente,
     navigate,
   } = useEstoque();
 
-  // Estado local para controlar se o usuário optou por digitar o setor manualmente
   const [digitarSetorManual, setDigitarSetorManual] = useState(false);
-
-  // Estados para paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
 
-  // Lógica de paginação utilizando diretamente a lista completa de itens do estoque
+  // Estado para o Modal Personalizado de Confirmação
+  const [saidaParaConfirmar, setSaidaParaConfirmar] = useState(null);
+  const [nomeConfirmacao, setNomeConfirmacao] = useState("");
+  const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
+
+  // Filtra apenas registros com o formato novo (status explicitamente igual a "pendente")
+  const pendentesFiltrados = saidasPendentes.filter(
+    (saida) => String(saida.status || "").toLowerCase() === "pendente"
+  );
+
   const indiceUltimoItem = paginaAtual * itensPorPagina;
   const indicePrimeiroItem = indiceUltimoItem - itensPorPagina;
   const itensPaginados = itensEstoque.slice(indicePrimeiroItem, indiceUltimoItem);
   const totalPaginas = Math.ceil(itensEstoque.length / itensPorPagina);
 
+  const handleAbrirConfirmacao = (saida) => {
+    setSaidaParaConfirmar(saida);
+    setNomeConfirmacao(saida.responsavelRecebimento || "");
+    setDeixarEmBrancoConfirmacao(false);
+  };
+
+  const handleExecutarConfirmacao = () => {
+    if (!saidaParaConfirmar) return;
+    const responsavelFinal = deixarEmBrancoConfirmacao ? "" : nomeConfirmacao.trim();
+    confirmarSaidaPendente(saidaParaConfirmar, responsavelFinal);
+    setSaidaParaConfirmar(null);
+    setNomeConfirmacao("");
+    setDeixarEmBrancoConfirmacao(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans print:bg-white print:p-0">
-      
-      {/* Header global escondido na impressão */}
       <div className="print:hidden">
         <Header />
       </div>
 
-      {/* Conteúdo Principal */}
       <main className="flex-grow p-4 md:p-8">
-        
-        {/* INTERFACE NORMAL (Escondida em tempo de impressão via CSS utility 'print:hidden') */}
         <div className="print:hidden">
           <header className="max-w-7xl mx-auto mb-8">
             <button
               onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group"
+              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group cursor-pointer"
             >
               <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-              Voltar ao Dashboard
+              voltar ao dashboard
             </button>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">
-                  <Box className="text-blue-600" size={28} /> Central do Estoque e Distribuição
+                  <Box className="text-blue-600" size={28} /> central do estoque e distribuição
                 </h1>
               </div>
               <button
                 onClick={carregarEstoque}
-                className="bg-white border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                className="bg-white border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
               >
                 <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                Atualizar Estoque
+                atualizar estoque
               </button>
             </div>
           </header>
 
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Tabela Principal de Itens em Estoque */}
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            {/* Tabela de Itens Disponíveis */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Disponíveis no Estoque</h2>
+                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">disponíveis no estoque</h2>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        <th className="p-4">Tipo de Item</th>
-                        <th className="p-4">Patrimônio Base</th>
-                        <th className="p-4">Detalhe / Nome</th>
-                        <th className="p-4">Conservação</th>
-                        <th className="p-4">Qtd. Disp.</th>
-                        <th className="p-4">Ação</th>
+                        <th className="p-4">tipo de item</th>
+                        <th className="p-4">patrimônio base</th>
+                        <th className="p-4">detalhe / nome</th>
+                        <th className="p-4">conservação</th>
+                        <th className="p-4">qtd. disp.</th>
+                        <th className="p-4">ação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loading ? (
                         <tr>
-                          <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">Carregando...</td>
+                          <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">carregando...</td>
                         </tr>
                       ) : itensPaginados.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">Nenhum item encontrado no estoque.</td>
+                          <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">nenhum item encontrado no estoque.</td>
                         </tr>
                       ) : (
                         itensPaginados.map((item) => (
-                          <tr key={item.id} className="hover:bg-blue-50/40 transition-colors">
-                            <td className="p-4 font-bold text-blue-600 uppercase text-xs">
+                          <tr key={item._id || item.id} className="hover:bg-blue-50/40 transition-colors">
+                            <td className="p-4 font-bold text-blue-600 text-xs">
                               {item.tipoItem || item.tipo || item.categoria || "Não informado"}
                             </td>
                             <td className="p-4">
@@ -137,11 +155,11 @@ const Estoque = () => {
                                 {item.patrimonio || "S/P"}
                               </span>
                             </td>
-                            <td className="p-4 text-xs font-bold text-slate-700 uppercase">
-                              {item.nome}
+                            <td className="p-4 text-xs font-bold text-slate-700">
+                              {item.nome || ""}
                             </td>
                             <td className="p-4 text-xs">
-                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${
                                 String(item.estadoConservacao || item.conservacao || item.estado || "").toLowerCase() === 'novo'
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   : 'bg-slate-100 text-slate-700 border border-slate-200'
@@ -155,11 +173,12 @@ const Estoque = () => {
                                 onClick={() => {
                                   setItemParaAdicionar(item);
                                   setQtdInput(1);
-                                  setPatrimonioInput(item.patrimonio === "S/P" ? "" : item.patrimonio);
+                                  const pat = item.patrimonio || "";
+                                  setPatrimonioInput(pat.toLowerCase() === "s/p" || pat.toLowerCase() === "sp" ? "" : pat);
                                 }}
-                                className="bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                                className="bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                               >
-                                <Plus size={14} /> Preparar Saída
+                                <Plus size={14} /> preparar saída
                               </button>
                             </td>
                           </tr>
@@ -169,11 +188,10 @@ const Estoque = () => {
                   </table>
                 </div>
 
-                {/* Controles de Paginação */}
                 {totalPaginas > 1 && (
                   <div className="p-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500">
-                      Página {paginaAtual} de {totalPaginas} (Total: {itensEstoque.length} itens)
+                      página {paginaAtual} de {totalPaginas} (total: {itensEstoque.length} itens)
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -181,14 +199,14 @@ const Estoque = () => {
                         disabled={paginaAtual === 1}
                         className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
                       >
-                        Anterior
+                        anterior
                       </button>
                       <button
                         onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
                         disabled={paginaAtual === totalPaginas}
                         className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
                       >
-                        Próxima
+                        próxima
                       </button>
                     </div>
                   </div>
@@ -196,18 +214,18 @@ const Estoque = () => {
               </div>
             </div>
 
-            {/* Painel de Controle de Destino e Lote */}
+            {/* Lote de Distribuição */}
             <div className="space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h2 className="font-black text-slate-800 uppercase text-sm tracking-tight flex items-center gap-2">
-                    <Truck size={18} className="text-blue-600" /> Lote de Distribuição
+                    <Truck size={18} className="text-blue-600" /> lote de distribuição
                   </h2>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unidade Destino</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">unidade destino</label>
                     <select
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none"
                       value={dadosSaida.novaUnidade}
@@ -221,7 +239,7 @@ const Estoque = () => {
                         });
                       }}
                     >
-                      <option value="">Selecione a Unidade...</option>
+                      <option value="">selecione a unidade...</option>
                       {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
@@ -229,7 +247,7 @@ const Estoque = () => {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {isEstoque ? "Classificação no Estoque" : "Setor Destino"}
+                        {isEstoque ? "classificação no estoque" : "setor destino"}
                       </label>
                       {dadosSaida.novaUnidade && !isEstoque && (
                         <button
@@ -238,9 +256,9 @@ const Estoque = () => {
                             setDigitarSetorManual(!digitarSetorManual);
                             setDadosSaida({ ...dadosSaida, novoSetor: "" });
                           }}
-                          className="text-[10px] font-bold text-blue-600 hover:underline"
+                          className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
                         >
-                          {digitarSetorManual ? "Escolher da Lista" : "Não achou? Digitar Setor"}
+                          {digitarSetorManual ? "escolher da lista" : "não achou? digitar setor"}
                         </button>
                       )}
                     </div>
@@ -248,7 +266,7 @@ const Estoque = () => {
                     {digitarSetorManual || isEstoque ? (
                       <input
                         type="text"
-                        placeholder={isEstoque ? "Ex: equipamento usado, reserva" : "Digite o nome do setor manualmente..."}
+                        placeholder={isEstoque ? "ex: equipamento usado, reserva" : "digite o nome do setor manualmente..."}
                         className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none border-l-4 border-l-amber-500"
                         value={dadosSaida.novoSetor}
                         onChange={(e) => setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })}
@@ -268,7 +286,7 @@ const Estoque = () => {
                         }}
                       >
                         <option value="">
-                          {dadosSaida.novaUnidade ? "Selecione o Setor Oficial..." : "Selecione uma unidade primeiro..."}
+                          {dadosSaida.novaUnidade ? "selecione o setor oficial..." : "selecione uma unidade primeiro..."}
                         </option>
                         {dadosSaida.novaUnidade && (
                           <>
@@ -278,7 +296,7 @@ const Estoque = () => {
                               </option>
                             ))}
                             <option value="OUTRO_MANUAL" className="text-blue-600 font-bold">
-                              ➕ Outro (Digitar Manualmente...)
+                              ➕ outro (digitar manualmente...)
                             </option>
                           </>
                         )}
@@ -288,7 +306,7 @@ const Estoque = () => {
 
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável pelo Recebimento</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">responsável pelo recebimento</label>
                       <label className="flex items-center gap-1 text-[10px] font-bold text-blue-600 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -301,13 +319,13 @@ const Estoque = () => {
                             }
                           }}
                         />
-                        Deixar em branco
+                        deixar em branco
                       </label>
                     </div>
                     <input
                       type="text"
                       disabled={naoSabeResponsavel}
-                      placeholder={naoSabeResponsavel ? "Assinatura do Responsável (preencher na entrega)" : "Quem vai assinar o documento"}
+                      placeholder={naoSabeResponsavel ? "será preenchido ao confirmar a entrega" : "quem vai assinar o documento"}
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
                       value={dadosSaida.responsavelRecebimento}
                       onChange={(e) => setDadosSaida({ ...dadosSaida, responsavelRecebimento: e.target.value })}
@@ -316,7 +334,7 @@ const Estoque = () => {
 
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                      Motivo da Saída / Troca
+                      motivo da saída / troca
                     </label>
                     <select
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none border-l-4 border-l-blue-500"
@@ -332,12 +350,11 @@ const Estoque = () => {
 
                 <hr className="border-slate-100" />
 
-                {/* Seção Interna do Lote de Saída */}
                 <div>
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Equipamentos no Lote ({loteSaida.length})</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">equipamentos no lote ({loteSaida.length})</h3>
                   {loteSaida.length === 0 ? (
                     <div className="text-center p-6 bg-slate-50 rounded-2xl text-xs font-bold text-slate-400 border border-dashed border-slate-200">
-                      Nenhum item adicionado ao lote.
+                      nenhum item adicionado ao lote.
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -345,12 +362,12 @@ const Estoque = () => {
                         {loteSaida.map((item, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                             <div>
-                              <p className="text-xs font-bold text-slate-700">{item.nome}</p>
-                              <p className="text-[10px] font-mono font-bold text-blue-600">Pat: {item.patrimonioMapeado}</p>
+                              <p className="text-xs font-bold text-slate-700">{item.nome || item.nomeEquipamento || ""}</p>
+                              <p className="text-[10px] font-mono font-bold text-blue-600">pat: {item.patrimonioMapeado || item.patrimonio || ""}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded-md text-xs">x{item.quantidadeMovimentada}</span>
-                              <button onClick={() => removerDoLote(index)} className="text-red-500 hover:text-red-700 p-1">
+                              <span className="bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded-md text-xs">x{item.quantidadeMovimentada || item.quantidadeRetirada || 1}</span>
+                              <button onClick={() => removerDoLote(index)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer">
                                 <Trash2 size={14} />
                               </button>
                             </div>
@@ -360,11 +377,11 @@ const Estoque = () => {
 
                       <button
                         type="button"
-                        disabled={!dadosSaida.novaUnidade || !dadosSaida.novoSetor || (!naoSabeResponsavel && !dadosSaida.responsavelRecebimento)}
+                        disabled={!dadosSaida.novaUnidade || !dadosSaida.novoSetor}
                         onClick={() => setMostrarPreview(true)}
-                        className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        <Eye size={16} /> Visualizar Termo Antes de Salvar
+                        <FileText size={16} /> salvar saída como pendente
                       </button>
                     </div>
                   )}
@@ -372,194 +389,204 @@ const Estoque = () => {
               </div>
             </div>
           </div>
+
+          {/* SEÇÃO DE SAÍDAS PENDENTES COM BOTÕES DE CONFIRMAR E EXCLUIR */}
+          <div className="max-w-7xl mx-auto mt-8">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-amber-100 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-slate-800 uppercase text-sm tracking-tight">
+                      saídas pendentes de confirmação
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      registros salvos com status "pendente". você pode confirmar a entrega ou excluir o registro pendente.
+                    </p>
+                  </div>
+                </div>
+                <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full">
+                  {pendentesFiltrados.length} pendente(s)
+                </span>
+              </div>
+
+              {pendentesFiltrados.length === 0 ? (
+                <div className="text-center p-8 bg-slate-50/50 rounded-2xl text-xs font-bold text-slate-400 border border-dashed border-slate-200">
+                  nenhuma saída pendente encontrada na base de dados.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendentesFiltrados.map((saida) => (
+                    <div
+                      key={saida._id || saida.id}
+                      className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-amber-300 transition-all"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] font-mono font-bold text-slate-400">
+                            {saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data"}
+                          </span>
+                          <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded">
+                            {saida.status || "pendente"}
+                          </span>
+                        </div>
+                        
+                        <p className="text-xs font-black text-slate-800">
+                          {saida.unidadeDestino} - {saida.setorDestino}
+                        </p>
+                        
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+                          <p className="text-xs font-bold text-blue-700">
+                            {saida.nomeEquipamento || "equipamento sem nome"}
+                          </p>
+                          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                            <span>patrimônio: {saida.patrimonio || "sp"}</span>
+                            <span>qtd: {saida.quantidadeRetirada || 1}</span>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] font-medium text-slate-500">
+                          motivo: {saida.motivo || "não informado"}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-400">
+                          responsável: {saida.responsavelRecebimento || "não informado"}
+                        </p>
+                      </div>
+
+                      {/* AÇÕES: CONFIRMAR OU EXCLUIR */}
+                      <div className="flex gap-2 pt-2 border-t border-slate-200/60">
+                        {recusarTermoPendente && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm("deseja realmente excluir/cancelar esta saída pendente?")) {
+                                recusarTermoPendente(saida);
+                              }
+                            }}
+                            className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer border border-red-200"
+                            title="excluir / cancelar saída"
+                          >
+                            <Trash2 size={14} /> excluir
+                          </button>
+                        )}
+
+                        {confirmarSaidaPendente && (
+                          <button
+                            onClick={() => handleAbrirConfirmacao(saida)}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            <CheckCircle size={14} /> confirmar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* MODAL 1: Configuração de Patrimônio Individual */}
-        {itemParaAdicionar && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:hidden">
-            <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-slate-800 uppercase text-sm">Configurar Patrimônio</h3>
-                <button onClick={() => setItemParaAdicionar(null)} className="text-slate-400 hover:text-slate-600">
+        {/* MODAL PERSONALIZADO DE CONFIRMAÇÃO DE BAIXA */}
+        {saidaParaConfirmar && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider flex items-center gap-2">
+                  <CheckCircle size={18} className="text-emerald-600" /> confirmar baixa no estoque
+                </h3>
+                <button
+                  onClick={() => setSaidaParaConfirmar(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={adicionarAoLote} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">TAG Patrimônio Final</label>
-                    {itemParaAdicionar.patrimonio === "S/P" ? (
-                      <input
-                        type="text"
-                        className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={patrimonioInput}
-                        onChange={(e) => setPatrimonioInput(e.target.value)}
-                        required
-                        placeholder="Insira a Tag"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        disabled
-                        className="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-500 cursor-not-allowed"
-                        value={itemParaAdicionar.patrimonio}
-                      />
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qtd</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max={itemParaAdicionar.quantidade}
-                      className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold outline-none"
-                      value={qtdInput}
-                      onChange={(e) => setQtdInput(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 font-medium">
+                  digite o nome do responsável pelo recebimento para dar baixa definitiva:
+                </p>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setItemParaAdicionar(null)}
-                    className="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-blue-700 shadow-md"
-                  >
-                    Confirmar no Lote
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 2: Visualização de Impressão do Termo A4 */}
-        {mostrarPreview && (
-          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center z-50 p-0 md:p-4 overflow-y-auto items-start print:absolute print:inset-0 print:bg-white print:p-0 print:shadow-none">
-            <div className="w-full max-w-[840px] flex flex-col my-0 md:my-4 print:my-0">
-              
-              {/* Header Flutuante de Comando do Modal */}
-              <div className="sticky top-0 z-50 flex flex-col sm:flex-row justify-between items-center bg-slate-900 text-white p-4 rounded-b-xl md:rounded-t-3xl border-b border-slate-800 font-sans print:hidden gap-3 shadow-lg">
-                <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-                  <AlertTriangle size={16} className="shrink-0" /> Modo de Conferência e Conferência Prévia
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={() => setMostrarPreview(false)}
-                    className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all"
-                  >
-                    Voltar e Editar
-                  </button>
-                  <button
-                    onClick={efetivarTransferenciaESalvar}
-                    disabled={processando}
-                    className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all"
-                  >
-                    {processando ? <RefreshCw className="animate-spin" size={14} /> : <Printer size={14} />}
-                    Salvar e Imprimir
-                  </button>
-                </div>
-              </div>
-
-              {/* Espelho do Documento Físico Oficial Tipo A4 */}
-              <div className="bg-white w-full min-h-[1050px] shadow-2xl p-6 md:p-12 flex flex-col justify-between font-serif text-slate-900 rounded-b-3xl print:rounded-none print:shadow-none print:p-4">
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b border-slate-200 w-full">
-                    <img src="/Imagem1.png" alt="Logo 1" className="h-12 w-auto max-w-[22%] object-contain" />
-                    <img src="/Imagem2.png" alt="Logo 2" className="h-12 w-auto max-w-[22%] object-contain" />
-                    <img src="/Imagem3.png" alt="Logo 3" className="h-12 w-auto max-w-[22%] object-contain" />
-                    <img src="/Imagem4.png" alt="Logo 4" className="h-12 w-auto max-w-[22%] object-contain" />
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      responsável pelo recebimento
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={deixarEmBrancoConfirmacao}
+                        onChange={(e) => {
+                          setDeixarEmBrancoConfirmacao(e.target.checked);
+                          if (e.target.checked) {
+                            setNomeConfirmacao("");
+                          }
+                        }}
+                      />
+                      deixar em branco
+                    </label>
                   </div>
 
-                  <div className="text-center space-y-2 border-b-2 border-slate-800 pb-6 mb-8 font-sans">
-                    <h2 className="text-xl font-black uppercase tracking-wide">Termo de Transferência e Responsabilidade Patrimonial</h2>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Controle de Distribuição de Insumos e Ativos</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-sm mb-8 font-sans border border-slate-200 p-4 rounded-xl bg-slate-50/50">
-                    <div><strong>Unidade de Origem:</strong> Almoxarifado Central / Patrimônio</div>
-                    <div><strong>Unidade de Destino:</strong> {dadosSaida.novaUnidade}</div>
-                    <div><strong>{isEstoque ? "Classificação no Estoque:" : "Setor de Destino:"}</strong> {dadosSaida.novoSetor}</div>
-                    <div><strong>Data de Emissão:</strong> {new Date().toLocaleDateString("pt-BR")}</div>
-                    <div className="sm:col-span-2 border-t border-dashed border-slate-200 pt-2 text-slate-700">
-                      <strong>Motivo do Fornecimento:</strong> <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold text-xs uppercase font-sans">{dadosSaida.motivo}</span>
-                    </div>
-                    <div className="sm:col-span-2 border-t border-slate-200 pt-2">
-                      <strong>Responsável pelo Recebimento:</strong> {naoSabeResponsavel ? "Responsável pelo Setor (A preencher no local)" : dadosSaida.responsavelRecebimento}
-                    </div>
-                  </div>
-
-                  <div className="text-sm leading-relaxed text-justify mb-8 space-y-4">
-                    <p>
-                      Declaramos para os devidos fins de controle técnico e administrativo que os itens listados abaixo foram conferidos, testados e transferidos da Central de Estoque para o respectivo setor de destino indicado neste documento.
-                    </p>
-                    <p>
-                      O servidor/responsável abaixo assinado assume total compromisso pela guarda, conservação e zelo dos referidos bens patrimoniais, devendo comunicar imediatamente qualquer avaria, defeito técnico ou necessidade de movimentação futura ao setor de patrimônio.
-                    </p>
-                  </div>
-
-                  <table className="w-full text-left border-collapse border border-slate-300 text-xs font-sans">
-                    <thead>
-                      <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 uppercase">
-                        <th className="p-3 border border-slate-300">Item / Equipamento</th>
-                        <th className="p-3 border border-slate-300 text-center">Nº Patrimônio (TAG)</th>
-                        <th className="p-3 border border-slate-300 text-center">Estado</th>
-                        <th className="p-3 border border-slate-300 text-center">Qtd.</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {loteSaida.map((item, index) => (
-                        <tr key={index}>
-                          <td className="p-3 border border-slate-300 font-medium">{item.nome}</td>
-                          <td className="p-3 border border-slate-300 font-mono text-center">{item.patrimonioMapeado}</td>
-                          <td className="p-3 border border-slate-300 text-center">{item.estado}</td>
-                          <td className="p-3 border border-slate-300 text-center font-bold">{item.quantidadeMovimentada}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <input
+                    type="text"
+                    disabled={deixarEmBrancoConfirmacao}
+                    placeholder={deixarEmBrancoConfirmacao ? "ficará sem responsável" : "nome do responsável..."}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                    value={nomeConfirmacao}
+                    onChange={(e) => setNomeConfirmacao(e.target.value)}
+                  />
                 </div>
+              </div>
 
-                {/* Assinaturas Formais */}
-                <div className="mt-20 pt-12 font-sans">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 text-center text-xs">
-                    <div className="space-y-1">
-                      <div className="border-t border-slate-400 w-full mx-auto pt-2"></div>
-                      <p className="font-bold text-slate-700">Responsável pelo Envio</p>
-                      <p className="text-[10px] text-slate-400 uppercase">Setor de Patrimônio / Estoque</p>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="border-t border-slate-400 w-full mx-auto pt-2"></div>
-                      <p className="font-bold text-slate-700">
-                        {naoSabeResponsavel ? "Assinatura do Responsável" : dadosSaida.responsavelRecebimento}
-                      </p>
-                      <p className="text-[10px] text-slate-400 uppercase">
-                        {naoSabeResponsavel ? "Recebedor (Nome por Extenso / Matrícula)" : "Assinatura e Carimbo"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSaidaParaConfirmar(null)}
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecutarConfirmacao}
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <CheckCircle size={16} /> confirmar
+                </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* Modais Extraídos */}
+        <ModalPatrimonio 
+          itemParaAdicionar={itemParaAdicionar}
+          setItemParaAdicionar={setItemParaAdicionar}
+          patrimonioInput={patrimonioInput}
+          setPatrimonioInput={setPatrimonioInput}
+          qtdInput={qtdInput}
+          setQtdInput={setQtdInput}
+          adicionarAoLote={adicionarAoLote}
+        />
+
+        <ModalPreviewTermo 
+          mostrarPreview={mostrarPreview}
+          setMostrarPreview={setMostrarPreview}
+          efetivarTransferenciaESalvar={efetivarTransferenciaESalvar}
+          processando={processando}
+          dadosSaida={dadosSaida}
+          isEstoque={isEstoque}
+          naoSabeResponsavel={naoSabeResponsavel}
+          loteSaida={loteSaida}
+        />
       </main>
 
-      {/* Footer global escondido na impressão */}
       <div className="print:hidden">
         <Footer />
       </div>
-
     </div>
   );
 };
