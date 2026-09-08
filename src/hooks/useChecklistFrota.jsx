@@ -92,6 +92,7 @@ export function useChecklistFrota() {
     hora: new Date().toTimeString().slice(0, 5),
     modelo: '',
     marca: '',
+    ano: '',
     cor: '',
     cidade: '',
     pneuDianteiro: 'b',
@@ -191,13 +192,19 @@ export function useChecklistFrota() {
       return;
     }
 
-    const veiculoEncontrado = veiculos.find((v) => String(v.id) === String(veiculoId) || String(v._id) === String(veiculoId));
+    const veiculoEncontrado = veiculos.find((v) => 
+      String(v.id) === String(veiculoId) || 
+      String(v._id) === String(veiculoId) || 
+      String(v._id?.$oid) === String(veiculoId)
+    );
     
     if (veiculoEncontrado) {
       try {
+        const idVeiculo = veiculoEncontrado.id || veiculoEncontrado._id || veiculoEncontrado._id?.$oid;
+
         const checklistsDoVeiculo = historicoChecklists.filter(item => 
-          String(item.veiculoId) === String(veiculoEncontrado.id || veiculoEncontrado._id) ||
-          (item.placa && item.placa.toLowerCase() === veiculoEncontrado.placa.toLowerCase())
+          String(item.veiculoId) === String(idVeiculo) ||
+          (item.placa && item.placa.toLowerCase() === veiculoEncontrado.placa?.toLowerCase())
         );
 
         let ultimoChecklist = null;
@@ -213,7 +220,9 @@ export function useChecklistFrota() {
         if (ultimoChecklist) {
           setFormData({
             ...ultimoChecklist,
-            veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+            veiculoId: idVeiculo,
+            ano: ultimoChecklist.ano || veiculoEncontrado.ano || "",
+            cor: ultimoChecklist.cor || veiculoEncontrado.cor || "",
             data: new Date().toISOString().split('T')[0],
             hora: new Date().toTimeString().slice(0, 5),
           });
@@ -226,10 +235,12 @@ export function useChecklistFrota() {
         } else {
           setFormData((prev) => ({
             ...prev,
-            veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+            veiculoId: idVeiculo,
             placa: veiculoEncontrado.placa || "",
             modelo: veiculoEncontrado.modelo || "",
             marca: veiculoEncontrado.marca || "",
+            ano: veiculoEncontrado.ano || "",
+            cor: veiculoEncontrado.cor || "",
             km: veiculoEncontrado.kmAtual || "",
             data: new Date().toISOString().split('T')[0],
             hora: new Date().toTimeString().slice(0, 5),
@@ -237,12 +248,15 @@ export function useChecklistFrota() {
           dispararToast("Veículo selecionado. Nenhum checklist anterior encontrado.");
         }
       } catch (e) {
+        const idVeiculo = veiculoEncontrado.id || veiculoEncontrado._id || veiculoEncontrado._id?.$oid;
         setFormData((prev) => ({
           ...prev,
-          veiculoId: veiculoEncontrado.id || veiculoEncontrado._id,
+          veiculoId: idVeiculo,
           placa: veiculoEncontrado.placa || "",
           modelo: veiculoEncontrado.modelo || "",
           marca: veiculoEncontrado.marca || "",
+          ano: veiculoEncontrado.ano || "",
+          cor: veiculoEncontrado.cor || "",
           km: veiculoEncontrado.kmAtual || "",
           data: new Date().toISOString().split('T')[0],
           hora: new Date().toTimeString().slice(0, 5),
@@ -352,7 +366,6 @@ export function useChecklistFrota() {
 
       dispararToast("Checklist salvo com sucesso! Novo registro gerado.");
       
-      // Atualiza o histórico localmente para sincronizar instantaneamente com o calendário
       const novoRegistro = res.data?.id || res.data?._id ? res.data : { ...payload, id: res.data?.id || Date.now() };
       setHistoricoChecklists((prev) => [...prev, novoRegistro]);
 
