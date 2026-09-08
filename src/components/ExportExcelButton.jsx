@@ -319,8 +319,10 @@ export default function ExportExcelButton({
       wsSaidas.columns = [
         { header: "Equipamento", key: "equipamento", width: 35 },
         { header: "Patrimônio", key: "patrimonio", width: 18 },
+        { header: "Qtd. Retirada", key: "quantidadeRetirada", width: 15 },
         { header: "Origem (Unidade/Setor)", key: "origem", width: 35 },
         { header: "Destino (Unidade/Setor)", key: "destino", width: 35 },
+        { header: "Responsável", key: "responsavelRecebimento", width: 28 },
         { header: "Motivo / Observações", key: "motivo", width: 45 },
         { header: "Data da Saída", key: "dataSaida", width: 20 },
       ];
@@ -351,13 +353,16 @@ export default function ExportExcelButton({
         const row = wsSaidas.addRow({
           equipamento: s.nomeEquipamento || s.equipamento || "N/A",
           patrimonio: s.patrimonio || "S/P",
+          quantidadeRetirada: s.quantidadeRetirada ?? 1,
           origem: orig,
           destino: dest,
+          responsavelRecebimento: s.responsavelRecebimento || "N/A",
           motivo: s.motivo || s.observacoes || "Transferência",
           dataSaida: s.dataSaidaStr || formatarDataHora(dataSaidaRaw),
         });
 
         row.getCell("patrimonio").alignment = { horizontal: "center" };
+        row.getCell("quantidadeRetirada").alignment = { horizontal: "center" };
         row.getCell("dataSaida").alignment = { horizontal: "center" };
 
         row.eachCell((cell) => {
