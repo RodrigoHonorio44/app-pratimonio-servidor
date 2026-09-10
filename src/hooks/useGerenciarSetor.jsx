@@ -45,22 +45,58 @@ export const useGerenciarSetor = () => {
 
   const unidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
 
+  // Normalização refinada para lidar com acentos, caracteres especiais e abreviações comuns (ex: hc -> hospitalar)
   const normalizarParaComparacao = (texto) => {
     if (!texto) return "";
-    return texto
+    let limpo = texto
       .toString()
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[\/\s._-]/g, "")
+      .replace(/[\/\s._-]/g, " ")
       .trim();
+
+    // Mapeamento de sinonímias/siglas conhecidas
+    limpo = limpo.replace(/\bhc\b/g, "hospitalar");
+    return limpo.replace(/\s+/g, "");
+  };
+
+  // Comparador flexível por palavras (verifica se os termos digitados/selecionados batem parcialmente com o item)
+  const compararSetoresFlexivel = (setorBuscado, setorItem) => {
+    if (!setorBuscado) return true;
+    if (!setorItem) return false;
+
+    const termoBuscaNorm = normalizarParaComparacao(setorBuscado);
+    const termoItemNorm = normalizarParaComparacao(setorItem);
+
+    if (termoItemNorm.includes(termoBuscaNorm) || termoBuscaNorm.includes(termoItemNorm)) {
+      return true;
+    }
+
+    // Validação palavra por palavra (ex: "deposito material" bate em "deposito material de hospitalar")
+    const palavrasBusca = setorBuscado
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/\s+/)
+      .filter((p) => p.length > 2 && p !== "de" && p !== "da" && p !== "do");
+
+    const palavrasItem = setorItem
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/\s+/)
+      .filter((p) => p.length > 2 && p !== "de" && p !== "da" && p !== "do");
+
+    return palavrasBusca.every((pBusca) =>
+      palavrasItem.some((pItem) => pItem.startsWith(pBusca) || pBusca.startsWith(pItem) || (pBusca === "hc" && pItem.startsWith("hosp")))
+    );
   };
 
   // Helper robusto para extrair o ID real do MongoDB
   const obterIdSanitizado = (item) => {
     if (!item) return "";
     
-    // Trata caso o _id venha como objeto do mongo ou string direta
     const rawId = item._id?.$oid || item._id || item.id || item.patrimonio || "";
     
     if (typeof rawId === "object" && rawId !== null) {
@@ -108,7 +144,7 @@ export const useGerenciarSetor = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Busca de ativos com ordenação alfabética garantida
+  // Busca de ativos com ordenação alfabética garantida e busca flexível de setor
   const buscarAtivos = async () => {
     setLoading(true);
     setMostrarDropdown(false);
@@ -124,19 +160,17 @@ export const useGerenciarSetor = () => {
       const unidadeFiltroNorm = normalizarParaComparacao(unidadeFiltro);
       const patrimonioNorm = normalizarParaComparacao(patrimonioBusca);
       const nomeNorm = normalizarParaComparacao(nomeBusca);
-      const setorBuscaNorm = normalizarParaComparacao(setorBusca);
 
       const filtrados = listaGeral.filter((item) => {
         const itemUnidadeNorm = normalizarParaComparacao(item.unidade || "");
         const itemPatrimonioNorm = normalizarParaComparacao(item.patrimonio || item._id || item.id || "");
         const itemNomeNorm = normalizarParaComparacao(item.nome || item.descricao || "");
-        const itemSetorNorm = normalizarParaComparacao(item.setor || "");
 
-        if (unidadeFiltroNorm && !itemUnidadeNorm.includes(unidadeFiltroNorm)) {
+        if (unidadeFiltroNorm && !itemUnidadeNorm.includes(unidadeFiltroNorm) && !unidadeFiltroNorm.includes(itemUnidadeNorm)) {
           return false;
         }
 
-        if (setorBuscaNorm && !itemSetorNorm.includes(setorBuscaNorm)) {
+        if (setorBusca && !compararSetoresFlexivel(setorBusca, item.setor || "")) {
           return false;
         }
 
@@ -151,7 +185,7 @@ export const useGerenciarSetor = () => {
         return true;
       });
 
-      // Ordenação por ordem alfabética (A-Z) com localeCompare e fallback de nome/descrição
+      // Ordenação por ordem alfabética (A-Z)
       const ordenados = filtrados.sort((a, b) => {
         const nomeA = String(a.nome || a.descricao || "").trim();
         const nomeB = String(b.nome || b.descricao || "").trim();
@@ -182,9 +216,8 @@ export const useGerenciarSetor = () => {
     
     if (!setorBusca.trim()) return setoresDaUnidade;
 
-    const buscaNorm = normalizarParaComparacao(setorBusca);
     return setoresDaUnidade.filter((setor) =>
-      normalizarParaComparacao(setor).includes(buscaNorm)
+      compararSetoresFlexivel(setorBusca, setor)
     );
   };
 
@@ -250,15 +283,11 @@ export const useGerenciarSetor = () => {
     }
   };
 
-  // Exclusão com depuração avançada do ID capturado
+  // Exclusão
   const handleExcluir = async () => {
     setLoading(true);
     
-    console.log("=== DEBUG EXCLUSÃO ===");
-    console.log("Objeto selecionado bruto:", itemSelecionado);
-    
     const idItem = obterIdSanitizado(itemSelecionado);
-    console.log("ID Final Extraído para a URL:", idItem);
 
     if (!idItem) {
       toast.error("erro: id do equipamento é inválido ou ausente.");
@@ -284,7 +313,6 @@ export const useGerenciarSetor = () => {
       setItemSelecionado(null);
       buscarAtivos();
     } catch (error) {
-      console.error("erro ao excluir no mongodb:", error);
       const mensagemErro = error.response?.data?.error || "erro ao excluir o equipamento no banco de dados.";
       toast.update(idToast, { 
         render: mensagemErro, 

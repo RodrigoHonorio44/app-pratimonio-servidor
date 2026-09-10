@@ -32,19 +32,59 @@ export const useInventario = () => {
   const WEBAPP_URL_SHEETS =
     "https://script.google.com/macros/s/AKfycbxR6EGGtOkeZCUMXA4y2hggPXNPUZL80L4acj9CP9MxVxqSbOrYcsyQ2OY2aFpYabsAEA/exec";
 
-  // Função de normalização para busca e filtros
+  // Função de normalização ajustada para traduzir siglas e padronizar caracteres
   const normalizarParaComparacao = (texto) => {
     if (!texto) return "";
-    return texto
+    let limpo = texto
       .toString()
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[/\s._-]/g, "")
+      .replace(/[/\s._-]/g, " ")
       .trim();
+
+    // Substituição de siglas comuns
+    limpo = limpo.replace(/\bhc\b/g, "hospitalar");
+    return limpo.replace(/\s+/g, "");
   };
 
-  // Fecha o dropdown se o usuário clicar em qualquer outro lugar da tela
+  // Comparador flexível por palavras para evitar falhas por variações de nomenclatura
+  const compararSetoresFlexivel = (setorBuscado, setorItem) => {
+    if (!setorBuscado || setorBuscado === "Todos" || !setorBuscado.trim()) return true;
+    if (!setorItem) return false;
+
+    const termoBuscaNorm = normalizarParaComparacao(setorBuscado);
+    const termoItemNorm = normalizarParaComparacao(setorItem);
+
+    if (termoItemNorm.includes(termoBuscaNorm) || termoBuscaNorm.includes(termoItemNorm)) {
+      return true;
+    }
+
+    const palavrasBusca = setorBuscado
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/\s+/)
+      .filter((p) => p.length > 2 && !["de", "da", "do"].includes(p));
+
+    const palavrasItem = setorItem
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/\s+/)
+      .filter((p) => p.length > 2 && !["de", "da", "do"].includes(p));
+
+    return palavrasBusca.every((pBusca) =>
+      palavrasItem.some(
+        (pItem) =>
+          pItem.startsWith(pBusca) ||
+          pBusca.startsWith(pItem) ||
+          (pBusca === "hc" && pItem.startsWith("hosp"))
+      )
+    );
+  };
+
+  // Fecha o dropdown se o usuário clicar fora
   useEffect(() => {
     const clicarFora = (e) => {
       if (dropdownSetorRef.current && !dropdownSetorRef.current.contains(e.target)) {
@@ -201,9 +241,8 @@ export const useInventario = () => {
     listaSetores.sort();
 
     if (setorFiltro !== "Todos" && setorFiltro.trim() !== "") {
-      const termoNorm = normalizarParaComparacao(setorFiltro);
       return listaSetores.filter(setor => 
-        normalizarParaComparacao(setor).includes(termoNorm)
+        compararSetoresFlexivel(setorFiltro, setor)
       );
     }
 
@@ -217,14 +256,11 @@ export const useInventario = () => {
       const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeFiltro);
       const matchUnidade =
         unidadeFiltro === "Todas" ||
-        unidadeItemNorm.includes(unidadeSelecionadaNorm);
+        unidadeItemNorm.includes(unidadeSelecionadaNorm) ||
+        unidadeSelecionadaNorm.includes(unidadeItemNorm);
 
-      const setorItemNorm = normalizarParaComparacao(item.setor || "");
-      const setorSelecionadoNorm = normalizarParaComparacao(setorFiltro);
-      const matchSetor =
-        setorFiltro === "Todos" ||
-        setorFiltro.trim() === "" ||
-        setorItemNorm === setorSelecionadoNorm;
+      // Usando comparação flexível de setor para contornar variações como "hc" vs "hospitalar"
+      const matchSetor = compararSetoresFlexivel(setorFiltro, item.setor || "");
 
       const statusItemLower = String(item.status || "operante").toLowerCase().trim();
       let matchStatus = false;
@@ -250,7 +286,6 @@ export const useInventario = () => {
 
       return matchUnidade && matchSetor && matchStatus && matchBusca;
     })
-    // Ordenação combinada: Setor (A-Z) -> Nome/Equipamento (A-Z)
     .sort((a, b) => {
       const setorA = String(a.setor || "").trim();
       const setorB = String(b.setor || "").trim();
