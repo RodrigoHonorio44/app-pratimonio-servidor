@@ -13,18 +13,19 @@ import {
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useHistoricoVistoria } from "../hooks/useHistoricoVistoria";
+import CalendarioChecklists from "../components/CalendarioChecklists";
+import ModalChecklistFrota from "../components/ModalChecklistFrota";
+import { imprimirVistoriaHistorico } from "../components/imprimirVistoriaHistorico";
 
-const OPCOES_ESTADO = {
-  bom: { label: "Bom", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-  ocioso: { label: "Ocioso", color: "text-amber-700 bg-amber-50 border-amber-200" },
-  recuperavel: { label: "Recuperável", color: "text-blue-700 bg-blue-50 border-blue-200" },
-  irrecuperavel: { label: "Irrecuperável", color: "text-rose-700 bg-rose-50 border-rose-200" },
-};
+const NOMES_MESES = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+];
 
 export default function HistoricoVistoria() {
   const navigate = useNavigate();
   const {
-    vistoriasFiltradas,
+    vistoriasFiltradas = [],
     loading,
     filtroUnidade,
     setFiltroUnidade,
@@ -34,7 +35,7 @@ export default function HistoricoVistoria() {
     setFiltroDataInicio,
     filtroDataFim,
     setFiltroDataFim,
-    selecionadas,
+    selecionadas = [],
     toggleSelecionar,
     selecionarTodas,
     vistoriaAtiva,
@@ -42,21 +43,135 @@ export default function HistoricoVistoria() {
     excluirVistoria,
   } = useHistoricoVistoria();
 
-  const [fotoExpandida, setFotoExpandida] = useState(null);
-  
-  // Tratativa segura para pegar o ID correto do objeto (id ou _id do MongoDB)
-  const getIdVistoria = (v) => v?.id || v?._id;
+  const [calendarioExpandido, setCalendarioExpandido] = useState(false);
+  const [dataCalendario, setDataCalendario] = useState(new Date());
+  const [listaChecklistsDoDiaModal, setListaChecklistsDoDiaModal] = useState(null);
 
-  const vistoriasParaImprimir = vistoriasFiltradas.filter((v) => 
+  const anoAtual = dataCalendario.getFullYear();
+  const mesAtual = dataCalendario.getMonth();
+
+  const navegarMes = (e, direcao) => {
+    e.stopPropagation();
+    setDataCalendario((prev) => new Date(prev.getFullYear(), prev.getMonth() + direcao, 1));
+  };
+
+  const primeiroDiaMes = new Date(anoAtual, mesAtual, 1).getDay();
+  const totalDiasMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+
+  const getIdVistoria = (v) => v?.id || v?._id?.$oid || v?._id;
+
+  const extrairAnoMesDia = (v) => {
+    const dataStr = v.data || v.dataHoraInicio || v.dataHora || (v.criadoEm && v.criadoEm.$date);
+    if (!dataStr) return null;
+
+    if (typeof dataStr === 'string' && dataStr.includes('-')) {
+      const [ano, mes, dia] = dataStr.split('T')[0].split('-').map(Number);
+      return { ano, mes: mes - 1, dia };
+    }
+
+    const d = new Date(dataStr);
+    if (!isNaN(d.getTime())) {
+      return { ano: d.getFullYear(), mes: d.getMonth(), dia: d.getDate() };
+    }
+    return null;
+  };
+
+  const obterChecklistsDoDia = (dia) => {
+    return vistoriasFiltradas.filter((v) => {
+      const dataObj = extrairAnoMesDia(v);
+      if (!dataObj) return false;
+      return (
+        dataObj.dia === dia &&
+        dataObj.mes === mesAtual &&
+        dataObj.ano === anoAtual
+      );
+    });
+  };
+
+  const totalChecklistsMes = vistoriasFiltradas.filter((v) => {
+    const dataObj = extrairAnoMesDia(v);
+    if (!dataObj) return false;
+    return (
+      dataObj.mes === mesAtual &&
+      dataObj.ano === anoAtual
+    );
+  }).length;
+
+  const handleSelecionarDiaDoCalendario = (dataString, vistoriasDoDia) => {
+    if (!vistoriasDoDia || vistoriasDoDia.length === 0) {
+      toast.error("nenhuma vistoria neste dia.");
+      return;
+    }
+
+    const vistoriasCompletas = vistoriasDoDia.map(v => ({
+      ...v,
+      id: getIdVistoria(v),
+      placa: v.placa || v.veiculo?.placa || "n/a",
+      modelo: v.modelo || v.veiculo?.modelo || "veículo",
+      marca: v.marca || v.veiculo?.marca || "",
+      ano: v.ano || v.anoModelo || v.veiculo?.ano || "2026",
+      cor: v.cor || v.veiculo?.cor || "não informada",
+      condutor: v.condutor || v.motorista || v.responsavel || "não informado",
+      km: v.km || v.quilometragem || v.kmAtual || "0",
+      combustivel: v.combustivel || "1/2",
+      crlv: v.crlv || "sim",
+      data: v.data || (v.dataHoraInicio ? v.dataHoraInicio.split('T')[0] : dataString),
+      hora: v.hora || (v.dataHoraInicio ? new Date(v.dataHoraInicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) : "00:00"),
+      acessorios: v.acessorios || {},
+      itensInspecao: v.itensInspecao || v.itensAvaliados || {},
+      obs: v.obs || v.observacoes || "nenhuma observação registrada.",
+      nomeResponsavel: v.nomeResponsavel || v.avaliador || v.vistoriador || v.motorista || v.condutor || v.responsavel || "",
+      tipoResponsavel: v.tipoResponsavel || v.cargoResponsavel || ""
+    }));
+
+    setListaChecklistsDoDiaModal(vistoriasCompletas);
+  };
+
+  const vistoriasParaImprimir = vistoriasFiltradas.filter((v) =>
     selecionadas.includes(getIdVistoria(v))
   );
 
-  // EXCLUSÃO COM TOAST PERSONALIZADO
+  // Tratamento totalmente isolado para impressão em lote via popups sequenciais
+  const handleImprimirLote = () => {
+    if (vistoriasParaImprimir.length === 0) {
+      toast.error("selecione ao menos uma vistoria para gerar as ordens.");
+      return;
+    }
+
+    vistoriasParaImprimir.forEach((v, index) => {
+      setTimeout(() => {
+        const itemNormalizado = {
+          ...v,
+          id: getIdVistoria(v),
+          placa: v.placa || v.veiculo?.placa || "n/a",
+          modelo: v.modelo || v.veiculo?.modelo || "veículo",
+          marca: v.marca || v.veiculo?.marca || "",
+          ano: v.ano || v.anoModelo || v.veiculo?.ano || "2026",
+          cor: v.cor || v.veiculo?.cor || "não informada",
+          condutor: v.condutor || v.motorista || v.responsavel || "não informado",
+          km: v.km || v.quilometragem || v.kmAtual || "0",
+          combustivel: v.combustivel || "1/2",
+          crlv: v.crlv || "sim",
+          data: v.data || (v.dataHoraInicio ? v.dataHoraInicio.split('T')[0] : "data não informada"),
+          hora: v.hora || (v.dataHoraInicio ? new Date(v.dataHoraInicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) : ""),
+          acessorios: v.acessorios || {},
+          itensInspecao: v.itensInspecao || v.itensAvaliados || {},
+          obs: v.obs || v.observacoes || "nenhuma observação registrada nesta vistoria.",
+          nomeResponsavel: v.nomeResponsavel || v.avaliador || v.vistoriador || v.motorista || v.condutor || v.responsavel || "",
+          tipoResponsavel: v.tipoResponsavel || v.cargoResponsavel || "",
+          avaliador: v.avaliador || v.vistoriador || "",
+          motorista: v.motorista || v.condutor || ""
+        };
+        imprimirVistoriaHistorico(itemNormalizado);
+      }, index * 500);
+    });
+  };
+
   const handleExcluirDireto = (idOuObjeto) => {
     const id = typeof idOuObjeto === "object" ? getIdVistoria(idOuObjeto) : idOuObjeto;
 
     if (!id) {
-      toast.error("ID da vistoria não encontrado.");
+      toast.error("id da vistoria não encontrado.");
       return;
     }
 
@@ -67,8 +182,8 @@ export default function HistoricoVistoria() {
             <Trash2 size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-800">Confirmar exclusão</h3>
-            <p className="text-xs text-slate-500 font-medium">Tem certeza que deseja excluir esta vistoria?</p>
+            <h3 className="text-sm font-black text-slate-800">confirmar exclusão</h3>
+            <p className="text-xs text-slate-500 font-medium">tem certeza que deseja excluir esta vistoria?</p>
           </div>
         </div>
         <div className="flex gap-2 justify-end mt-2">
@@ -76,49 +191,67 @@ export default function HistoricoVistoria() {
             onClick={() => toast.dismiss(t.id)}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
           >
-            Cancelar
+            cancelar
           </button>
           <button
             onClick={async () => {
               toast.dismiss(t.id);
-              const toastLoading = toast.loading("Excluindo vistoria...");
+              const toastLoading = toast.loading("excluindo vistoria...");
               try {
                 await excluirVistoria(id);
                 if (vistoriaAtiva && getIdVistoria(vistoriaAtiva) === id) {
                   setVistoriaAtiva(null);
                 }
-                toast.success("Vistoria excluída com sucesso!", { id: toastLoading });
+                setListaChecklistsDoDiaModal((prev) =>
+                  prev ? prev.filter(item => getIdVistoria(item) !== id) : null
+                );
+                toast.success("vistoria excluída com sucesso!", { id: toastLoading });
               } catch (error) {
-                console.error("Erro capturado ao excluir:", error);
-                toast.error("Erro ao excluir vistoria.", { id: toastLoading });
+                console.error("erro capturado ao excluir:", error);
+                toast.error("erro ao excluir vistoria.", { id: toastLoading });
               }
             }}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-rose-200"
           >
-            Sim, Excluir
+            sim, excluir
           </button>
         </div>
       </div>
     ), { duration: 6000 });
   };
 
-  // IMPRIMIR APENAS A VISTORIA ATIVA DO MODAL
-  const handleImprimirVistoriaAtiva = () => {
-    if (!vistoriaAtiva) return;
-    const activeId = getIdVistoria(vistoriaAtiva);
-    if (!selecionadas.includes(activeId)) {
-      toggleSelecionar(activeId);
-    }
-    setVistoriaAtiva(null);
-    setTimeout(() => {
-      window.print();
-    }, 150);
+  const handleImprimirItemModal = (item) => {
+    if (!item) return;
+
+    const itemNormalizado = {
+      ...item,
+      id: getIdVistoria(item),
+      placa: item.placa || item.veiculo?.placa || "n/a",
+      modelo: item.modelo || item.veiculo?.modelo || "veículo",
+      marca: item.marca || item.veiculo?.marca || "",
+      ano: item.ano || item.anoModelo || item.veiculo?.ano || "2026",
+      cor: item.cor || item.veiculo?.cor || "não informada",
+      condutor: item.condutor || item.motorista || item.responsavel || "não informado",
+      km: item.km || item.quilometragem || item.kmAtual || "0",
+      combustivel: item.combustivel || "1/2",
+      crlv: item.crlv || "sim",
+      data: item.data || (item.dataHoraInicio ? item.dataHoraInicio.split('T')[0] : "data não informada"),
+      hora: item.hora || (item.dataHoraInicio ? new Date(item.dataHoraInicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) : ""),
+      acessorios: item.acessorios || {},
+      itensInspecao: item.itensInspecao || item.itensAvaliados || {},
+      obs: item.obs || item.observacoes || "nenhuma observação registrada nesta vistoria.",
+      nomeResponsavel: item.nomeResponsavel || item.avaliador || item.vistoriador || item.motorista || item.condutor || item.responsavel || "",
+      tipoResponsavel: item.tipoResponsavel || item.cargoResponsavel || "",
+      avaliador: item.avaliador || item.vistoriador || "",
+      motorista: item.motorista || item.condutor || ""
+    };
+
+    imprimirVistoriaHistorico(itemNormalizado);
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans antialiased text-slate-900">
-      {/* HEADER DA TELA */}
-      <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 z-40 print:hidden">
+      <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 z-40">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/dashboard")}
@@ -128,65 +261,71 @@ export default function HistoricoVistoria() {
           </button>
           <div>
             <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-              Auditoria & Patrimônio
+              auditoria & patrimônio
             </h2>
             <h1 className="text-xl font-black text-slate-800 tracking-tight italic">
-              Histórico e Relatórios de Vistoria
+              histórico e relatórios de vistoria
             </h1>
           </div>
         </div>
 
         {selecionadas.length > 0 && (
           <button
-            onClick={() => window.print()}
+            onClick={handleImprimirLote}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
           >
             <Printer size={18} />
-            Gerar Ordens de Manutenção ({selecionadas.length})
+            gerar ordens de manutenção ({selecionadas.length})
           </button>
         )}
       </header>
 
-      {/* CONTEÚDO VISÍVEL NA TELA */}
-      <main className="flex-1 p-10 max-w-7xl mx-auto w-full print:hidden">
+      <main className="flex-1 p-10 max-w-7xl mx-auto w-full space-y-6">
+        <CalendarioChecklists
+          calendarioExpandido={calendarioExpandido}
+          setCalendarioExpandido={setCalendarioExpandido}
+          anoAtual={anoAtual}
+          mesAtual={mesAtual}
+          nomesMeses={NOMES_MESES}
+          totalChecklistsMes={totalChecklistsMes}
+          navegarMes={navegarMes}
+          primeiroDiaMes={primeiroDiaMes}
+          totalDiasMes={totalDiasMes}
+          obterChecklistsDoDia={obterChecklistsDoDia}
+          setListaChecklistsDoDiaModal={setListaChecklistsDoDiaModal}
+          onSelecionarDia={handleSelecionarDiaDoCalendario}
+        />
+
         {/* FILTROS DE BUSCA */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-200/80 shadow-sm mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200/80 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-              Unidade
-            </label>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">unidade</label>
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
               <Building2 size={18} className="text-blue-600" />
               <input
                 type="text"
-                placeholder="Ex: Hospital Conde..."
+                placeholder="ex: hospital..."
                 value={filtroUnidade}
                 onChange={(e) => setFiltroUnidade(e.target.value)}
                 className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none w-full"
               />
             </div>
           </div>
-
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-              Setor
-            </label>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">setor</label>
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
               <MapPin size={18} className="text-blue-600" />
               <input
                 type="text"
-                placeholder="Ex: Almoxarifado..."
+                placeholder="ex: almoxarifado..."
                 value={filtroSetor}
                 onChange={(e) => setFiltroSetor(e.target.value)}
                 className="bg-transparent text-sm font-bold text-slate-700 focus:outline-none w-full"
               />
             </div>
           </div>
-
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-              Data Início
-            </label>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">data início</label>
             <input
               type="date"
               value={filtroDataInicio}
@@ -194,11 +333,8 @@ export default function HistoricoVistoria() {
               className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none w-full cursor-pointer"
             />
           </div>
-
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-              Data Fim
-            </label>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">data fim</label>
             <input
               type="date"
               value={filtroDataFim}
@@ -220,31 +356,28 @@ export default function HistoricoVistoria() {
               ) : (
                 <Square size={18} className="text-slate-400" />
               )}
-              Selecionar Todas ({vistoriasFiltradas.length})
+              selecionar todas ({vistoriasFiltradas.length})
             </button>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Mostrando {vistoriasFiltradas.length} vistorias
+              mostrando {vistoriasFiltradas.length} vistorias
             </p>
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-slate-400 font-bold uppercase text-xs">
-              Carregando histórico...
-            </div>
+            <div className="p-12 text-center text-slate-400 font-bold uppercase text-xs">carregando histórico...</div>
           ) : vistoriasFiltradas.length === 0 ? (
             <div className="p-16 text-center">
               <History size={40} className="mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-600 font-bold text-sm">Nenhuma vistoria encontrada.</p>
+              <p className="text-slate-600 font-bold text-sm">nenhuma vistoria encontrada.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {vistoriasFiltradas.map((v) => {
                 const currentId = getIdVistoria(v);
                 const isSelected = selecionadas.includes(currentId);
-                const dataFormatada = v.dataHoraInicio || v.dataHora 
-                  ? new Date(v.dataHoraInicio || v.dataHora).toLocaleString("pt-BR") 
-                  : "Data não informada";
-                const listaItens = v.itensAvaliados || v.itens || [];
+                const dataFormatada = v.data || v.dataHoraInicio || v.dataHora
+                  ? (v.data || new Date(v.dataHoraInicio || v.dataHora).toLocaleDateString("pt-BR"))
+                  : "data não informada";
 
                 return (
                   <div
@@ -264,15 +397,15 @@ export default function HistoricoVistoria() {
                       <div>
                         <div className="flex items-center gap-3 mb-1">
                           <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                            {v.unidade}
+                            {v.placa || v.veiculo?.placa || "placa n/a"}
                           </span>
                           <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                            Setor: {v.setor}
+                            modelo: {v.modelo || v.veiculo?.modelo || "veículo"}
                           </span>
                         </div>
                         <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
                           <Calendar size={14} className="text-slate-400" />
-                          {dataFormatada}
+                          data: {dataFormatada} {v.hora ? `às ${v.hora}` : ''} - condutor: <strong>{v.condutor || v.motorista || 'não informado'}</strong>
                         </h3>
                       </div>
                     </div>
@@ -280,24 +413,27 @@ export default function HistoricoVistoria() {
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                       <span className="px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
                         <CheckSquare size={14} className="text-blue-600" />
-                        {listaItens.length} item(ns)
+                        km: {v.km || v.quilometragem || '0'}
                       </span>
 
                       <button
-                        onClick={() => setVistoriaAtiva(v)}
-                        className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:border-blue-600 hover:text-blue-600 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImprimirItemModal(v);
+                        }}
+                        className="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1"
                       >
-                        Ver Detalhes
+                        <Printer size={14} /> imprimir
                       </button>
 
-                      {/* BOTÃO EXCLUIR VISTORIA DIRETO */}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleExcluirDireto(currentId);
                         }}
-                        title="Excluir Vistoria"
+                        title="excluir vistoria"
                         className="p-2.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-sm"
                       >
                         <Trash2 size={16} />
@@ -311,292 +447,13 @@ export default function HistoricoVistoria() {
         </div>
       </main>
 
-      {/* MODAL DE DETALHES DA VISTORIA */}
-      {vistoriaAtiva && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
-          <div className="bg-white rounded-[2.5rem] max-w-3xl w-full p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
-              <div>
-                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                  Detalhes da Vistoria
-                </span>
-                <h2 className="text-2xl font-black text-slate-900 italic mt-1">
-                  {vistoriaAtiva.unidade} - {vistoriaAtiva.setor}
-                </h2>
-              </div>
-              <button
-                onClick={() => setVistoriaAtiva(null)}
-                className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 font-bold text-xs cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              {((vistoriaAtiva.itensAvaliados || vistoriaAtiva.itens) || []).map((item, index) => {
-                const estadoChave = (item.estadoConservacao || item.estado || "bom").toLowerCase();
-                const infoEstado = OPCOES_ESTADO[estadoChave] || { label: estadoChave, color: "bg-slate-100 text-slate-700 border-slate-200" };
-                const fotoItem = item.foto || item.fotoUrl;
-
-                return (
-                  <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      {fotoItem && (
-                        <img 
-                          src={fotoItem} 
-                          alt="Foto" 
-                          className="w-14 h-14 object-cover rounded-xl border cursor-pointer hover:opacity-90 transition-opacity" 
-                          onClick={() => setFotoExpandida(fotoItem)} 
-                        />
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-blue-100 text-blue-700">
-                            #{item.patrimonio || "S/P"}
-                          </span>
-                          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase border ${infoEstado.color}`}>
-                            {infoEstado.label}
-                          </span>
-                        </div>
-                        <p className="text-sm font-extrabold text-slate-800 uppercase mt-1">
-                          {item.equipamento || item.descricao || item.nome}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-between items-center gap-3 border-t border-slate-100 pt-6">
-              <button
-                type="button"
-                onClick={() => handleExcluirDireto(getIdVistoria(vistoriaAtiva))}
-                className="flex items-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer"
-              >
-                <Trash2 size={16} />
-                Excluir Vistoria
-              </button>
-
-              <button
-                onClick={handleImprimirVistoriaAtiva}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all cursor-pointer"
-              >
-                <Printer size={16} />
-                Imprimir Ordem de Manutenção
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE AMPLIAÇÃO DA FOTO */}
-      {fotoExpandida && (
-        <div 
-          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[60] flex items-center justify-center p-4 print:hidden"
-          onClick={() => setFotoExpandida(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img 
-              src={fotoExpandida} 
-              alt="Foto Expandida" 
-              className="max-w-full max-h-[85vh] object-contain rounded-2xl border-4 border-white shadow-2xl"
-            />
-            <button
-              onClick={() => setFotoExpandida(null)}
-              className="absolute -top-4 -right-4 bg-white text-slate-900 w-10 h-10 rounded-full font-black flex items-center justify-center shadow-lg hover:bg-slate-100 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* SEÇÃO DE IMPRESSÃO OFICIAL */}
-      <div id="secao-laudo-oficial" className="hidden print:block bg-white w-full max-w-[850px] font-sans text-slate-900 mx-auto p-2">
-        <div className="w-full flex flex-col justify-between flex-1 corpo-documento-print">
-          <div>
-            {/* CABEÇALHO COM LOGOS */}
-            <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-200 w-full cabecalho-logos">
-              <img src="/Imagem1.png" alt="Logo 1" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
-              <img src="/Imagem2.png" alt="Logo 2" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
-              <img src="/Imagem3.png" alt="Logo 3" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
-              <img src="/Imagem4.png" alt="Logo 4" className="h-8 sm:h-9 w-auto max-w-[22%] object-contain" />
-            </div>
-
-            {/* TÍTULO FOCADO EM MANUTENÇÃO */}
-            <div className="text-center space-y-0.5 border-b-2 border-slate-800 pb-2 mb-4">
-              <h2 className="text-base sm:text-lg font-black uppercase tracking-wide">
-                Ordem de Serviço & Laudo de Manutenção
-              </h2>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                Documento de Encaminhamento Técnico — Emitido em: {new Date().toLocaleString("pt-BR")}
-              </p>
-            </div>
-
-            {/* CARDS INDIVIDUAIS POR EQUIPAMENTO */}
-            <div className="space-y-6">
-              {vistoriasParaImprimir.length === 0 ? (
-                <p className="text-xs font-bold text-slate-600">Nenhuma vistoria selecionada para impressão.</p>
-              ) : (
-                vistoriasParaImprimir.map((v, i) => {
-                  const itens = v.itensAvaliados || v.itens || [];
-                  const dataVistoria = v.dataHoraInicio || v.dataHora ? new Date(v.dataHoraInicio || v.dataHora).toLocaleString("pt-BR") : "Data não informada";
-
-                  return (
-                    <div key={i} className="space-y-6">
-                      {itens.map((item, idx) => {
-                        const estadoChave = (item.estadoConservacao || item.estado || "bom").toUpperCase();
-                        const fotoItem = item.foto || item.fotoUrl;
-
-                        return (
-                          <div key={idx} className="border-2 border-slate-800 rounded-2xl p-4 bg-white page-break-inside-avoid">
-                            {/* DADOS DE LOCALIZAÇÃO */}
-                            <div className="flex justify-between items-center bg-slate-900 text-white px-3 py-1.5 rounded-lg mb-4 text-xs font-black uppercase">
-                              <span>Unidade: {v.unidade} — Setor: {v.setor}</span>
-                              <span className="text-[10px] text-slate-300">Vistoriado em: {dataVistoria}</span>
-                            </div>
-
-                            {/* FOTO GRANDE E CENTRALIZADA */}
-                            <div className="flex flex-col items-center justify-center my-3">
-                              {fotoItem ? (
-                                <div className="border-2 border-slate-300 p-1 bg-slate-50 rounded-xl max-w-[320px] w-full flex justify-center">
-                                  <img 
-                                    src={fotoItem} 
-                                    alt="Foto do Equipamento" 
-                                    className="max-h-[220px] w-auto object-contain rounded-lg" 
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-full max-w-[320px] h-36 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-slate-50">
-                                  <span className="text-xs font-bold text-slate-400 uppercase">Sem foto cadastrada</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* DETALHES DO EQUIPAMENTO */}
-                            <div className="grid grid-cols-3 gap-2 bg-slate-100 p-3 rounded-xl mb-4 text-xs uppercase border border-slate-200">
-                              <div>
-                                <span className="block text-[8px] font-black text-slate-500">Patrimônio</span>
-                                <span className="font-mono font-black text-slate-900 text-sm">#{item.patrimonio || "S/P"}</span>
-                              </div>
-                              <div>
-                                <span className="block text-[8px] font-black text-slate-500">Equipamento / Descrição</span>
-                                <span className="font-extrabold text-slate-900">{item.equipamento || item.descricao || item.nome}</span>
-                              </div>
-                              <div>
-                                <span className="block text-[8px] font-black text-slate-500">Estado Constatado</span>
-                                <span className="font-black text-red-700 bg-red-100 px-2 py-0.5 rounded text-[10px] inline-block mt-0.5">
-                                  {estadoChave}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* DIZERES E INSTRUÇÕES PARA A EQUIPE DE MANUTENÇÃO */}
-                            <div className="space-y-3">
-                              <div className="border border-slate-300 p-2.5 rounded-xl bg-slate-50/50">
-                                <span className="block text-[9px] font-black uppercase text-blue-800 mb-1">
-                                  📌 Observação do Técnico da Vistoria:
-                                </span>
-                                <p className="text-xs font-semibold text-slate-800 capitalize italic">
-                                  {item.observacao || "Nenhuma observação informada."}
-                                </p>
-                              </div>
-
-                              <div className="border border-amber-300 bg-amber-50/40 p-2.5 rounded-xl">
-                                <span className="block text-[9px] font-black uppercase text-amber-900 mb-1">
-                                  🛠️ Instrução para Equipe de Manutenção:
-                                </span>
-                                <p className="text-[10px] font-bold text-slate-700 uppercase">
-                                  Realizar avaliação técnica, reparo/mantenabilidade do item listado ou emitir laudo de baixa definitiva caso seja irrecuperável.
-                                </p>
-                              </div>
-
-                              {/* CAMPO EM BRANCO PARA O TÉCNICO DE MANUTENÇÃO PREENCHER */}
-                              <div className="border border-slate-300 p-2.5 rounded-xl space-y-2">
-                                <span className="block text-[9px] font-black uppercase text-slate-600">
-                                  ✍️ Parecer do Técnico de Manutenção (Preenchimento Manual):
-                                </span>
-                                <div className="h-10 border-b border-dashed border-slate-300"></div>
-                                <div className="flex justify-between items-center pt-1 text-[8px] font-bold text-slate-500 uppercase">
-                                  <span>Data do Reparo: ____/____/________</span>
-                                  <span>Status: (  ) Concluído  (  ) Aguardando Peça  (  ) Condenado</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ASSINATURAS DE PROTOCOLO */}
-          <div className="mt-6 pt-2">
-            <div className="grid grid-cols-2 gap-8 sm:gap-12 text-center text-xs">
-              <div className="space-y-1">
-                <div className="border-t border-slate-400 w-full mx-auto pt-1"></div>
-                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Solicitante / Patrimônio</p>
-                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Assinatura do Emissor</p>
-              </div>
-              <div className="space-y-1">
-                <div className="border-t border-slate-400 w-full mx-auto pt-1"></div>
-                <p className="font-bold text-slate-700 text-[10px] sm:text-[11px]">Recebido Pela Manutenção Patrimonial</p>
-                <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase">Técnico Responsável / Data</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ESTILOS DE IMPRESSÃO */}
-        <style>{`
-          @media print {
-            @page {
-              size: A4 portrait;
-              margin: 12mm 10mm 10mm 10mm;
-            }
-
-            body, html {
-              background: #ffffff !important;
-              color: #000000 !important;
-            }
-
-            button, nav, header, aside {
-              display: none !important;
-            }
-
-            #secao-laudo-oficial {
-              position: absolute !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              background: #ffffff !important;
-              display: block !important;
-            }
-
-            .page-break-inside-avoid {
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-            }
-
-            img {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            .corpo-documento-print,
-            .corpo-documento-print * {
-              visibility: visible !important;
-            }
-          }
-        `}</style>
-      </div>
+      {/* MODAL DE CHECKLIST DE FROTA INTEGRADO */}
+      <ModalChecklistFrota
+        listaChecklistsDoDiaModal={listaChecklistsDoDiaModal}
+        onClose={() => setListaChecklistsDoDiaModal(null)}
+        onExcluir={handleExcluirDireto}
+        onImprimir={handleImprimirItemModal}
+      />
     </div>
   );
 }

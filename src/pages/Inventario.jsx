@@ -1,5 +1,5 @@
 import React from "react";
-import { useInventario } from "../hooks/useInventario"; // Ajuste o caminho se necessário
+import { useInventario } from "../hooks/useInventario";
 import {
   Search,
   Shield,
@@ -10,9 +10,9 @@ import {
   FilterX,
   ArrowLeft,
   ChevronDown,
+  FileSpreadsheet,
 } from "lucide-react";
 
-// Importação dos componentes do sistema
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ModalInventario from "../components/ModalInventario";
@@ -48,6 +48,7 @@ const Inventario = () => {
     limparFiltros,
     obterSetoresDisponiveis,
     exportarExcelCompleto,
+    exportarInventarioSecretaria,
     lidarComAberturaModal,
   } = useInventario();
 
@@ -77,10 +78,16 @@ const Inventario = () => {
                 Gestão centralizada de ativos.
               </p>
             </div>
-            <div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={exportarInventarioSecretaria}
+                className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-teal-100 cursor-pointer"
+              >
+                <FileSpreadsheet size={18} /> Inventário Secretaria
+              </button>
               <button
                 onClick={exportarExcelCompleto}
-                className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-emerald-100 cursor-pointer"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-emerald-100 cursor-pointer"
               >
                 <Database size={18} /> Exportar Excel
               </button>
