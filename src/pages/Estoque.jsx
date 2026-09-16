@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useEstoque } from "../hooks/useEstoque";
+// Se você tiver um hook de autenticação,importe-o aqui:
+// import { useAuth } from "../hooks/useAuth"; 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ModalPatrimonio, ModalPreviewTermo } from "../components/ModalEstoque";
@@ -46,18 +48,27 @@ const Estoque = () => {
     confirmarSaidaPendente,
     recusarTermoPendente,
     navigate,
+    // Se o seu hook já retornar dados do usuário, inclua-os aqui, ex: usuario, role, etc.
   } = useEstoque();
+
+  // Exemplo de obtenção da role do usuário (ajuste conforme a estrutura do seu app)
+  // const { usuario } = useAuth();
+  // const userRole = String(usuario?.role || "").toLowerCase();
+  // const temPermissaoAdmin = userRole === "root" || userRole === "admin";
+
+  // Mock temporário caso venha direto no hook ou localStorage (substitua pela sua lógica real de auth):
+  const usuarioLocal = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const userRole = String(usuarioLocal.role || "").toLowerCase();
+  const temPermissaoAdmin = userRole === "root" || userRole === "admin";
 
   const [digitarSetorManual, setDigitarSetorManual] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
 
-  // Estado para o Modal Personalizado de Confirmação
   const [loteParaConfirmar, setLoteParaConfirmar] = useState(null);
   const [nomeConfirmacao, setNomeConfirmacao] = useState("");
   const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
 
-  // Agrupa saídas pendentes por lote (unidade, setor, motivo, responsável e data)
   const pendentesAgrupados = useMemo(() => {
     const pendentes = saidasPendentes.filter(
       (saida) => String(saida.status || "").toLowerCase() === "pendente"
@@ -67,7 +78,6 @@ const Estoque = () => {
 
     pendentes.forEach((saida) => {
       const dataFormatada = saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data";
-      // Chave única para agrupar o mesmo lote de movimentação
       const chaveGrupo = saida.termoId || saida.loteId || `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
 
       if (!grupos.has(chaveGrupo)) {
@@ -104,7 +114,6 @@ const Estoque = () => {
     if (!loteParaConfirmar) return;
     const responsavelFinal = deixarEmBrancoConfirmacao ? "" : nomeConfirmacao.trim();
 
-    // Executa a confirmação para todos os itens do lote agrupado
     for (const item of loteParaConfirmar.itens) {
       await confirmarSaidaPendente(item, responsavelFinal);
     }
@@ -156,7 +165,6 @@ const Estoque = () => {
           </header>
 
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            {/* Tabela de Itens Disponíveis */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -254,7 +262,6 @@ const Estoque = () => {
               </div>
             </div>
 
-            {/* Lote de Distribuição */}
             <div className="space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-6">
                 <div className="border-b border-slate-100 pb-4">
@@ -430,7 +437,7 @@ const Estoque = () => {
             </div>
           </div>
 
-          {/* SEÇÃO DE SAÍDAS PENDENTES COM BOTÕES DE CONFIRMAR E EXCLUIR */}
+          {/* SEÇÃO DE SAÍDAS PENDENTES - PROTEÇÃO DE BOTÕES POR ROLE ROOT / ADMIN */}
           <div className="max-w-7xl mx-auto mt-8">
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-amber-100 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -477,7 +484,6 @@ const Estoque = () => {
                           {lote.unidadeDestino} - {lote.setorDestino}
                         </p>
                         
-                        {/* LISTA DE EQUIPAMENTOS DO MESMO LOTE/CARD */}
                         <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-2 max-h-48 overflow-y-auto">
                           {lote.itens.map((item, idx) => (
                             <div key={item._id || item.id || idx} className="border-b border-slate-100 last:border-b-0 pb-1.5 last:pb-0">
@@ -500,27 +506,35 @@ const Estoque = () => {
                         </p>
                       </div>
 
-                      {/* AÇÕES: CONFIRMAR OU EXCLUIR O LOTE COMPLETO */}
-                      <div className="flex gap-2 pt-2 border-t border-slate-200/60">
-                        {recusarTermoPendente && (
-                          <button
-                            onClick={() => handleExecutarExclusao(lote)}
-                            className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer border border-red-200"
-                            title="excluir / cancelar saída do lote"
-                          >
-                            <Trash2 size={14} /> excluir
-                          </button>
-                        )}
+                      {/* AÇÕES CONDICIONADAS: EXIBIDAS APENAS SE FOR ROOT OU ADMIN */}
+                      {temPermissaoAdmin ? (
+                        <div className="flex gap-2 pt-2 border-t border-slate-200/60">
+                          {recusarTermoPendente && (
+                            <button
+                              onClick={() => handleExecutarExclusao(lote)}
+                              className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer border border-red-200"
+                              title="excluir / cancelar saída do lote"
+                            >
+                              <Trash2 size={14} /> excluir
+                            </button>
+                          )}
 
-                        {confirmarSaidaPendente && (
-                          <button
-                            onClick={() => handleAbrirConfirmacao(lote)}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                          >
-                            <CheckCircle size={14} /> confirmar
-                          </button>
-                        )}
-                      </div>
+                          {confirmarSaidaPendente && (
+                            <button
+                              onClick={() => handleAbrirConfirmacao(lote)}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                            >
+                              <CheckCircle size={14} /> confirmar
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-slate-200/60 text-center">
+                          <span className="text-[10px] font-bold text-slate-400 italic">
+                            ações restritas a administradores
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -529,7 +543,6 @@ const Estoque = () => {
           </div>
         </div>
 
-        {/* MODAL PERSONALIZADO DE CONFIRMAÇÃO DE BAIXA */}
         {loteParaConfirmar && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
@@ -602,7 +615,6 @@ const Estoque = () => {
           </div>
         )}
 
-        {/* Modais Extraídos */}
         <ModalPatrimonio 
           itemParaAdicionar={itemParaAdicionar}
           setItemParaAdicionar={setItemParaAdicionar}

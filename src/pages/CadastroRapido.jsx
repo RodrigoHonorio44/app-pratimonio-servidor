@@ -13,6 +13,8 @@ import {
   FiInfo,
   FiActivity,
   FiPackage,
+  FiLayers,
+  FiUser
 } from "react-icons/fi";
 
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
@@ -22,6 +24,11 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   const [verificandoAcesso, setVerificandoAcesso] = useState(true);
   const [nomeUsuario, setNomeUsuario] = useState("");
   const [setorManual, setSetorManual] = useState(false);
+  
+  // Novos estados para o modo lote
+  const [modoLote, setModoLote] = useState(false);
+  const [quantidade, setQuantidade] = useState(1);
+  const [patrimoniosLote, setPatrimoniosLote] = useState([""]);
 
   const estadoInicialForm = {
     patrimonio: "",
@@ -82,38 +89,50 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
     return () => unsubscribe();
   }, [onClose]);
 
+  // Atualiza a lista de inputs de patrimônio quando a quantidade muda
+  useEffect(() => {
+    if (modoLote && quantidade > 1) {
+      setPatrimoniosLote((prev) => {
+        const novaLista = [...prev];
+        if (quantidade > novaLista.length) {
+          for (let i = novaLista.length; i < quantidade; i++) {
+            novaLista.push("");
+          }
+        } else {
+          novaLista.length = quantidade;
+        }
+        return novaLista;
+      });
+    }
+  }, [quantidade, modoLote]);
+
   // Carrega dados para edição ou limpa para novo cadastro
   useEffect(() => {
     if (isEditing && initialData) {
-      // 1. Pega todas as possibilidades de onde a unidade pode vir no objeto
+      setModoLote(false); // Edição é sempre unitária
       const unidadeBruta = 
         initialData.unidade || 
         initialData.unidadeAtual || 
         initialData.local || 
         "";
 
-      // 2. Faz a correspondência flexível com as unidades disponíveis (ignorando case e espaços)
       const unidadeEncontrada = unidades.find(
         (u) => u.toLowerCase().trim() === unidadeBruta.toLowerCase().trim()
       ) || unidadeBruta;
 
-      // 3. Garante que o setor venha limpo
       const setorAtual = initialData.setor || "";
 
-      // 4. Verifica se o setor preenchido existe na lista oficial daquela unidade
       const setoresUnidade = MAPA_SETORES_POR_UNIDADE[unidadeEncontrada] || [];
       const existeNaLista = setoresUnidade.some(
         (s) => s.toLowerCase().trim() === setorAtual.toLowerCase().trim()
       );
 
-      // 5. Se houver setor mas ele não estiver na lista padrão, força o modo manual automaticamente
       if (setorAtual && !existeNaLista) {
         setSetorManual(true);
       } else {
         setSetorManual(false);
       }
 
-      // 6. Preenche o formulário garantindo que o patrimônio (mesmo S/P) seja tratado como string limpa
       setFormData({
         patrimonio: initialData.patrimonio ? String(initialData.patrimonio).trim() : "",
         nome: initialData.nome || "",
@@ -126,15 +145,23 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
     } else {
       setFormData(estadoInicialForm);
       setSetorManual(false);
+      setModoLote(false);
+      setQuantidade(1);
+      setPatrimoniosLote([""]);
     }
   }, [isEditing, initialData, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const idToast = toast.loading(
-      isEditing ? "Atualizando ativo..." : "Registrando ativo diretamente via API..."
-    );
+
+    const acaoTexto = isEditing
+      ? "Atualizando ativo..."
+      : modoLote && quantidade > 1
+      ? `Registrando ${quantidade} ativos em lote...`
+      : "Registrando ativo diretamente via API...";
+
+    const idToast = toast.loading(acaoTexto);
 
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -149,7 +176,6 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
           initialData.uid;
 
         if (!idItem) {
-          console.error("Objeto sem ID identificado:", initialData);
           toast.update(idToast, {
             render: "Erro: ID do equipamento não foi encontrado para edição.",
             type: "error",
@@ -185,6 +211,41 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
 
         if (onSuccess) onSuccess();
         if (onClose) onClose();
+      } else if (modoLote && quantidade > 1) {
+        // Envio em lote usando Promise.all ou chamadas sequenciais
+        for (let i = 0; i < quantidade; i++) {
+          const patrimonioAtual = patrimoniosLote[i] ? patrimoniosLote[i].trim() : `S/P-${i + 1}`;
+          await api.post(
+            "/ativos",
+            {
+              nome: formData.nome.toLowerCase().trim(),
+              setor: formData.setor.toLowerCase().trim(),
+              observacoes: formData.observacoes.toLowerCase().trim(),
+              patrimonio: patrimonioAtual,
+              unidade: formData.unidade,
+              estado: formData.estado.toLowerCase().trim(),
+              tipo: "equipamento",
+              tipoItem: formData.tipo,
+              status: "ativo",
+              cadastradoPor: nomeUsuario,
+            },
+            { headers }
+          );
+        }
+
+        toast.update(idToast, {
+          render: `${quantidade} ativos registrados e alocados com sucesso!`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
+
+        setFormData(estadoInicialForm);
+        setSetorManual(false);
+        setModoLote(false);
+        setQuantidade(1);
+
+        if (onSuccess) onSuccess();
       } else {
         await api.post(
           "/ativos",
@@ -264,42 +325,91 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-all font-medium bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 text-sm cursor-pointer"
-          >
-            <FiArrowLeft /> Voltar
-          </button>
+          
+          <div className="flex items-center gap-3">
+            {/* Botão de Alternância para Modo Lote (Apenas em novo cadastro) */}
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => setModoLote(!modoLote)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  modoLote 
+                    ? "bg-amber-50 text-amber-700 border-amber-200" 
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                <FiLayers size={14} /> {modoLote ? "Modo Lote Ativo" : "Cadastrar Vários"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-all font-medium bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 text-sm cursor-pointer"
+            >
+              <FiArrowLeft /> Voltar
+            </button>
+          </div>
         </div>
 
         {/* FORMULÁRIO */}
         <div className="overflow-y-auto p-6 md:p-10 flex-1">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Patrimônio */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                  TAG do Patrimônio
-                </label>
-                <div className="relative">
-                  <FiHash
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={18}
-                  />
+            
+            {/* SE MODO LOTE ESTIVER ATIVADO */}
+            {!isEditing && modoLote && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-amber-800 uppercase tracking-wider">
+                    Configuração de Cadastro em Lote
+                  </span>
+                  <span className="text-xs font-bold text-amber-700">
+                    Total: {quantidade} {quantidade === 1 ? "item" : "itens"}
+                  </span>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-amber-700 uppercase tracking-widest ml-1 block">
+                    Quantidade de itens idênticos a gerar
+                  </label>
                   <input
-                    type="text"
-                    required
-                    placeholder="Ex: HMC-1234 ou S/P"
-                    className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
-                    value={formData.patrimonio}
-                    onChange={(e) =>
-                      setFormData({ ...formData, patrimonio: e.target.value })
-                    }
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={quantidade}
+                    onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full bg-white border border-amber-300 p-3 rounded-xl outline-none focus:border-amber-600 text-sm font-bold text-slate-700"
                   />
                 </div>
               </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Patrimônio (Aparece se for edição ou cadastro unitário) */}
+              {(!modoLote || isEditing) && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
+                    TAG do Patrimônio
+                  </label>
+                  <div className="relative">
+                    <FiHash
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      required={!modoLote}
+                      placeholder="Ex: HMC-1234 ou S/P"
+                      className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
+                      value={formData.patrimonio}
+                      onChange={(e) =>
+                        setFormData({ ...formData, patrimonio: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Unidade */}
               <div className="space-y-1">
@@ -333,6 +443,33 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 </div>
               </div>
             </div>
+
+            {/* SEÇÃO DE PATRIMÔNIOS MÚLTIPLOS NO MODO LOTE */}
+            {!isEditing && modoLote && quantidade > 1 && (
+              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                  Patrimônios Individuais (Deixe em branco para preencher como S/P automático)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2">
+                  {Array.from({ length: quantidade }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-500 w-16">#{index + 1}:</span>
+                      <input
+                        type="text"
+                        placeholder={`Patrimônio ${index + 1} (Opcional)`}
+                        value={patrimoniosLote[index] || ""}
+                        onChange={(e) => {
+                          const novaLista = [...patrimoniosLote];
+                          novaLista[index] = e.target.value;
+                          setPatrimoniosLote(novaLista);
+                        }}
+                        className="w-full bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-600"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
@@ -433,7 +570,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Computador All-in-One, Impressora Laser..."
+                  placeholder="Ex: Cadeira de Escritório, Suporte de Soro..."
                   className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
                   value={formData.nome}
                   onChange={(e) =>
@@ -463,6 +600,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                   <option value="novo">Novo</option>
                   <option value="bom">Bom</option>
                   <option value="regular">Regular</option>
+                  <option value="pessimo">Péssimo</option>
                   <option value="danificado">Danificado</option>
                 </select>
               </div>
@@ -494,7 +632,12 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <FiSave size={16} /> {isEditing ? "Atualizar Equipamento" : "Finalizar Cadastro Direto"}
+                  <FiSave size={16} /> 
+                  {isEditing 
+                    ? "Atualizar Equipamento" 
+                    : modoLote && quantidade > 1 
+                    ? `Registrar ${quantidade} Itens em Lote` 
+                    : "Finalizar Cadastro Direto"}
                 </>
               )}
             </button>
