@@ -52,6 +52,11 @@ const Inventario = () => {
     lidarComAberturaModal,
   } = useInventario();
 
+  // Verificação de permissão para a role root ou admin
+  const usuarioLocal = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const userRole = String(usuarioLocal.role || "").toLowerCase().trim();
+  const temPermissaoAdmin = userRole === "root" || userRole === "admin";
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
       <Header />
@@ -60,7 +65,7 @@ const Inventario = () => {
         <header className="max-w-7xl mx-auto mb-8">
           <button
             onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group"
+            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group cursor-pointer"
           >
             <ArrowLeft
               size={18}
@@ -155,7 +160,7 @@ const Inventario = () => {
                     setSetorFiltro("Todos");
                     setMostrarDropdownSetor(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-black uppercase text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-50"
+                  className="w-full text-left px-4 py-2.5 text-xs font-black uppercase text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-50 cursor-pointer"
                 >
                   📦 Mostrar Todos os Setores
                 </button>
@@ -169,7 +174,7 @@ const Inventario = () => {
                         setSetorFiltro(setor);
                         setMostrarDropdownSetor(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors font-bold uppercase border-b border-slate-50 last:border-none"
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors font-bold uppercase border-b border-slate-50 last:border-none cursor-pointer"
                     >
                       {setor}
                     </button>
@@ -302,12 +307,18 @@ const Inventario = () => {
                           </td>
                           <td className="p-4 text-center">
                             {isAtivo ? (
-                              <button
-                                onClick={() => lidarComAberturaModal(item)}
-                                className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm border border-red-100"
-                              >
-                                Baixar
-                              </button>
+                              temPermissaoAdmin ? (
+                                <button
+                                  onClick={() => lidarComAberturaModal(item)}
+                                  className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm border border-red-100"
+                                >
+                                  Baixar
+                                </button>
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-400 italic">
+                                  Restrito
+                                </span>
+                              )
                             ) : (
                               <span className="text-[10px] font-bold text-slate-400">
                                 Baixado em {formatarDataBR(item.dataBaixa)}
