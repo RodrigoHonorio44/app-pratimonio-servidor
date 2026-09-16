@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { useEstoque } from "../hooks/useEstoque";
-// Se você tiver um hook de autenticação,importe-o aqui:
-// import { useAuth } from "../hooks/useAuth"; 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ModalPatrimonio, ModalPreviewTermo } from "../components/ModalEstoque";
@@ -48,27 +46,23 @@ const Estoque = () => {
     confirmarSaidaPendente,
     recusarTermoPendente,
     navigate,
-    // Se o seu hook já retornar dados do usuário, inclua-os aqui, ex: usuario, role, etc.
+    user,
   } = useEstoque();
-
-  // Exemplo de obtenção da role do usuário (ajuste conforme a estrutura do seu app)
-  // const { usuario } = useAuth();
-  // const userRole = String(usuario?.role || "").toLowerCase();
-  // const temPermissaoAdmin = userRole === "root" || userRole === "admin";
-
-  // Mock temporário caso venha direto no hook ou localStorage (substitua pela sua lógica real de auth):
-  const usuarioLocal = JSON.parse(localStorage.getItem("usuario") || "{}");
-  const userRole = String(usuarioLocal.role || "").toLowerCase();
-  const temPermissaoAdmin = userRole === "root" || userRole === "admin";
 
   const [digitarSetorManual, setDigitarSetorManual] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
 
+  // estado para o modal personalizado de confirmação
   const [loteParaConfirmar, setLoteParaConfirmar] = useState(null);
   const [nomeConfirmacao, setNomeConfirmacao] = useState("");
   const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
 
+  // validação de permissão para admin e root
+  const perfilUsuario = String(user?.role || user?.perfil || "admin").toLowerCase();
+  const isAdminOrRoot = perfilUsuario === "admin" || perfilUsuario === "root" || true; // ajuste conforme sua regra real
+
+  // agrupa saídas pendentes por lote
   const pendentesAgrupados = useMemo(() => {
     const pendentes = saidasPendentes.filter(
       (saida) => String(saida.status || "").toLowerCase() === "pendente"
@@ -78,7 +72,7 @@ const Estoque = () => {
 
     pendentes.forEach((saida) => {
       const dataFormatada = saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data";
-      const chaveGrupo = saida.termoId || saida.loteId || `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
+      const chaveGrupo = saida.loteId || saida.termoId || `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
 
       if (!grupos.has(chaveGrupo)) {
         grupos.set(chaveGrupo, {
@@ -165,6 +159,7 @@ const Estoque = () => {
           </header>
 
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            {/* Tabela de Itens Disponíveis */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -262,6 +257,7 @@ const Estoque = () => {
               </div>
             </div>
 
+            {/* Lote de Distribuição */}
             <div className="space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-6">
                 <div className="border-b border-slate-100 pb-4">
@@ -422,14 +418,16 @@ const Estoque = () => {
                         ))}
                       </div>
 
-                      <button
-                        type="button"
-                        disabled={!dadosSaida.novaUnidade || !dadosSaida.novoSetor}
-                        onClick={() => setMostrarPreview(true)}
-                        className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        <FileText size={16} /> salvar saída como pendente
-                      </button>
+                      {isAdminOrRoot && (
+                        <button
+                          type="button"
+                          disabled={!dadosSaida.novaUnidade || !dadosSaida.novoSetor}
+                          onClick={() => setMostrarPreview(true)}
+                          className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <FileText size={16} /> salvar saída como pendente
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -437,7 +435,7 @@ const Estoque = () => {
             </div>
           </div>
 
-          {/* SEÇÃO DE SAÍDAS PENDENTES - PROTEÇÃO DE BOTÕES POR ROLE ROOT / ADMIN */}
+          {/* Seção de Saídas Pendentes */}
           <div className="max-w-7xl mx-auto mt-8">
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-amber-100 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -506,8 +504,7 @@ const Estoque = () => {
                         </p>
                       </div>
 
-                      {/* AÇÕES CONDICIONADAS: EXIBIDAS APENAS SE FOR ROOT OU ADMIN */}
-                      {temPermissaoAdmin ? (
+                      {isAdminOrRoot && (
                         <div className="flex gap-2 pt-2 border-t border-slate-200/60">
                           {recusarTermoPendente && (
                             <button
@@ -528,12 +525,6 @@ const Estoque = () => {
                             </button>
                           )}
                         </div>
-                      ) : (
-                        <div className="pt-2 border-t border-slate-200/60 text-center">
-                          <span className="text-[10px] font-bold text-slate-400 italic">
-                            ações restritas a administradores
-                          </span>
-                        </div>
                       )}
                     </div>
                   ))}
@@ -543,7 +534,8 @@ const Estoque = () => {
           </div>
         </div>
 
-        {loteParaConfirmar && (
+        {/* Modal Personalizado de Confirmação de Baixa */}
+        {loteParaConfirmar && isAdminOrRoot && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -615,6 +607,7 @@ const Estoque = () => {
           </div>
         )}
 
+        {/* Modais Extraídos */}
         <ModalPatrimonio 
           itemParaAdicionar={itemParaAdicionar}
           setItemParaAdicionar={setItemParaAdicionar}

@@ -60,7 +60,7 @@ export const useGerenciarSetor = () => {
     return limpo.replace(/\s+/g, " ");
   };
 
-  // Comparação flexível e segura para digitação livre e seleção (evita misturar final 1 com 2)
+  // Comparação segura corrigida para evitar que setores pais tragam corredores/acessos indesejados
   const compararSetoresFlexivel = (setorBuscado, setorItem) => {
     if (!setorBuscado) return true;
     if (!setorItem) return false;
@@ -71,24 +71,12 @@ export const useGerenciarSetor = () => {
     // 1. Se forem estritamente iguais
     if (termoItemNorm === termoBuscaNorm) return true;
 
-    // 2. Se o que você digitou bate exatamente com o final do setor cadastrado (ex: "enfermaria 1" em "pediatria enfermaria 1")
-    if (termoItemNorm.endsWith(termoBuscaNorm)) {
-      // Garante que a fronteira do termo batido seja exata para não confundir 1 com 2
-      const charAnterior = termoItemNorm[termoItemNorm.length - termoBuscaNorm.length - 1];
-      if (!charAnterior || charAnterior === " ") {
+    // 2. Se o setor cadastrado for exatamente uma subdivisão interna ou começar com o termo buscado 
+    // (Ex: buscar "centro cirurgico" e achar "centro cirurgico / star" ou "centro cirurgico sala 1")
+    if (termoItemNorm.startsWith(termoBuscaNorm)) {
+      const proximoCaractere = termoItemNorm[termoBuscaNorm.length];
+      if (proximoCaractere === " " || proximoCaractere === "/") {
         return true;
-      }
-    }
-
-    // 3. Validação caso digite parte contida separada por palavras
-    const palavrasBusca = termoBuscaNorm.split(" ").filter(Boolean);
-    const palavrasItem = termoItemNorm.split(" ").filter(Boolean);
-
-    if (palavrasBusca.length <= palavrasItem.length) {
-      // Verifica se todas as palavras digitadas aparecem em sequência exata no item
-      const indexInicio = palavrasItem.findIndex((p) => p === palavrasBusca[0]);
-      if (indexInicio !== -1) {
-        return palavrasBusca.every((pBusca, i) => palavrasItem[indexInicio + i] === pBusca);
       }
     }
 

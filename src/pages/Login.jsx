@@ -3,7 +3,7 @@ import { Stethoscope, Lock, User, Loader2, AlertCircle } from "lucide-react";
 import { auth, db } from "../services/firebase";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { doc, getDoc, updateDoc } from "firebase/firestore"; // Adicionado updateDoc
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 
 export default function Login() {
@@ -57,9 +57,23 @@ export default function Login() {
           return;
         }
 
-        // --- 3. IMPLEMENTAÇÃO DE LOGIN ÚNICO (DERRUBADA) ---
+        // --- 3. IMPLEMENTAÇÃO DE LOGIN ÚNICO E SALVAMENTO DO USUÁRIO ---
         const newSessionId = Date.now().toString();
+        
+        // Objeto unificado com os dados do usuário vindos do Firestore
+        const dadosUsuarioLogado = {
+          uid: user.uid,
+          email: user.email,
+          nome: userData.nome || "",
+          role: userData.role || "",
+          cargo: userData.cargo || "",
+          currentSessionId: newSessionId,
+        };
+
+        // Salva o controle de sessão e os dados do usuário no localStorage
         localStorage.setItem("current_session_id", newSessionId);
+        localStorage.setItem("usuario", JSON.stringify(dadosUsuarioLogado));
+
         await updateDoc(userDocRef, {
           currentSessionId: newSessionId,
         });
@@ -78,7 +92,7 @@ export default function Login() {
         const userCargo = userData.cargo?.toLowerCase().trim();
 
         if (
-          ["analista", "admin", "root", "coordenador"].includes(userRole) || // Incluído coordenador aqui também
+          ["analista", "admin", "root", "coordenador"].includes(userRole) ||
           userCargo === "admin" ||
           userCargo === "administrador"
         ) {
