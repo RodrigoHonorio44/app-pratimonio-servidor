@@ -14,7 +14,7 @@ import {
   FiActivity,
   FiPackage,
   FiLayers,
-  FiUser
+  FiRefreshCw
 } from "react-icons/fi";
 
 import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
@@ -25,7 +25,10 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   const [nomeUsuario, setNomeUsuario] = useState("");
   const [setorManual, setSetorManual] = useState(false);
   
-  // Novos estados para o modo lote
+  // Opção para manter Unidade e Setor para o próximo cadastro
+  const [manterSetor, setManterSetor] = useState(true);
+
+  // Modo lote (itens iguais)
   const [modoLote, setModoLote] = useState(false);
   const [quantidade, setQuantidade] = useState(1);
   const [patrimoniosLote, setPatrimoniosLote] = useState([""]);
@@ -41,10 +44,8 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   };
 
   const [formData, setFormData] = useState(estadoInicialForm);
-
   const unidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
 
-  // Validação de permissão e autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -55,22 +56,13 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
           if (docSnap.exists()) {
             const data = docSnap.data();
             const role = data.role?.toLowerCase().trim() || "";
-
-            const cargosAutorizados = [
-              "root",
-              "adm",
-              "admin",
-              "analista",
-              "ti",
-            ];
+            const cargosAutorizados = ["root", "adm", "admin", "analista", "ti"];
 
             if (cargosAutorizados.includes(role)) {
               setNomeUsuario(data.nome || "Usuário");
               setVerificandoAcesso(false);
             } else {
-              toast.error(
-                "Acesso negado: Você não tem permissão de nível técnico."
-              );
+              toast.error("Acesso negado: Você não tem permissão de nível técnico.");
               if (onClose) onClose();
             }
           } else {
@@ -89,7 +81,6 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
     return () => unsubscribe();
   }, [onClose]);
 
-  // Atualiza a lista de inputs de patrimônio quando a quantidade muda
   useEffect(() => {
     if (modoLote && quantidade > 1) {
       setPatrimoniosLote((prev) => {
@@ -106,32 +97,21 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
     }
   }, [quantidade, modoLote]);
 
-  // Carrega dados para edição ou limpa para novo cadastro
   useEffect(() => {
     if (isEditing && initialData) {
-      setModoLote(false); // Edição é sempre unitária
-      const unidadeBruta = 
-        initialData.unidade || 
-        initialData.unidadeAtual || 
-        initialData.local || 
-        "";
-
+      setModoLote(false);
+      const unidadeBruta = initialData.unidade || initialData.unidadeAtual || initialData.local || "";
       const unidadeEncontrada = unidades.find(
         (u) => u.toLowerCase().trim() === unidadeBruta.toLowerCase().trim()
       ) || unidadeBruta;
 
       const setorAtual = initialData.setor || "";
-
       const setoresUnidade = MAPA_SETORES_POR_UNIDADE[unidadeEncontrada] || [];
       const existeNaLista = setoresUnidade.some(
         (s) => s.toLowerCase().trim() === setorAtual.toLowerCase().trim()
       );
 
-      if (setorAtual && !existeNaLista) {
-        setSetorManual(true);
-      } else {
-        setSetorManual(false);
-      }
+      setSetorManual(Boolean(setorAtual && !existeNaLista));
 
       setFormData({
         patrimonio: initialData.patrimonio ? String(initialData.patrimonio).trim() : "",
@@ -159,7 +139,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
       ? "Atualizando ativo..."
       : modoLote && quantidade > 1
       ? `Registrando ${quantidade} ativos em lote...`
-      : "Registrando ativo diretamente via API...";
+      : "Registrando ativo...";
 
     const idToast = toast.loading(acaoTexto);
 
@@ -168,12 +148,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
       const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
 
       if (isEditing && initialData) {
-        const idItem = 
-          initialData.firebaseId || 
-          initialData._id || 
-          initialData.id || 
-          initialData.equipamentoId || 
-          initialData.uid;
+        const idItem = initialData.firebaseId || initialData._id || initialData.id || initialData.equipamentoId || initialData.uid;
 
         if (!idItem) {
           toast.update(idToast, {
@@ -212,7 +187,6 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         if (onSuccess) onSuccess();
         if (onClose) onClose();
       } else if (modoLote && quantidade > 1) {
-        // Envio em lote usando Promise.all ou chamadas sequenciais
         for (let i = 0; i < quantidade; i++) {
           const patrimonioAtual = patrimoniosLote[i] ? patrimoniosLote[i].trim() : `S/P-${i + 1}`;
           await api.post(
@@ -234,17 +208,24 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         }
 
         toast.update(idToast, {
-          render: `${quantidade} ativos registrados e alocados com sucesso!`,
+          render: `${quantidade} ativos registrados com sucesso!`,
           type: "success",
           isLoading: false,
           autoClose: 3000,
         });
 
-        setFormData(estadoInicialForm);
-        setSetorManual(false);
+        if (manterSetor) {
+          setFormData((prev) => ({
+            ...estadoInicialForm,
+            unidade: prev.unidade,
+            setor: prev.setor,
+          }));
+        } else {
+          setFormData(estadoInicialForm);
+        }
+
         setModoLote(false);
         setQuantidade(1);
-
         if (onSuccess) onSuccess();
       } else {
         await api.post(
@@ -265,23 +246,29 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         );
 
         toast.update(idToast, {
-          render: "Ativo registrado e alocado com sucesso!",
+          render: "Ativo registrado com sucesso!",
           type: "success",
           isLoading: false,
           autoClose: 3000,
         });
 
-        setFormData(estadoInicialForm);
-        setSetorManual(false);
+        // Mantém setor e unidade se a opção estiver marcada
+        if (manterSetor) {
+          setFormData((prev) => ({
+            ...estadoInicialForm,
+            unidade: prev.unidade,
+            setor: prev.setor,
+          }));
+        } else {
+          setFormData(estadoInicialForm);
+        }
 
         if (onSuccess) onSuccess();
       }
     } catch (error) {
-      console.error("Erro ao salvar o ativo:", error);
+      console.error("Erro ao salvar ativo:", error);
       toast.update(idToast, {
-        render:
-          error.response?.data?.message ||
-          "Erro ao comunicar com o servidor da API",
+        render: error.response?.data?.message || "Erro ao comunicar com o servidor da API",
         type: "error",
         isLoading: false,
         autoClose: 3000,
@@ -327,7 +314,6 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Botão de Alternância para Modo Lote (Apenas em novo cadastro) */}
             {!isEditing && (
               <button
                 type="button"
@@ -338,7 +324,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
-                <FiLayers size={14} /> {modoLote ? "Modo Lote Ativo" : "Cadastrar Vários"}
+                <FiLayers size={14} /> {modoLote ? "Modo Lote Ativo" : "Cadastrar Vários Iguais"}
               </button>
             )}
 
@@ -356,12 +342,34 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         <div className="overflow-y-auto p-6 md:p-10 flex-1">
           <form onSubmit={handleSubmit} className="space-y-6">
             
+            {/* Opção para manter local ao cadastrar itens sequenciais */}
+            {!isEditing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FiRefreshCw className="text-blue-600" size={18} />
+                  <div>
+                    <p className="text-xs font-bold text-blue-900">Modo de Cadastro Sequencial</p>
+                    <p className="text-[11px] text-blue-700">Mantém a unidade e o setor preenchidos ao salvar para cadastrar o próximo item.</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={manterSetor} 
+                    onChange={(e) => setManterSetor(e.target.checked)} 
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            )}
+
             {/* SE MODO LOTE ESTIVER ATIVADO */}
             {!isEditing && modoLote && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-black text-amber-800 uppercase tracking-wider">
-                    Configuração de Cadastro em Lote
+                    Configuração de Cadastro em Lote (Itens Idênticos)
                   </span>
                   <span className="text-xs font-bold text-amber-700">
                     Total: {quantidade} {quantidade === 1 ? "item" : "itens"}
@@ -386,7 +394,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Patrimônio (Aparece se for edição ou cadastro unitário) */}
+              {/* Patrimônio */}
               {(!modoLote || isEditing) && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
@@ -444,11 +452,11 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               </div>
             </div>
 
-            {/* SEÇÃO DE PATRIMÔNIOS MÚLTIPLOS NO MODO LOTE */}
+            {/* Patrimônios no modo lote */}
             {!isEditing && modoLote && quantidade > 1 && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                  Patrimônios Individuais (Deixe em branco para preencher como S/P automático)
+                  Patrimônios Individuais
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2">
                   {Array.from({ length: quantidade }).map((_, index) => (
@@ -570,7 +578,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Cadeira de Escritório, Suporte de Soro..."
+                  placeholder="Ex: Cadeira de Escritório, Suporte de Soro, Mesa..."
                   className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
                   value={formData.nome}
                   onChange={(e) =>
@@ -637,7 +645,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     ? "Atualizar Equipamento" 
                     : modoLote && quantidade > 1 
                     ? `Registrar ${quantidade} Itens em Lote` 
-                    : "Finalizar Cadastro Direto"}
+                    : "Salvar e Cadastrar Próximo"}
                 </>
               )}
             </button>

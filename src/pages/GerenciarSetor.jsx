@@ -295,7 +295,9 @@ const GerenciarSetor = () => {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           onSuccess={() => {
-            setShowModal(false);
+            if (modoEdicao) {
+              setShowModal(false);
+            }
             executarBusca();
           }}
           initialData={modoEdicao ? formData : null}
