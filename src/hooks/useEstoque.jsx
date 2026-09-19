@@ -155,6 +155,42 @@ export const useEstoque = () => {
     carregarTermosPendentes();
   }, []);
 
+  // FUNÇÃO DE ALTERAR QUANTIDADE NO ESTOQUE VIA API
+  const atualizarQuantidadeEstoque = async (idItem, novaQuantidade) => {
+    try {
+      const targetId = String(idItem);
+      const itemOriginal = itensEstoque.find(
+        (i) => String(i._id?.$oid || i._id || i.id) === targetId
+      );
+
+      if (!itemOriginal) return;
+
+      const payload = {
+        ...itemOriginal,
+        quantidade: Number(novaQuantidade),
+        ultimaMovimentacao: new Date().toISOString(),
+      };
+
+      // Atualização no backend
+      await api.put(`/estoque/${targetId}`, payload);
+
+      // Atualiza o estado local para garantir alteração na interface sem piscar
+      setItensEstoque((prev) =>
+        prev.map((item) => {
+          const itemId = String(item._id?.$oid || item._id || item.id);
+          if (itemId === targetId) {
+            return { ...item, quantidade: Number(novaQuantidade) };
+          }
+          return item;
+        })
+      );
+    } catch (error) {
+      console.error("Erro ao atualizar quantidade do estoque:", error);
+      toast.error("Erro ao alterar a quantidade no servidor.");
+      throw error;
+    }
+  };
+
   const adicionarAoLote = (e) => {
     e.preventDefault();
     if (!itemParaAdicionar) return;
@@ -336,7 +372,6 @@ export const useEstoque = () => {
         responsavelNome || termoPendente.responsavelRecebimento || "responsavel pelo setor"
       );
 
-      // Busca item na lista de estoque completa para evitar erro 404 em GET individual
       const resEstoque = await api.get("/estoque");
       const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
       const itemEstoque = listaEstoque.find((i) => {
@@ -355,7 +390,6 @@ export const useEstoque = () => {
         );
       }
 
-      // 1. Registra / atualiza em /ativos
       if (categoriaTratada !== "bem duravel") {
         const resAtivos = await api.get("/ativos").catch(() => ({ data: [] }));
         const listaAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
@@ -404,7 +438,6 @@ export const useEstoque = () => {
         }
       }
 
-      // 2. Abate ou exclui do /estoque
       if (qtdSolicitada < qtdAtual) {
         const payloadEstoque = {
           ...itemEstoque,
@@ -433,7 +466,6 @@ export const useEstoque = () => {
         }
       }
 
-      // 3. Atualiza o status do termo para "concluido"
       await api.put(`/saidaEquipamento/${termoId}`, {
         ...termoPendente,
         responsavelRecebimento: responsavelFinal,
@@ -505,6 +537,7 @@ export const useEstoque = () => {
     isEstoque,
     carregarEstoque,
     carregarTermosPendentes,
+    atualizarQuantidadeEstoque,
     adicionarAoLote,
     removerDoLote,
     efetivarTransferenciaESalvar,

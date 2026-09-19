@@ -57,6 +57,8 @@ const SETORES_HOSPITAL_CONDE = [
   "Estoque Nutrição",
   "Estoque Patrimonio",
   "Farmácia",
+  "farmácia/Coordenação",
+  "farmácia/Estar",
   "Farmácia Satélite",
   "Faturamento",
   "FRESH TRECK",

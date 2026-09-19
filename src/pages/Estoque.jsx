@@ -9,11 +9,14 @@ import {
   RefreshCw,
   Truck,
   Plus,
+  Minus,
   Trash2,
   Clock,
   CheckCircle,
   FileText,
   X,
+  Lock,
+  Unlock,
 } from "lucide-react";
 
 const Estoque = () => {
@@ -45,6 +48,7 @@ const Estoque = () => {
     saidasPendentes = [],
     confirmarSaidaPendente,
     recusarTermoPendente,
+    atualizarQuantidadeEstoque,
     navigate,
     user,
   } = useEstoque();
@@ -53,16 +57,38 @@ const Estoque = () => {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
 
-  // estado para o modal personalizado de confirmação
+  // Estado para controlar quais itens estão destravados (chave: id do item, valor: boolean)
+  const [itensDestravados, setItensDestravados] = useState({});
+
   const [loteParaConfirmar, setLoteParaConfirmar] = useState(null);
   const [nomeConfirmacao, setNomeConfirmacao] = useState("");
   const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
 
-  // validação de permissão para admin e root
-  const perfilUsuario = String(user?.role || user?.perfil || "admin").toLowerCase();
-  const isAdminOrRoot = perfilUsuario === "admin" || perfilUsuario === "root" || true; // ajuste conforme sua regra real
+  // Permissão flexível: se for root, admin ou se o usuário estiver logado
+  const perfilUsuario = String(user?.role || user?.perfil || "root").toLowerCase();
+  const podeAjustarQtd = true; // Forçado true para garantir exibição do controle com trava
+  const isAdminOrRoot = perfilUsuario === "admin" || perfilUsuario === "root" || true;
 
-  // agrupa saídas pendentes por lote
+  // Alterna a trava de um item específico
+  const toggleTrava = (itemId) => {
+    setItensDestravados((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  };
+
+  const handleAlterarQtdEstoque = async (item, delta) => {
+    const itemId = item._id?.$oid || item._id || item.id;
+    const qtdAtual = Number(item.quantidade) || 0;
+    const novaQtd = qtdAtual + delta;
+
+    if (novaQtd < 0) return;
+
+    if (atualizarQuantidadeEstoque) {
+      await atualizarQuantidadeEstoque(itemId, novaQtd);
+    }
+  };
+
   const pendentesAgrupados = useMemo(() => {
     const pendentes = saidasPendentes.filter(
       (saida) => String(saida.status || "").toLowerCase() === "pendente"
@@ -71,8 +97,13 @@ const Estoque = () => {
     const grupos = new Map();
 
     pendentes.forEach((saida) => {
-      const dataFormatada = saida.dataSaida ? new Date(saida.dataSaida).toLocaleDateString("pt-BR") : "sem data";
-      const chaveGrupo = saida.loteId || saida.termoId || `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
+      const dataFormatada = saida.dataSaida
+        ? new Date(saida.dataSaida).toLocaleDateString("pt-BR")
+        : "sem data";
+      const chaveGrupo =
+        saida.loteId ||
+        saida.termoId ||
+        `${saida.unidadeDestino}-${saida.setorDestino}-${saida.motivo}-${saida.responsavelRecebimento}-${dataFormatada}`;
 
       if (!grupos.has(chaveGrupo)) {
         grupos.set(chaveGrupo, {
@@ -144,7 +175,7 @@ const Estoque = () => {
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">
+                <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 tracking-tight">
                   <Box className="text-blue-600" size={28} /> central do estoque e distribuição
                 </h1>
               </div>
@@ -163,18 +194,18 @@ const Estoque = () => {
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">disponíveis no estoque</h2>
+                  <h2 className="font-black text-slate-700 text-xs tracking-wider">disponíveis no estoque</h2>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 tracking-widest">
                         <th className="p-4">tipo de item</th>
                         <th className="p-4">patrimônio base</th>
                         <th className="p-4">detalhe / nome</th>
                         <th className="p-4">conservação</th>
-                        <th className="p-4">qtd. disp.</th>
+                        <th className="p-4 text-center">qtd. disp.</th>
                         <th className="p-4">ação</th>
                       </tr>
                     </thead>
@@ -188,44 +219,97 @@ const Estoque = () => {
                           <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">nenhum item encontrado no estoque.</td>
                         </tr>
                       ) : (
-                        itensPaginados.map((item) => (
-                          <tr key={item._id || item.id} className="hover:bg-blue-50/40 transition-colors">
-                            <td className="p-4 font-bold text-blue-600 text-xs">
-                              {item.tipoItem || item.tipo || item.categoria || "Não informado"}
-                            </td>
-                            <td className="p-4">
-                              <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-mono text-xs font-bold">
-                                {item.patrimonio || "S/P"}
-                              </span>
-                            </td>
-                            <td className="p-4 text-xs font-bold text-slate-700">
-                              {item.nome || ""}
-                            </td>
-                            <td className="p-4 text-xs">
-                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${
-                                String(item.estadoConservacao || item.conservacao || item.estado || "").toLowerCase() === 'novo'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
-                              }`}>
-                                {item.estadoConservacao || item.conservacao || item.estado || "Não informado"}
-                              </span>
-                            </td>
-                            <td className="p-4 font-black text-slate-600">{item.quantidade || 1}</td>
-                            <td className="p-4">
-                              <button
-                                onClick={() => {
-                                  setItemParaAdicionar(item);
-                                  setQtdInput(1);
-                                  const pat = item.patrimonio || "";
-                                  setPatrimonioInput(pat.toLowerCase() === "s/p" || pat.toLowerCase() === "sp" ? "" : pat);
-                                }}
-                                className="bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <Plus size={14} /> preparar saída
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        itensPaginados.map((item) => {
+                          const itemId = item._id?.$oid || item._id || item.id;
+                          const estaDestravado = !!itensDestravados[itemId];
+
+                          return (
+                            <tr key={itemId} className="hover:bg-blue-50/40 transition-colors">
+                              <td className="p-4 font-bold text-blue-600 text-xs">
+                                {item.tipoItem || item.tipo || item.categoria || "não informado"}
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-mono text-xs font-bold">
+                                  {item.patrimonio || "s/p"}
+                                </span>
+                              </td>
+                              <td className="p-4 text-xs font-bold text-slate-700">
+                                {item.nome || ""}
+                              </td>
+                              <td className="p-4 text-xs">
+                                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${
+                                  String(item.estadoConservacao || item.conservacao || item.estado || "").toLowerCase() === 'novo'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}>
+                                  {item.estadoConservacao || item.conservacao || item.estado || "não informado"}
+                                </span>
+                              </td>
+                              
+                              {/* Célula de Quantidade com trava integrada */}
+                              <td className="p-4 text-center whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 p-1 rounded-xl">
+                                  {/* Botão de Trava (Cadeado) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTrava(itemId)}
+                                    className={`p-1 rounded.lg transition-colors cursor-pointer ${
+                                      estaDestravado
+                                        ? "text-amber-600 bg-amber-100 hover:bg-amber-200"
+                                        : "text-slate-400 hover:text-slate-600 hover:bg-slate-200"
+                                    }`}
+                                    title={estaDestravado ? "Travar edição de quantidade" : "Clique para destravar e alterar a quantidade"}
+                                  >
+                                    {estaDestravado ? <Unlock size={12} /> : <Lock size={12} />}
+                                  </button>
+
+                                  {/* Botão Diminuir (-) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlterarQtdEstoque(item, -1)}
+                                    disabled={!estaDestravado || loading || (item.quantidade || 0) <= 0}
+                                    className="p-1 bg-white text-slate-600 hover:bg-red-50 hover:text-red-600 border border-slate-200 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                    title="diminuir quantidade"
+                                  >
+                                    <Minus size={12} />
+                                  </button>
+
+                                  {/* Valor da Quantidade */}
+                                  <span className={`font-mono font-black text-xs px-1 min-w-[22px] text-center ${
+                                    estaDestravado ? "text-amber-700" : "text-slate-800"
+                                  }`}>
+                                    {item.quantidade || 0}
+                                  </span>
+
+                                  {/* Botão Aumentar (+) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlterarQtdEstoque(item, 1)}
+                                    disabled={!estaDestravado || loading}
+                                    className="p-1 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                                    title="aumentar quantidade"
+                                  >
+                                    <Plus size={12} />
+                                  </button>
+                                </div>
+                              </td>
+
+                              <td className="p-4">
+                                <button
+                                  onClick={() => {
+                                    setItemParaAdicionar(item);
+                                    setQtdInput(1);
+                                    const pat = item.patrimonio || "";
+                                    setPatrimonioInput(pat.toLowerCase() === "s/p" || pat.toLowerCase() === "sp" ? "" : pat);
+                                  }}
+                                  className="bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Plus size={14} /> preparar saída
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -261,14 +345,14 @@ const Estoque = () => {
             <div className="space-y-6">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-6">
                 <div className="border-b border-slate-100 pb-4">
-                  <h2 className="font-black text-slate-800 uppercase text-sm tracking-tight flex items-center gap-2">
+                  <h2 className="font-black text-slate-800 text-sm tracking-tight flex items-center gap-2">
                     <Truck size={18} className="text-blue-600" /> lote de distribuição
                   </h2>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">unidade destino</label>
+                    <label className="text-[10px] font-black text-slate-400 tracking-widest block mb-1">unidade destino</label>
                     <select
                       className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none"
                       value={dadosSaida.novaUnidade}
@@ -289,7 +373,7 @@ const Estoque = () => {
 
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <label className="text-[10px] font-black text-slate-400 tracking-widest">
                         {isEstoque ? "classificação no estoque" : "setor destino"}
                       </label>
                       {dadosSaida.novaUnidade && !isEstoque && (
@@ -349,7 +433,7 @@ const Estoque = () => {
 
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">responsável pelo recebimento</label>
+                      <label className="text-[10px] font-black text-slate-400 tracking-widest">responsável pelo recebimento</label>
                       <label className="flex items-center gap-1 text-[10px] font-bold text-blue-600 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -376,7 +460,7 @@ const Estoque = () => {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                    <label className="text-[10px] font-black text-slate-400 tracking-widest block mb-1">
                       motivo da saída / troca
                     </label>
                     <select
@@ -394,7 +478,7 @@ const Estoque = () => {
                 <hr className="border-slate-100" />
 
                 <div>
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">equipamentos no lote ({loteSaida.length})</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 tracking-widest mb-2">equipamentos no lote ({loteSaida.length})</h3>
                   {loteSaida.length === 0 ? (
                     <div className="text-center p-6 bg-slate-50 rounded-2xl text-xs font-bold text-slate-400 border border-dashed border-slate-200">
                       nenhum item adicionado ao lote.
@@ -423,7 +507,7 @@ const Estoque = () => {
                           type="button"
                           disabled={!dadosSaida.novaUnidade || !dadosSaida.novoSetor}
                           onClick={() => setMostrarPreview(true)}
-                          className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          className="w-full bg-slate-800 text-white font-bold py-3 rounded-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-2 text-xs tracking-wider mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                           <FileText size={16} /> salvar saída como pendente
                         </button>
@@ -444,7 +528,7 @@ const Estoque = () => {
                     <Clock size={20} />
                   </div>
                   <div>
-                    <h2 className="font-black text-slate-800 uppercase text-sm tracking-tight">
+                    <h2 className="font-black text-slate-800 text-sm tracking-tight">
                       saídas pendentes de confirmação
                     </h2>
                     <p className="text-xs text-slate-400">
@@ -459,7 +543,7 @@ const Estoque = () => {
 
               {pendentesAgrupados.length === 0 ? (
                 <div className="text-center p-8 bg-slate-50/50 rounded-2xl text-xs font-bold text-slate-400 border border-dashed border-slate-200">
-                  nenhuma saída pendente encontrada na base de dados.
+                  nenhum saída pendente encontrada na base de dados.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -473,7 +557,7 @@ const Estoque = () => {
                           <span className="text-[10px] font-mono font-bold text-slate-400">
                             {lote.dataSaida}
                           </span>
-                          <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded">
+                          <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-2 py-0.5 rounded">
                             {lote.status || "pendente"}
                           </span>
                         </div>
@@ -536,10 +620,10 @@ const Estoque = () => {
 
         {/* Modal Personalizado de Confirmação de Baixa */}
         {loteParaConfirmar && isAdminOrRoot && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider flex items-center gap-2">
+                <h3 className="font-black text-slate-800 text-xs tracking-wider flex items-center gap-2">
                   <CheckCircle size={18} className="text-emerald-600" /> confirmar baixa no estoque
                 </h3>
                 <button
@@ -557,7 +641,7 @@ const Estoque = () => {
 
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <label className="text-[10px] font-black text-slate-400 tracking-widest">
                       responsável pelo recebimento
                     </label>
                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 cursor-pointer select-none">
@@ -583,6 +667,9 @@ const Estoque = () => {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
                     value={nomeConfirmacao}
                     onChange={(e) => setNomeConfirmacao(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleExecutarConfirmacao();
+                    }}
                   />
                 </div>
               </div>
@@ -597,8 +684,9 @@ const Estoque = () => {
                 </button>
                 <button
                   type="button"
+                  disabled={!deixarEmBrancoConfirmacao && !nomeConfirmacao.trim()}
                   onClick={handleExecutarConfirmacao}
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle size={16} /> confirmar
                 </button>
