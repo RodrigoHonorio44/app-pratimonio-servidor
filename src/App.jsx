@@ -8,6 +8,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { useLicenseGuard } from "./hooks/useLicenseGuard";
 import AppRoutes from "./routes/AppRoutes";
+import AvisoAtualizacao from "./components/AvisoAtualizacao"; // 👈 IMPORTANTE: Importação do notificador de atualização
 
 function App() {
   const [user, setUser] = useState(null);
@@ -139,6 +140,10 @@ function App() {
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
+      
+      {/* 👈 Notificador flutuante global de atualizações do sistema */}
+      <AvisoAtualizacao />
+
       <BrowserRouter>
         <AppRoutes
           user={user}

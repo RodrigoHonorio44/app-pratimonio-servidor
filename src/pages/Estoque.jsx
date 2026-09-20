@@ -3,6 +3,8 @@ import { useEstoque } from "../hooks/useEstoque";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ModalPatrimonio, ModalPreviewTermo } from "../components/ModalEstoque";
+import api from "../services/api";
+import { toast } from "react-toastify";
 import {
   Box,
   ArrowLeft,
@@ -64,9 +66,8 @@ const Estoque = () => {
   const [nomeConfirmacao, setNomeConfirmacao] = useState("");
   const [deixarEmBrancoConfirmacao, setDeixarEmBrancoConfirmacao] = useState(false);
 
-  // Permissão flexível: se for root, admin ou se o usuário estiver logado
+  // Permissão flexível
   const perfilUsuario = String(user?.role || user?.perfil || "root").toLowerCase();
-  const podeAjustarQtd = true; // Forçado true para garantir exibição do controle com trava
   const isAdminOrRoot = perfilUsuario === "admin" || perfilUsuario === "root" || true;
 
   // Alterna a trava de um item específico
@@ -86,6 +87,27 @@ const Estoque = () => {
 
     if (atualizarQuantidadeEstoque) {
       await atualizarQuantidadeEstoque(itemId, novaQtd);
+    }
+  };
+
+  // Função para excluir um item do estoque
+  const handleExcluirItemEstoque = async (item) => {
+    const itemId = item._id?.$oid || item._id || item.id;
+    const nomeItem = item.nome || "este item";
+
+    const confirmou = window.confirm(
+      `tem certeza que deseja excluir "${nomeItem}" permanentemente do estoque?`
+    );
+
+    if (!confirmou) return;
+
+    try {
+      await api.delete(`/estoque/${itemId}`);
+      toast.success("item excluído com sucesso!");
+      carregarEstoque();
+    } catch (error) {
+      console.error("erro ao excluir item do estoque:", error);
+      toast.error(error.response?.data?.message || "erro ao excluir o item do estoque.");
     }
   };
 
@@ -246,19 +268,19 @@ const Estoque = () => {
                                 </span>
                               </td>
                               
-                              {/* Célula de Quantidade com trava integrada */}
+                              {/* Célula de Quantidade com trava e botão de exclusão */}
                               <td className="p-4 text-center whitespace-nowrap">
                                 <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 p-1 rounded-xl">
                                   {/* Botão de Trava (Cadeado) */}
                                   <button
                                     type="button"
                                     onClick={() => toggleTrava(itemId)}
-                                    className={`p-1 rounded.lg transition-colors cursor-pointer ${
+                                    className={`p-1 rounded-lg transition-colors cursor-pointer ${
                                       estaDestravado
                                         ? "text-amber-600 bg-amber-100 hover:bg-amber-200"
                                         : "text-slate-400 hover:text-slate-600 hover:bg-slate-200"
                                     }`}
-                                    title={estaDestravado ? "Travar edição de quantidade" : "Clique para destravar e alterar a quantidade"}
+                                    title={estaDestravado ? "travar alterações" : "clique para destravar edição e exclusão"}
                                   >
                                     {estaDestravado ? <Unlock size={12} /> : <Lock size={12} />}
                                   </button>
@@ -290,6 +312,17 @@ const Estoque = () => {
                                     title="aumentar quantidade"
                                   >
                                     <Plus size={12} />
+                                  </button>
+
+                                  {/* Botão Excluir Item (🗑️) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExcluirItemEstoque(item)}
+                                    disabled={!estaDestravado || loading}
+                                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer ml-0.5"
+                                    title="excluir item permanentemente do estoque"
+                                  >
+                                    <Trash2 size={12} />
                                   </button>
                                 </div>
                               </td>

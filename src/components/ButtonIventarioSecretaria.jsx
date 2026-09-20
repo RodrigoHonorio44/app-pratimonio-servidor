@@ -8,261 +8,642 @@ export function ButtonInventarioSecretaria({
 }) {
   const [exportando, setExportando] = useState(false);
 
+  const ITENS_POR_PAGINA = 9;
+  const ALTURA_LINHA_ITEM = 51;
+
+  const aplicarBorda = (cell) => {
+    cell.border = {
+      top: {
+        style: "thin",
+        color: { argb: "FF000000" },
+      },
+      left: {
+        style: "thin",
+        color: { argb: "FF000000" },
+      },
+      bottom: {
+        style: "thin",
+        color: { argb: "FF000000" },
+      },
+      right: {
+        style: "thin",
+        color: { argb: "FF000000" },
+      },
+    };
+  };
+
+  const formatarTexto = (valor, fallback = "") => {
+    return String(valor ?? fallback)
+      .trim()
+      .toLowerCase();
+  };
+
+  const obterDataInventario = (item, dataPadrao) => {
+    const rawData =
+      item?.dataBaixa ||
+      item?.data_baixa ||
+      item?.createdAt ||
+      item?.data ||
+      null;
+
+    if (!rawData) {
+      return dataPadrao;
+    }
+
+    try {
+      const dataConvertida =
+        typeof rawData?.toDate === "function"
+          ? rawData.toDate()
+          : new Date(rawData);
+
+      if (
+        dataConvertida instanceof Date &&
+        !Number.isNaN(dataConvertida.getTime())
+      ) {
+        return `${dataConvertida.toLocaleString("pt-BR", {
+          month: "short",
+        })}/${dataConvertida.getFullYear()}`.toLowerCase();
+      }
+    } catch (error) {
+      console.warn("Não foi possível converter a data:", error);
+    }
+
+    return dataPadrao;
+  };
+
+  const obterEstado = (item) => {
+    return formatarTexto(
+      item?.estado ||
+        item?.estadoConservacao ||
+        item?.conservacao ||
+        "bom"
+    );
+  };
+
   const handleExportar = async () => {
     try {
       setExportando(true);
+
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = "sistema de gestao hospitalar";
+
+      workbook.creator = "Sistema de Gestão Hospitalar";
+      workbook.lastModifiedBy = "Sistema de Gestão Hospitalar";
       workbook.created = new Date();
+      workbook.modified = new Date();
 
-      const listaGeral = Array.isArray(inventario) ? inventario : [];
+      const listaGeral = Array.isArray(inventario)
+        ? inventario
+        : [];
 
-      const unidadeFiltro = (unidade || "").toString().trim().toLowerCase();
-      const itensFiltrados =
-        unidadeFiltro && unidadeFiltro !== "todas" && unidadeFiltro !== "geral"
-          ? listaGeral.filter(
-              (item) =>
-                (item.unidade || "").toString().trim().toLowerCase() ===
-                unidadeFiltro
-            )
-          : listaGeral;
+      const unidadeFiltro = formatarTexto(unidade);
 
-      const gruposPorUnidade = itensFiltrados.reduce((acc, item) => {
-        const uNome = (item.unidade || unidade || "unidade")
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (!acc[uNome]) acc[uNome] = [];
-        acc[uNome].push(item);
-        return acc;
-      }, {});
+      const filtrarTodasAsUnidades =
+        !unidadeFiltro ||
+        unidadeFiltro === "todas" ||
+        unidadeFiltro === "geral";
 
-      if (Object.keys(gruposPorUnidade).length === 0) {
-        gruposPorUnidade[unidadeFiltro || unidade || "unidade"] = [];
-      }
-
-      const ITENS_POR_PAGINA = 9;
-
-      const aplicarBorda = (cell) => {
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
-      };
-
-      Object.keys(gruposPorUnidade).forEach((nomeUnidade) => {
-        const itensUnidade = gruposPorUnidade[nomeUnidade];
-        const ws = workbook.addWorksheet(
-          nomeUnidade.substring(0, 31).toLowerCase(),
-          {
-            views: [{ showGridLines: true }],
-            pageSetup: {
-              paperSize: 9, // A4
-              orientation: "portrait",
-              fitToPage: true,
-              fitToWidth: 1,
-              fitToHeight: 0,
-              margins: {
-                left: 0.2,
-                right: 0.2,
-                top: 0.3,
-                bottom: 0.3,
-                header: 0.1,
-                footer: 0.1,
-              },
-            },
-          }
-        );
-
-        // --- LARGURAS EXATAS FORÇADAS (COM WCH PARA O EXCELJS) ---
-        const colunasConfig = [
-          { index: 1, width: 4.18 },   // A (item)
-          { index: 2, width: 10.73 },  // B (patrimônio / sms)
-          { index: 3, width: 14.27 },  // C (descrição)
-          { index: 4, width: 8.64 },   // D (data)
-          { index: 5, width: 18.18 },  // E (localização origem)
-          { index: 6, width: 13.45 },  // F (situação)
-          { index: 7, width: 4.27 },   // G (excel)
-          { index: 8, width: 4.27 },   // H (bom)
-          { index: 9, width: 4.27 },   // I (reg)
-          { index: 10, width: 4.27 },  // J (péssi)
-        ];
-
-        colunasConfig.forEach(col => {
-          const column = ws.getColumn(col.index);
-          column.width = col.width;
-          column.defn = { ...column.defn, wch: col.width };
-        });
-
-        const itensOrdenados = [...itensUnidade].sort((a, b) => {
-          const setorA = String(a.setor || "").toLowerCase().trim();
-          const setorB = String(b.setor || "").toLowerCase().trim();
-          const compSetor = setorA.localeCompare(setorB, "pt-BR", { numeric: true });
-          if (compSetor !== 0) return compSetor;
-
-          const nomeA = String(a.nome || a.equipamento || a.descricao || "").toLowerCase().trim();
-          const nomeB = String(b.nome || b.equipamento || b.descricao || "").toLowerCase().trim();
-          return nomeA.localeCompare(nomeB, "pt-BR", { numeric: true });
-        });
-
-        const totalPaginasSheet = Math.max(1, Math.ceil(itensOrdenados.length / ITENS_POR_PAGINA));
-        const dataAtual = new Date();
-        const mesAnoTexto = `${dataAtual.toLocaleString("pt-BR", { month: "short" })}/${dataAtual.getFullYear()}`.toLowerCase();
-
-        for (let p = 0; p < totalPaginasSheet; p++) {
-          const startRow = ws.rowCount === 0 ? 1 : ws.rowCount + 1;
-
-          // --- LINHA 1: INVENTÁRIO (A até J) ---
-          const r1 = startRow;
-          const row1 = ws.getRow(r1);
-          row1.height = 20;
-          ws.getCell(`A${r1}`).value = "INVENTÁRIO";
-          ws.mergeCells(`A${r1}:J${r1}`);
-          ws.getCell(`A${r1}`).font = { name: "Arial", size: 11, bold: true };
-          ws.getCell(`A${r1}`).alignment = { vertical: "middle", horizontal: "left" };
-
-          // --- LINHA 2: Unidade (A até F) | Situação do bem (G até J) ---
-          const r2 = startRow + 1;
-          const row2 = ws.getRow(r2);
-          row2.height = 18;
-          
-          const exibirUnidade = (unidade && unidade !== "todas" && unidade !== "geral" ? unidade : nomeUnidade).toLowerCase();
-          ws.getCell(`A${r2}`).value = exibirUnidade;
-          ws.mergeCells(`A${r2}:F${r2}`);
-          ws.getCell(`A${r2}`).font = { name: "Arial", size: 10, bold: true };
-          ws.getCell(`A${r2}`).alignment = { vertical: "middle", horizontal: "left" };
-
-          ws.getCell(`G${r2}`).value = "situação do bem";
-          ws.mergeCells(`G${r2}:J${r2}`);
-          ws.getCell(`G${r2}`).font = { name: "Arial", size: 8, bold: true };
-          ws.getCell(`G${r2}`).alignment = { vertical: "middle", horizontal: "center" };
-
-          // --- LINHA 3: Data inventário (A até F) | excel, bom, reg, péssi (G, H, I, J) ---
-          const r3 = startRow + 2;
-          const row3 = ws.getRow(r3);
-          row3.height = 18;
-          ws.getCell(`A${r3}`).value = `data inventário: ${mesAnoTexto}`;
-          ws.mergeCells(`A${r3}:F${r3}`);
-          ws.getCell(`A${r3}`).font = { name: "Arial", size: 9 };
-          ws.getCell(`A${r3}`).alignment = { vertical: "middle", horizontal: "left" };
-
-          ws.getCell(`G${r3}`).value = "excel";
-          ws.getCell(`H${r3}`).value = "bom";
-          ws.getCell(`I${r3}`).value = "reg";
-          ws.getCell(`J${r3}`).value = "péssi";
-
-          ["G", "H", "I", "J"].forEach((col) => {
-            const cell = ws.getCell(`${col}${r3}`);
-            cell.font = { name: "Arial", size: 8, bold: true };
-            cell.alignment = { horizontal: "center", vertical: "middle" };
+      const itensFiltrados = filtrarTodasAsUnidades
+        ? listaGeral
+        : listaGeral.filter((item) => {
+            const unidadeItem = formatarTexto(item?.unidade);
+            return unidadeItem === unidadeFiltro;
           });
 
-          // --- LINHA 4: Títulos das colunas ---
-          const r4 = startRow + 3;
-          const row4 = ws.getRow(r4);
-          row4.height = 24;
-          
-          ws.getCell(`A${r4}`).value = "item";
-          ws.getCell(`B${r4}`).value = "patrimônio / sms";
-          ws.getCell(`C${r4}`).value = "descrição";
-          ws.getCell(`D${r4}`).value = "data";
-          ws.getCell(`E${r4}`).value = "localização origem";
-          ws.getCell(`F${r4}`).value = "situação";
-          
-          ws.getCell(`G${r4}`).value = "";
-          ws.getCell(`H${r4}`).value = "";
-          ws.getCell(`I${r4}`).value = "";
-          ws.getCell(`J${r4}`).value = "";
+      const gruposPorUnidade = itensFiltrados.reduce(
+        (acc, item) => {
+          const nomeUnidade = formatarTexto(
+            item?.unidade || unidade || "unidade"
+          );
 
-          for (let c = 1; c <= 10; c++) {
-            const cell = row4.getCell(c);
-            cell.font = { name: "Arial", size: 8, bold: true };
-            cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+          if (!acc[nomeUnidade]) {
+            acc[nomeUnidade] = [];
           }
 
-          // Aplica bordas em todo o cabeçalho (linhas 1 até 4, colunas 1 até 10)
-          for (let r = r1; r <= r4; r++) {
-            const row = ws.getRow(r);
-            for (let c = 1; c <= 10; c++) {
-              aplicarBorda(row.getCell(c));
-            }
+          acc[nomeUnidade].push(item);
+
+          return acc;
+        },
+        {}
+      );
+
+      if (Object.keys(gruposPorUnidade).length === 0) {
+        const nomeUnidadeVazia =
+          unidadeFiltro || "unidade";
+
+        gruposPorUnidade[nomeUnidadeVazia] = [];
+      }
+
+      const dataAtual = new Date();
+
+      const mesAnoTexto = `${dataAtual.toLocaleString(
+        "pt-BR",
+        {
+          month: "short",
+        }
+      )}/${dataAtual.getFullYear()}`.toLowerCase();
+
+      Object.entries(gruposPorUnidade).forEach(
+        ([nomeUnidade, itensUnidade]) => {
+          const nomeAbaBase =
+            nomeUnidade
+              .substring(0, 31)
+              .replace(/[\\/?*[\]:]/g, "")
+              .trim() || "inventario";
+
+          let nomeAba = nomeAbaBase;
+          let contadorAba = 1;
+
+          while (
+            workbook.worksheets.some(
+              (worksheet) =>
+                worksheet.name.toLowerCase() ===
+                nomeAba.toLowerCase()
+            )
+          ) {
+            const sufixo = `_${contadorAba}`;
+            nomeAba = `${nomeAbaBase.substring(
+              0,
+              31 - sufixo.length
+            )}${sufixo}`;
+            contadorAba++;
           }
 
-          // --- LINHAS DE ITENS (EXATAMENTE 9 POR PÁGINA) ---
-          const inicioItens = p * ITENS_POR_PAGINA;
-          const sublista = itensOrdenados.slice(inicioItens, inicioItens + ITENS_POR_PAGINA);
+          const ws = workbook.addWorksheet(nomeAba);
 
-          for (let i = 0; i < ITENS_POR_PAGINA; i++) {
-            const currentRowNum = r4 + 1 + i;
-            const row = ws.getRow(currentRowNum);
+          /*
+           * Configuração da visualização da planilha
+           */
+          ws.views = [
+            {
+              showGridLines: false,
+              showRowColHeaders: true,
+              zoomScale: 100,
+            },
+          ];
 
-            // --- ALTURA DA LINHA FIXA EM 51 PARA TODOS OS ITENS ---
-            row.height = 51;
+          /*
+           * Configuração da página
+           */
+          ws.properties.pageSetUpPr = {
+            fitToPage: true,
+            autoPageBreaks: false,
+          };
 
-            const item = sublista[i];
-            const numItem = i + 1; // Reinicia numeração de 1 a 9 por bloco/página
+          ws.pageSetup = {
+            paperSize: 9, // A4
+            orientation: "portrait",
 
-            if (item) {
-              let dataTexto = mesAnoTexto;
-              const rawData = item.dataBaixa || item.data_baixa || item.createdAt;
-              if (rawData) {
-                try {
-                  const d = typeof rawData.toDate === "function" ? rawData.toDate() : new Date(rawData);
-                  if (d && !isNaN(d.getTime())) {
-                    dataTexto = `${d.toLocaleString("pt-BR", { month: "short" })}/${d.getFullYear()}`.toLowerCase();
-                  }
-                } catch {
-                  dataTexto = mesAnoTexto;
+            fitToPage: true,
+            fitToWidth: 1,
+            fitToHeight: 0,
+
+            pageOrder: "downThenOver",
+
+            horizontalCentered: true,
+            verticalCentered: false,
+
+            margins: {
+              left: 0.35,
+              right: 0.35,
+              top: 0.25,
+              bottom: 0.25,
+              header: 0.05,
+              footer: 0.05,
+            },
+          };
+
+          /*
+           * Larguras das colunas.
+           * Essas larguras são interpretadas pelo ExcelJS
+           * como largura de coluna em caracteres/WCH.
+           */
+          const colunasConfig = [
+            { index: 1, width: 4.18 }, // A - item
+            { index: 2, width: 10.73 }, // B - patrimônio / sms
+            { index: 3, width: 14.27 }, // C - descrição
+            { index: 4, width: 8.64 }, // D - data
+            { index: 5, width: 18.18 }, // E - localização origem
+            { index: 6, width: 13.45 }, // F - situação
+            { index: 7, width: 4.27 }, // G - excel
+            { index: 8, width: 4.27 }, // H - bom
+            { index: 9, width: 4.27 }, // I - reg
+            { index: 10, width: 4.27 }, // J - péssi
+          ];
+
+          colunasConfig.forEach(({ index, width }) => {
+            ws.getColumn(index).width = width;
+          });
+
+          /*
+           * Ordenação dos itens
+           */
+          const itensOrdenados = [...itensUnidade].sort(
+            (a, b) => {
+              const setorA = formatarTexto(a?.setor);
+              const setorB = formatarTexto(b?.setor);
+
+              const comparacaoSetor = setorA.localeCompare(
+                setorB,
+                "pt-BR",
+                {
+                  numeric: true,
+                  sensitivity: "base",
                 }
+              );
+
+              if (comparacaoSetor !== 0) {
+                return comparacaoSetor;
               }
 
-              const estadoLower = String(item.estado || item.estadoConservacao || "bom").toLowerCase().trim();
+              const nomeA = formatarTexto(
+                a?.nome ||
+                  a?.equipamento ||
+                  a?.descricao
+              );
 
-              row.getCell(1).value = numItem;
-              row.getCell(2).value = String(item.patrimonio || "sp").toLowerCase().trim();
-              row.getCell(3).value = String(item.nome || item.equipamento || item.descricao || "").toLowerCase().trim();
-              row.getCell(4).value = dataTexto;
-              row.getCell(5).value = String(item.setor || "").toLowerCase().trim();
-              row.getCell(6).value = "x";
-              row.getCell(7).value = estadoLower === "excelente" || estadoLower === "excel" ? "x" : "";
-              row.getCell(8).value = estadoLower === "bom" ? "x" : "";
-              row.getCell(9).value = estadoLower === "regular" || estadoLower === "reg" ? "x" : "";
-              row.getCell(10).value = estadoLower === "pessimo" || estadoLower === "pessi" || estadoLower === "ruim" ? "x" : "";
+              const nomeB = formatarTexto(
+                b?.nome ||
+                  b?.equipamento ||
+                  b?.descricao
+              );
+
+              return nomeA.localeCompare(
+                nomeB,
+                "pt-BR",
+                {
+                  numeric: true,
+                  sensitivity: "base",
+                }
+              );
             }
+          );
 
-            for (let c = 1; c <= 10; c++) {
-              const cell = row.getCell(c);
-              cell.font = { name: "Arial", size: 8 };
+          const totalPaginas = Math.max(
+            1,
+            Math.ceil(
+              itensOrdenados.length / ITENS_POR_PAGINA
+            )
+          );
+
+          let proximaLinha = 1;
+
+          for (
+            let pagina = 0;
+            pagina < totalPaginas;
+            pagina++
+          ) {
+            const startRow = proximaLinha;
+
+            /*
+             * LINHA 1 - TÍTULO
+             */
+            const r1 = startRow;
+            const row1 = ws.getRow(r1);
+
+            row1.height = 20;
+
+            ws.mergeCells(`A${r1}:J${r1}`);
+
+            const tituloCell = ws.getCell(`A${r1}`);
+            tituloCell.value = "INVENTÁRIO";
+            tituloCell.font = {
+              name: "Arial",
+              size: 11,
+              bold: true,
+            };
+            tituloCell.alignment = {
+              vertical: "middle",
+              horizontal: "left",
+            };
+
+            /*
+             * LINHA 2 - UNIDADE E SITUAÇÃO DO BEM
+             */
+            const r2 = startRow + 1;
+            const row2 = ws.getRow(r2);
+
+            row2.height = 18;
+
+            const exibirUnidade =
+              !filtrarTodasAsUnidades
+                ? unidade
+                : nomeUnidade;
+
+            ws.mergeCells(`A${r2}:F${r2}`);
+
+            const unidadeCell = ws.getCell(`A${r2}`);
+            unidadeCell.value = formatarTexto(
+              exibirUnidade
+            );
+            unidadeCell.font = {
+              name: "Arial",
+              size: 10,
+              bold: true,
+            };
+            unidadeCell.alignment = {
+              vertical: "middle",
+              horizontal: "left",
+            };
+
+            ws.mergeCells(`G${r2}:J${r2}`);
+
+            const situacaoTituloCell =
+              ws.getCell(`G${r2}`);
+
+            situacaoTituloCell.value = "situação do bem";
+            situacaoTituloCell.font = {
+              name: "Arial",
+              size: 8,
+              bold: true,
+            };
+            situacaoTituloCell.alignment = {
+              vertical: "middle",
+              horizontal: "center",
+            };
+
+            /*
+             * LINHA 3 - DATA E CLASSIFICAÇÕES
+             */
+            const r3 = startRow + 2;
+            const row3 = ws.getRow(r3);
+
+            row3.height = 18;
+
+            ws.mergeCells(`A${r3}:F${r3}`);
+
+            const dataCell = ws.getCell(`A${r3}`);
+            dataCell.value = `data inventário: ${mesAnoTexto}`;
+            dataCell.font = {
+              name: "Arial",
+              size: 9,
+            };
+            dataCell.alignment = {
+              vertical: "middle",
+              horizontal: "left",
+            };
+
+            const classificacoes = {
+              G: "excel",
+              H: "bom",
+              I: "reg",
+              J: "péssi",
+            };
+
+            Object.entries(classificacoes).forEach(
+              ([coluna, valor]) => {
+                const cell = ws.getCell(
+                  `${coluna}${r3}`
+                );
+
+                cell.value = valor;
+                cell.font = {
+                  name: "Arial",
+                  size: 8,
+                  bold: true,
+                };
+                cell.alignment = {
+                  horizontal: "center",
+                  vertical: "middle",
+                };
+              }
+            );
+
+            /*
+             * LINHA 4 - CABEÇALHOS
+             */
+            const r4 = startRow + 3;
+            const row4 = ws.getRow(r4);
+
+            row4.height = 24;
+
+            const cabecalhos = [
+              "item",
+              "patrimônio / sms",
+              "descrição",
+              "data",
+              "localização origem",
+              "situação",
+              "",
+              "",
+              "",
+              "",
+            ];
+
+            cabecalhos.forEach((valor, index) => {
+              const cell = row4.getCell(index + 1);
+
+              cell.value = valor;
+              cell.font = {
+                name: "Arial",
+                size: 8,
+                bold: true,
+              };
               cell.alignment = {
                 vertical: "middle",
-                horizontal: c === 3 || c === 5 ? "left" : "center",
+                horizontal: "center",
                 wrapText: true,
               };
-              aplicarBorda(cell);
+            });
+
+            /*
+             * Bordas do cabeçalho
+             */
+            for (let linha = r1; linha <= r4; linha++) {
+              const row = ws.getRow(linha);
+
+              for (let coluna = 1; coluna <= 10; coluna++) {
+                aplicarBorda(row.getCell(coluna));
+              }
             }
+
+            /*
+             * Itens da página
+             */
+            const inicioItens =
+              pagina * ITENS_POR_PAGINA;
+
+            const sublista = itensOrdenados.slice(
+              inicioItens,
+              inicioItens + ITENS_POR_PAGINA
+            );
+
+            for (
+              let i = 0;
+              i < ITENS_POR_PAGINA;
+              i++
+            ) {
+              const linhaAtual = r4 + 1 + i;
+              const row = ws.getRow(linhaAtual);
+
+              /*
+               * Altura solicitada:
+               * 51 pontos por linha
+               */
+              row.height = ALTURA_LINHA_ITEM;
+
+              const item = sublista[i];
+
+              if (item) {
+                const dataTexto = obterDataInventario(
+                  item,
+                  mesAnoTexto
+                );
+
+                const estado = obterEstado(item);
+
+                const patrimonio = formatarTexto(
+                  item?.patrimonio,
+                  "sp"
+                );
+
+                const descricao = formatarTexto(
+                  item?.nome ||
+                    item?.equipamento ||
+                    item?.descricao,
+                  ""
+                );
+
+                const setor = formatarTexto(
+                  item?.setor,
+                  ""
+                );
+
+                row.getCell(1).value = i + 1;
+                row.getCell(2).value = patrimonio;
+                row.getCell(3).value = descricao;
+                row.getCell(4).value = dataTexto;
+                row.getCell(5).value = setor;
+                row.getCell(6).value = "x";
+
+                row.getCell(7).value =
+                  estado === "excelente" ||
+                  estado === "excel"
+                    ? "x"
+                    : "";
+
+                row.getCell(8).value =
+                  estado === "bom" ? "x" : "";
+
+                row.getCell(9).value =
+                  estado === "regular" ||
+                  estado === "reg"
+                    ? "x"
+                    : "";
+
+                row.getCell(10).value =
+                  estado === "pessimo" ||
+                  estado === "péssimo" ||
+                  estado === "pessi" ||
+                  estado === "ruim"
+                    ? "x"
+                    : "";
+              }
+
+              /*
+               * Formatação de cada linha
+               */
+              for (
+                let coluna = 1;
+                coluna <= 10;
+                coluna++
+              ) {
+                const cell = row.getCell(coluna);
+
+                cell.font = {
+                  name: "Arial",
+                  size: 8,
+                };
+
+                cell.alignment = {
+                  vertical: "middle",
+                  horizontal:
+                    coluna === 3 || coluna === 5
+                      ? "left"
+                      : "center",
+                  wrapText: true,
+                };
+
+                aplicarBorda(cell);
+              }
+            }
+
+            /*
+             * Quebra de página entre os blocos
+             */
+            if (pagina < totalPaginas - 1) {
+              const ultimaLinhaBloco =
+                r4 + ITENS_POR_PAGINA;
+
+              ws.getRow(ultimaLinhaBloco)
+                .addPageBreak();
+            }
+
+            /*
+             * Espaço de duas linhas antes do próximo bloco
+             */
+            proximaLinha =
+              r4 + ITENS_POR_PAGINA + 2;
           }
 
-          if (p < totalPaginasSheet - 1) {
-            ws.getRow(r4 + ITENS_POR_PAGINA).addPageBreak();
-          }
+          /*
+           * Área de impressão.
+           *
+           * Não usamos printTitlesRow porque cada bloco
+           * já contém seu próprio cabeçalho.
+           */
+          const ultimaLinha = ws.lastRow
+            ? ws.lastRow.number
+            : 1;
+
+          ws.pageSetup.printArea = `A1:J${ultimaLinha}`;
+
+          /*
+           * Reforça a configuração depois que todo
+           * o conteúdo foi criado.
+           */
+          ws.pageSetup.fitToPage = true;
+          ws.pageSetup.fitToWidth = 1;
+          ws.pageSetup.fitToHeight = 0;
+          ws.pageSetup.orientation = "portrait";
+          ws.pageSetup.paperSize = 9;
+          ws.pageSetup.horizontalCentered = true;
+          ws.pageSetup.verticalCentered = false;
         }
-      });
+      );
 
+      /*
+       * Gera o arquivo Excel
+       */
       const buffer = await workbook.xlsx.writeBuffer();
+
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
+
+      const sufixo = unidadeFiltro
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9_]/g, "");
+
       link.href = url;
-      const sufixo = unidadeFiltro.replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-      link.download = `inventario_secretaria_${sufixo || "geral"}.xlsx`;
+      link.download = `inventario_secretaria_${
+        sufixo || "geral"
+      }.xlsx`;
+
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("erro ao gerar inventario no modelo impresso:", err);
+    } catch (error) {
+      console.error(
+        "Erro ao gerar inventário:",
+        error
+      );
     } finally {
       setExportando(false);
     }
@@ -276,12 +657,17 @@ export function ButtonInventarioSecretaria({
     >
       {exportando ? (
         <>
-          <FiLoader size={16} className="animate-spin" />
-          <span>gerando inventario...</span>
+          <FiLoader
+            size={16}
+            className="animate-spin"
+          />
+
+          <span>gerando inventário...</span>
         </>
       ) : (
         <>
           <FiFileText size={16} />
+
           <span>Inventário Secretaria</span>
         </>
       )}
