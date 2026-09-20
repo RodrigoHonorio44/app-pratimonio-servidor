@@ -1,22 +1,33 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
-import packageJson from "../../package.json";
-
-// Importa automaticamente a versão definida no package.json
-const VERSAO_ATUAL = packageJson.version;
 
 const AvisoAtualizacao = () => {
   const [temNovaVersao, setTemNovaVersao] = useState(false);
+  
+  // Armazena a versão inicial entregue pelo servidor quando o app carregou
+  const versaoInicialRef = useRef(null);
 
   const verificarVersaoServidor = async () => {
     try {
-      // Adiciona timestamp para desativar qualquer cache local do navegador
-      const resposta = await fetch(`/version.json?t=${Date.now()}`);
+      // Busca a versão no servidor forçando a ignorar o cache do navegador
+      const resposta = await fetch(`/version.json?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!resposta.ok) return;
 
       const dados = await resposta.json();
+      const versaoServidor = dados.version;
 
-      if (dados.version && dados.version !== VERSAO_ATUAL) {
+      if (!versaoServidor) return;
+
+      // Na primeira checagem, grava a versão atual em execução
+      if (!versaoInicialRef.current) {
+        versaoInicialRef.current = versaoServidor;
+        return;
+      }
+
+      // Se a versão do servidor for diferente da versão gravada na inicialização do app
+      if (versaoServidor !== versaoInicialRef.current) {
         setTemNovaVersao(true);
       }
     } catch (erro) {
@@ -25,13 +36,12 @@ const AvisoAtualizacao = () => {
   };
 
   useEffect(() => {
-    // Checa assim que abre o app
     verificarVersaoServidor();
 
-    // Checa a cada 60 segundos
+    // Checa por atualizações a cada 60 segundos
     const intervalo = setInterval(verificarVersaoServidor, 60000);
 
-    // Checa também quando o usuário volta para a aba do navegador
+    // Checa quando o usuário retorna para a aba do navegador
     const handleFocus = () => verificarVersaoServidor();
     window.addEventListener("focus", handleFocus);
 
@@ -42,8 +52,11 @@ const AvisoAtualizacao = () => {
   }, []);
 
   const handleAtualizarAgora = () => {
-    // Recarrega a página limpando o cache
-    window.location.reload(true);
+    // Oculta o aviso na hora para evitar travamento na tela
+    setTemNovaVersao(false);
+    
+    // Recarrega a página aplicando a nova versão
+    window.location.href = window.location.href;
   };
 
   if (!temNovaVersao) return null;
