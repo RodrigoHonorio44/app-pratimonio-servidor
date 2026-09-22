@@ -9,11 +9,24 @@ const AvisoAtualizacao = () => {
 
   const verificarVersaoServidor = async () => {
     try {
-      // Busca a versão no servidor forçando a ignorar o cache do navegador
-      const resposta = await fetch(`/version.json?t=${Date.now()}`, {
+      // Usa a origem absoluta para garantir que vá direto à raiz do domínio na Vercel
+      const urlVersion = `${window.location.origin}/version.json?t=${Date.now()}`;
+
+      // Busca a versão no servidor forçando a ignorar qualquer cache de proxy/navegador
+      const resposta = await fetch(urlVersion, {
+        method: "GET",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        },
         cache: "no-store",
       });
-      if (!resposta.ok) return;
+
+      if (!resposta.ok) {
+        console.warn("Não foi possível carregar o version.json. Status:", resposta.status);
+        return;
+      }
 
       const dados = await resposta.json();
       const versaoServidor = dados.version;
@@ -23,11 +36,13 @@ const AvisoAtualizacao = () => {
       // Na primeira checagem, grava a versão atual em execução
       if (!versaoInicialRef.current) {
         versaoInicialRef.current = versaoServidor;
+        console.log("Versão inicial registrada no app:", versaoServidor);
         return;
       }
 
       // Se a versão do servidor for diferente da versão gravada na inicialização do app
       if (versaoServidor !== versaoInicialRef.current) {
+        console.log(`Nova versão detectada! Servidor: ${versaoServidor} | Inicial: ${versaoInicialRef.current}`);
         setTemNovaVersao(true);
       }
     } catch (erro) {
@@ -55,8 +70,8 @@ const AvisoAtualizacao = () => {
     // Oculta o aviso na hora para evitar travamento na tela
     setTemNovaVersao(false);
     
-    // Recarrega a página aplicando a nova versão
-    window.location.href = window.location.href;
+    // Recarrega a página limpando qualquer resquício de cache do navegador
+    window.location.reload(true);
   };
 
   if (!temNovaVersao) return null;
