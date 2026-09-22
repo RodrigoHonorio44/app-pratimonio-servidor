@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../services/api";
 import { auth } from "../services/firebase";
 import { toast } from "react-toastify";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 
 export const useLaudos = () => {
   const [itens, setItens] = useState([]);
@@ -10,8 +10,8 @@ export const useLaudos = () => {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [buscaPatrimonio, setBuscaPatrimonio] = useState("");
-  const [unidadeSelecionada, setUnidadeSelecionada] = useState("Todas");
-  const [buscaSetor, setBuscaSetor] = useState("Todos");
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState("todas");
+  const [buscaSetor, setBuscaSetor] = useState("todos");
 
   const [laudosPendentes, setLaudosPendentes] = useState([]);
   const [loadingLaudos, setLoadingLaudos] = useState(false);
@@ -19,6 +19,9 @@ export const useLaudos = () => {
 
   const [modalAberto, setModalAberto] = useState(false);
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState(null);
+
+  // Consome o mapa de setores dinâmico
+  const { mapaSetores } = useSetores();
 
   useEffect(() => {
     const inicializarPainel = async () => {
@@ -30,9 +33,13 @@ export const useLaudos = () => {
 
   const normalizarParaComparacao = (texto) => {
     if (!texto) return "";
-    return texto
-      .toString()
-      .toLowerCase()
+    let str = String(texto).toLowerCase().trim();
+
+    if (/upa.*ino/i.test(str) || str.includes("inoã")) {
+      return "upa inoã";
+    }
+
+    return str
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[/\s._-]/g, "")
@@ -40,41 +47,44 @@ export const useLaudos = () => {
   };
 
   const obterSetoresDaUnidade = (unidade) => {
-    if (!unidade || unidade === "Todas" || unidade === "Todas As Unidades...") return null;
+    const uniNorm = String(unidade || "").toLowerCase().trim();
+    if (!unidade || uniNorm === "todas" || uniNorm === "todas as unidades...") return null;
 
     const deParaUnidades = {
-      "Hospital Conde": "Hospital Conde",
-      "Estoque Patrimônio": "Estoque Patrimônio",
-      "Residência Do Paciente": "Residência Do Paciente",
-      "Santa Rita": "Upa Santa Rita",
-      "Upa Santa Rita": "Upa Santa Rita",
-      "UPA Santa Rita": "Upa Santa Rita",
-      "Inoã": "Upa Inoã",
-      "Upa Inoã": "Upa Inoã",
-      "UPA Inoã": "Upa Inoã",
-      "Upa Inoa": "Upa Inoã",
-      "upa inoa": "Upa Inoã",
-      "Barroco": "Samu Barroco",
-      "Samu Barroco": "Samu Barroco",
-      "Ponta Negra": "Samu Ponta Negra",
-      "Samu Ponta Negra": "Samu Ponta Negra",
-      "Centro": "Samu Centro",
-      "Samu Centro": "Samu Centro"
+      "hospital conde": "hospital conde",
+      "estoque patrimonio": "estoque patrimonio",
+      "residencia do paciente": "residencia do paciente",
+      "santa rita": "upa santa rita",
+      "upa santa rita": "upa santa rita",
+      "inoã": "upa inoã",
+      "upa inoã": "upa inoã",
+      "upa inoa": "upa inoã",
+      "barroco": "samu barroco",
+      "samu barroco": "samu barroco",
+      "ponta negra": "samu ponta negra",
+      "samu ponta negra": "samu ponta negra",
+      "centro": "samu centro",
+      "samu centro": "samu centro"
     };
 
-    const chaveUnidade = deParaUnidades[unidade] || unidade;
+    const chaveUnidade = deParaUnidades[uniNorm] || uniNorm;
     let listaSetores = [];
 
-    if (chaveUnidade && MAPA_SETORES_POR_UNIDADE[chaveUnidade]) {
-      listaSetores = [...MAPA_SETORES_POR_UNIDADE[chaveUnidade]];
+    // Busca no mapa dinâmico de setores
+    const chaveEncontrada = Object.keys(mapaSetores || {}).find(
+      (k) => normalizarParaComparacao(k) === normalizarParaComparacao(chaveUnidade)
+    );
+
+    if (chaveEncontrada && mapaSetores[chaveEncontrada]) {
+      listaSetores = (mapaSetores[chaveEncontrada] || []).map((s) => String(s).toLowerCase().trim());
     } else {
       const setoresUnicos = new Set();
       const unidadeNorm = normalizarParaComparacao(unidade);
 
       itens.forEach((item) => {
         const itemUnidadeNorm = normalizarParaComparacao(item.unidade || "");
-        if (itemUnidadeNorm.includes(unidadeNorm) && item.setor && item.setor.trim() !== "") {
-          setoresUnicos.add(item.setor.trim());
+        if (itemUnidadeNorm.includes(unidadeNorm) && item.setor && String(item.setor).trim() !== "") {
+          setoresUnicos.add(String(item.setor).toLowerCase().trim());
         }
       });
       listaSetores = Array.from(setoresUnicos);
@@ -82,8 +92,9 @@ export const useLaudos = () => {
 
     listaSetores.sort((a, b) => a.localeCompare(b, "pt", { sensitivity: "base" }));
 
-    if (buscaSetor !== "Todos" && buscaSetor !== "Todos Os Setores..." && buscaSetor.trim() !== "") {
-      const termoNorm = normalizarParaComparacao(buscaSetor);
+    const buscaSetorNorm = String(buscaSetor || "").toLowerCase().trim();
+    if (buscaSetorNorm !== "todos" && buscaSetorNorm !== "todos os setores..." && buscaSetorNorm !== "") {
+      const termoNorm = normalizarParaComparacao(buscaSetorNorm);
       return listaSetores.filter(setor => 
         normalizarParaComparacao(setor).includes(termoNorm)
       );
@@ -155,13 +166,13 @@ export const useLaudos = () => {
             status: "inutilizado",
             dataBaixa: new Date().toISOString(),
             ultimaMovimentacao: new Date().toISOString(),
-            motivoBaixa: laudoObj?.justificativaLaudo || "Laudo técnico de inviabilidade aprovado"
+            motivoBaixa: String(laudoObj?.justificativaLaudo || "laudo tecnico de inviabilidade aprovado").toLowerCase()
           },
           { headers }
         );
       }
 
-      toast.success("Laudo aprovado e ativo movido para Inutilizados!");
+      toast.success("Laudo aprovado e ativo movido para inutilizados!");
 
       // Remove imediatamente da tabela de pendentes
       setLaudosPendentes((prev) => prev.filter((item) => (item._id || item.id) !== laudoId));
@@ -237,7 +248,7 @@ export const useLaudos = () => {
 
       dados.forEach((item) => {
         if (item.unidade) {
-          const original = item.unidade.trim();
+          const original = String(item.unidade).toLowerCase().trim();
           if (original) {
             const chaveNorm = normalizarParaComparacao(original);
             if (!mapaUnicas.has(chaveNorm)) {
@@ -290,8 +301,8 @@ export const useLaudos = () => {
 
   const handleLimparBusca = () => {
     setBuscaPatrimonio("");
-    setBuscaSetor("Todos");
-    setUnidadeSelecionada("Todas");
+    setBuscaSetor("todos");
+    setUnidadeSelecionada("todas");
     setHasSearched(false);
   };
 
@@ -308,15 +319,15 @@ export const useLaudos = () => {
     const unidadeItemNorm = normalizarParaComparacao(item.unidade || "");
     const unidadeSelecionadaNorm = normalizarParaComparacao(unidadeSelecionada);
     const matchUnidade =
-      unidadeSelecionada === "Todas" ||
-      unidadeSelecionada === "Todas As Unidades..." ||
+      unidadeSelecionada === "todas" ||
+      unidadeSelecionada === "todas as unidades..." ||
       unidadeItemNorm.includes(unidadeSelecionadaNorm);
 
     const setorItemNorm = normalizarParaComparacao(item.setor || "");
     const setorSelecionadoNorm = normalizarParaComparacao(buscaSetor);
     const matchSetor =
-      buscaSetor === "Todos" ||
-      buscaSetor === "Todos Os Setores..." ||
+      buscaSetor === "todos" ||
+      buscaSetor === "todos os setores..." ||
       buscaSetor.trim() === "" ||
       setorItemNorm === setorSelecionadoNorm ||
       setorItemNorm.includes(setorSelecionadoNorm);

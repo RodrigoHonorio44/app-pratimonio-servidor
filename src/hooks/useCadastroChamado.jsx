@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { auth, db } from "../services/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import api from "../services/api";
 import { toast } from "react-hot-toast";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores"; // Importa o novo hook do banco
 
 export const useCadastroChamado = () => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +20,9 @@ export const useCadastroChamado = () => {
   const [descricao, setDescricao] = useState("");
   const [prioridade, setPrioridade] = useState("média");
   const [naoSeiPatrimonio, setNaoSeiPatrimonio] = useState(false);
+
+  // Consome os setores vindos do MongoDB através douseSetores Hook
+  const { mapaSetores, loading: loadingSetores } = useSetores();
 
   // Altera a unidade mantendo o setor caso tenha sido preenchido por busca manual/automática
   const handleUnidadeChange = (valor) => {
@@ -78,9 +81,9 @@ export const useCadastroChamado = () => {
         setSetor(ativoEncontrado.setor || "");
         setSetorManual(true);
 
-        // Mapeia case-insensitive a unidade do banco para bater com o chave exata do select
+        // Mapeia case-insensitive a unidade do banco para bater com a chave exata das unidades do MongoDB
         const unidadeBanco = String(ativoEncontrado.unidade || "").trim().toLowerCase();
-        const chavesUnidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
+        const chavesUnidades = Object.keys(mapaSetores || {});
         const chaveCorrespondente = chavesUnidades.find(
           u => u.toLowerCase() === unidadeBanco
         );
@@ -176,6 +179,7 @@ export const useCadastroChamado = () => {
 
   return {
     loading, 
+    loadingSetores,
     buscandoAtivo, 
     sucesso, 
     setSucesso, 
@@ -201,6 +205,6 @@ export const useCadastroChamado = () => {
     toggleNaoSei, 
     handleBotaoBusca, 
     handleNovoChamado,
-    MAPA_SETORES_POR_UNIDADE
+    MAPA_SETORES_POR_UNIDADE: mapaSetores // Retorna o mapa vindo do MongoDB com retrocompatibilidade
   };
 };

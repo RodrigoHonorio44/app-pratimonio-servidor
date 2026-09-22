@@ -3,7 +3,7 @@ import { auth } from "../services/firebase";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import { abrirVisualizacaoTermo } from "../components/ImpressaoTransferencia";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores"; // Hook integrado do MongoDB
 
 export const useTransferencia = () => {
   const [patrimonioBusca, setPatrimonioBusca] = useState("");
@@ -25,6 +25,9 @@ export const useTransferencia = () => {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 12;
 
+  // Consome os setores e unidades dinâmicos do MongoDB
+  const { mapaSetores, loading: loadingSetores } = useSetores();
+
   const [dadosSaida, setDadosSaida] = useState({
     novaUnidade: "",
     novoSetor: "",
@@ -37,16 +40,12 @@ export const useTransferencia = () => {
     quantidadeRetirada: 1,
   });
 
-  const unidades = [
-    "Estoque Patrimônio",
-    "Hospital Conde",
-    "UPA INOÃ",
-    "UPA SANTA RITA",
-    "SAMU BARROCO",
-    "SAMU PONTA NEGRA",
-    "SAMU CENTRO",
-    "Residência do Paciente",
-  ];
+  // Monta dinamicamente a lista de unidades combinando os dados do MongoDB com unidades especiais
+  const unidadesDinamicas = Object.keys(mapaSetores || {});
+  const unidadesEspeciais = ["Estoque Patrimônio", "Residência do Paciente"];
+  
+  // Lista final consolidada sem duplicidades
+  const unidades = Array.from(new Set([...unidadesEspeciais, ...unidadesDinamicas]));
 
   const normalizarParaComparacao = (texto) => {
     if (!texto) return "";
@@ -82,11 +81,11 @@ export const useTransferencia = () => {
   const obterSetoresFiltrados = () => {
     if (!unidadeFiltro) return [];
 
-    const chaveUnidade = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
+    const chaveUnidade = Object.keys(mapaSetores || {}).find(
       (key) => normalizarParaComparacao(key) === normalizarParaComparacao(unidadeFiltro)
     );
 
-    const setoresDaUnidade = chaveUnidade ? MAPA_SETORES_POR_UNIDADE[chaveUnidade] : [];
+    const setoresDaUnidade = chaveUnidade ? mapaSetores[chaveUnidade] : [];
     
     if (!setorBusca.trim()) return setoresDaUnidade;
 
@@ -283,19 +282,19 @@ export const useTransferencia = () => {
 
     const patrimonioFinal =
       normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" && novoPatrimonioParaSP
-        ? novoPatrimonioParaSP.trim()
-        : itemSelecionado.patrimonio;
+        ? novoPatrimonioParaSP.trim().toLowerCase()
+        : String(itemSelecionado.patrimonio || "").toLowerCase();
 
     if (isVindoDeResidencial) {
       setDadosParaImpressaoRetirada({
         patrimonio: patrimonioFinal,
-        nomeEquipamento: itemSelecionado.nome,
-        unidadeOrigem: itemSelecionado.unidade,
-        setorOrigem: itemSelecionado.setor,
-        nomePaciente: itemSelecionado.setor,
-        unidadeDestino: dadosSaida.novaUnidade,
-        setorDestino: dadosSaida.novoSetor || "Estoque Patrimônio",
-        responsavelRecebimento: dadosSaida.responsavelRecebimento,
+        nomeEquipamento: (itemSelecionado.nome || "").toLowerCase(),
+        unidadeOrigem: (itemSelecionado.unidade || "").toLowerCase(),
+        setorOrigem: (itemSelecionado.setor || "").toLowerCase(),
+        nomePaciente: (itemSelecionado.setor || "").toLowerCase(),
+        unidadeDestino: dadosSaida.novaUnidade.toLowerCase(),
+        setorDestino: (dadosSaida.novoSetor || "Estoque Patrimônio").toLowerCase(),
+        responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase(),
       });
 
       setTimeout(() => {
@@ -314,17 +313,17 @@ export const useTransferencia = () => {
     const dadosCompletosParaTermo = {
       ativoId: itemSelecionado._id || itemSelecionado.id,
       patrimonio: patrimonioFinal,
-      nomeEquipamento: itemSelecionado.nome,
-      unidadeOrigem: itemSelecionado.unidade,
-      setorOrigem: itemSelecionado.setor,
-      unidadeDestino: dadosSaida.novaUnidade,
-      setorDestino: dadosSaida.novoSetor || "Estoque Patrimônio",
-      responsavelRecebimento: dadosSaida.responsavelRecebimento,
-      motivo: isResidencial ? "internação domiciliar (home care)" : dadosSaida.motivo,
-      pacienteEndereco: dadosSaida.pacienteEndereco,
-      pacienteTelefone: dadosSaida.pacienteTelefone,
-      pacienteIdentidade: dadosSaida.pacienteIdentidade,
-      pacienteCpf: dadosSaida.pacienteCpf,
+      nomeEquipamento: (itemSelecionado.nome || "").toLowerCase(),
+      unidadeOrigem: (itemSelecionado.unidade || "").toLowerCase(),
+      setorOrigem: (itemSelecionado.setor || "").toLowerCase(),
+      unidadeDestino: dadosSaida.novaUnidade.toLowerCase(),
+      setorDestino: (dadosSaida.novoSetor || "Estoque Patrimônio").toLowerCase(),
+      responsavelRecebimento: dadosSaida.responsavelRecebimento.toLowerCase(),
+      motivo: isResidencial ? "internação domiciliar (home care)" : dadosSaida.motivo.toLowerCase(),
+      pacienteEndereco: dadosSaida.pacienteEndereco.toLowerCase(),
+      pacienteTelefone: dadosSaida.pacienteTelefone.toLowerCase(),
+      pacienteIdentidade: dadosSaida.pacienteIdentidade.toLowerCase(),
+      pacienteCpf: dadosSaida.pacienteCpf.toLowerCase(),
       isResidencial: isResidencial
     };
 
@@ -350,8 +349,8 @@ export const useTransferencia = () => {
       const idOriginal = itemSelecionado._id || itemSelecionado.id;
       const patrimonioFinal =
         normalizarParaComparacao(itemSelecionado.patrimonio) === "sp" && novoPatrimonioParaSP
-          ? novoPatrimonioParaSP.trim()
-          : String(itemSelecionado.patrimonio || "").trim();
+          ? novoPatrimonioParaSP.trim().toLowerCase()
+          : String(itemSelecionado.patrimonio || "").trim().toLowerCase();
 
       const ehSemPatrimonio = 
         !patrimonioFinal || 
@@ -373,10 +372,10 @@ export const useTransferencia = () => {
 
       const basePayload = {
         ...itemSelecionado,
-        nome: itemSelecionado.nome ? itemSelecionado.nome.trim() : "",
+        nome: itemSelecionado.nome ? itemSelecionado.nome.trim().toLowerCase() : "",
         patrimonio: patrimonioFinal,
-        unidade: dadosSaida.novaUnidade,
-        setor: dadosSaida.novoSetor.trim(),
+        unidade: dadosSaida.novaUnidade.toLowerCase(),
+        setor: dadosSaida.novoSetor.trim().toLowerCase(),
         status: "ativo",
         quantidade: 1,
         ultimaMovimentacao: new Date().toISOString(),
@@ -468,40 +467,40 @@ export const useTransferencia = () => {
       const payloadSaida = {
         ativoId: idOriginal,
         patrimonio: patrimonioFinal,
-        nomeEquipamento: String(itemSelecionado.nome || "").trim(),
-        unidadeOrigem: String(itemSelecionado.unidade || "").trim(),
-        setorOrigem: String(itemSelecionado.setor || "").trim(),
-        unidadeDestino: dadosSaida.novaUnidade,
-        setorDestino: dadosSaida.novoSetor.trim(),
-        responsavelRecebimento: dadosSaida.responsavelRecebimento.trim(),
-        motivo: isResidencial ? "home care" : dadosSaida.motivo.trim(),
+        nomeEquipamento: String(itemSelecionado.nome || "").trim().toLowerCase(),
+        unidadeOrigem: String(itemSelecionado.unidade || "").trim().toLowerCase(),
+        setorOrigem: String(itemSelecionado.setor || "").trim().toLowerCase(),
+        unidadeDestino: dadosSaida.novaUnidade.toLowerCase(),
+        setorDestino: dadosSaida.novoSetor.trim().toLowerCase(),
+        responsavelRecebimento: dadosSaida.responsavelRecebimento.trim().toLowerCase(),
+        motivo: isResidencial ? "home care" : dadosSaida.motivo.trim().toLowerCase(),
         quantidadeTransferida: Number(dadosSaida.quantidadeRetirada) || 1,
         dataSaida: new Date().toISOString(),
       };
 
       if (isResidencial) {
         payloadSaida.pacienteDetails = {
-          endereco: dadosSaida.pacienteEndereco.trim(),
-          telefone: dadosSaida.pacienteTelefone.trim(),
-          identity: dadosSaida.pacienteIdentidade.trim(),
-          cpf: dadosSaida.pacienteCpf.trim(),
+          endereco: dadosSaida.pacienteEndereco.trim().toLowerCase(),
+          telefone: dadosSaida.pacienteTelefone.trim().toLowerCase(),
+          identity: dadosSaida.pacienteIdentidade.trim().toLowerCase(),
+          cpf: dadosSaida.pacienteCpf.trim().toLowerCase(),
         };
 
         await api.post(`/equipamento_com_paciente`, {
           equipamentoId: idOriginal,
-          equipamentoNome: String(itemSelecionado.nome || "").trim(),
+          equipamentoNome: String(itemSelecionado.nome || "").trim().toLowerCase(),
           patrimonio: patrimonioFinal,
-          unidadeOrigem: String(itemSelecionado.unidade || "").trim(),
-          setorOrigem: String(itemSelecionado.setor || "").trim(),
+          unidadeOrigem: String(itemSelecionado.unidade || "").trim().toLowerCase(),
+          setorOrigem: String(itemSelecionado.setor || "").trim().toLowerCase(),
           dataEntrega: new Date().toISOString(),
           statusVinculo: "ativo",
           paciente: {
-            nome: dadosSaida.novoSetor.trim(),
-            endereco: dadosSaida.pacienteEndereco.trim(),
-            telefone: dadosSaida.pacienteTelefone.trim(),
-            identidade: dadosSaida.pacienteIdentidade.trim(),
-            cpf: dadosSaida.pacienteCpf.trim(),
-            responsavelRecebimento: dadosSaida.responsavelRecebimento.trim()
+            nome: dadosSaida.novoSetor.trim().toLowerCase(),
+            endereco: dadosSaida.pacienteEndereco.trim().toLowerCase(),
+            telefone: dadosSaida.pacienteTelefone.trim().toLowerCase(),
+            identidade: dadosSaida.pacienteIdentidade.trim().toLowerCase(),
+            cpf: dadosSaida.pacienteCpf.trim().toLowerCase(),
+            responsavelRecebimento: dadosSaida.responsavelRecebimento.trim().toLowerCase()
           }
         });
       }
@@ -550,7 +549,7 @@ export const useTransferencia = () => {
     setItemSelecionado,
     showModal,
     setShowModal,
-    loading,
+    loading: loading || loadingSetores,
     novoPatrimonioParaSP,
     setNovoPatrimonioParaSP,
     mostrarDropdown,

@@ -3,8 +3,7 @@ import { auth } from "../services/firebase";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 
 const normalizarTexto = (str) => {
   if (!str) return "";
@@ -25,6 +24,9 @@ export const useEstoque = () => {
   const [termosPendentes, setTermosPendentes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState(false);
+
+  // Consome o mapa de setores dinâmico e a lista da base de dados
+  const { mapaSetores } = useSetores();
 
   const [loteSaida, setLoteSaida] = useState([]);
   const [itemParaAdicionar, setItemParaAdicionar] = useState(null);
@@ -53,25 +55,10 @@ export const useEstoque = () => {
     "samu centro",
   ];
 
-  const obterSetoresDoMapa = (nomeUnidade) => {
-    if (!MAPA_SETORES_POR_UNIDADE) return [];
-
-    if (MAPA_SETORES_POR_UNIDADE[nomeUnidade]) {
-      return MAPA_SETORES_POR_UNIDADE[nomeUnidade].map((s) => normalizarTexto(s));
-    }
-
-    const chaveEncontrada = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
-      (chave) => normalizarTexto(chave) === normalizarTexto(nomeUnidade)
-    );
-
-    return chaveEncontrada
-      ? MAPA_SETORES_POR_UNIDADE[chaveEncontrada].map((s) => normalizarTexto(s))
-      : [];
-  };
-
+  // Constrói dinamicamente o objeto setoresPorUnidade normalizado em caixa baixa
   const setoresPorUnidade = {
-    ...Object.keys(MAPA_SETORES_POR_UNIDADE || {}).reduce((acc, key) => {
-      acc[normalizarTexto(key)] = MAPA_SETORES_POR_UNIDADE[key].map((s) =>
+    ...Object.keys(mapaSetores || {}).reduce((acc, key) => {
+      acc[normalizarTexto(key)] = (mapaSetores[key] || []).map((s) =>
         normalizarTexto(s)
       );
       return acc;
@@ -81,13 +68,6 @@ export const useEstoque = () => {
       "reserva tecnica",
       "inservivel / manutencao",
     ],
-    "hospital conde": obterSetoresDoMapa("Hospital Conde"),
-    "upa inoã":
-      obterSetoresDoMapa("UPA de Inoã") || obterSetoresDoMapa("upa inoã"),
-    "upa santa rita": obterSetoresDoMapa("UPA de Santa Rita"),
-    "samu barroco": obterSetoresDoMapa("SAMU Barroco"),
-    "samu ponta negra": obterSetoresDoMapa("SAMU Ponta Negra"),
-    "samu centro": obterSetoresDoMapa("SAMU Centro"),
   };
 
   const motivosSaida = [
@@ -214,7 +194,10 @@ export const useEstoque = () => {
       return;
     }
 
-    const itemIdAtual = itemParaAdicionar._id?.$oid || itemParaAdicionar._id || itemParaAdicionar.id;
+    const itemIdAtual =
+      itemParaAdicionar._id?.$oid ||
+      itemParaAdicionar._id ||
+      itemParaAdicionar.id;
 
     const jaExiste = loteSaida.some((item) => {
       const itemIdNoLote = item._id?.$oid || item._id || item.id;
@@ -341,7 +324,10 @@ export const useEstoque = () => {
     }
   };
 
-  const confirmarBaixaTermoPendente = async (termoPendenteInput, responsavelNome = null) => {
+  const confirmarBaixaTermoPendente = async (
+    termoPendenteInput,
+    responsavelNome = null
+  ) => {
     setProcessando(true);
     try {
       const currentUser = auth.currentUser;
@@ -369,11 +355,15 @@ export const useEstoque = () => {
         termoPendente.setorDestino
       );
       const responsavelFinal = normalizarTexto(
-        responsavelNome || termoPendente.responsavelRecebimento || "responsavel pelo setor"
+        responsavelNome ||
+          termoPendente.responsavelRecebimento ||
+          "responsavel pelo setor"
       );
 
       const resEstoque = await api.get("/estoque");
-      const listaEstoque = Array.isArray(resEstoque.data) ? resEstoque.data : [];
+      const listaEstoque = Array.isArray(resEstoque.data)
+        ? resEstoque.data
+        : [];
       const itemEstoque = listaEstoque.find((i) => {
         const idItem = i._id?.$oid || i._id || i.id;
         return String(idItem) === String(itemId);
@@ -392,7 +382,9 @@ export const useEstoque = () => {
 
       if (categoriaTratada !== "bem duravel") {
         const resAtivos = await api.get("/ativos").catch(() => ({ data: [] }));
-        const listaAtivos = Array.isArray(resAtivos.data) ? resAtivos.data : [];
+        const listaAtivos = Array.isArray(resAtivos.data)
+          ? resAtivos.data
+          : [];
 
         let ativoExistente = null;
         if (patrimonioFinal === "s/p" || patrimonioFinal === "sp") {
@@ -431,7 +423,10 @@ export const useEstoque = () => {
         };
 
         if (ativoExistente) {
-          const idTarget = ativoExistente._id?.$oid || ativoExistente._id || ativoExistente.id;
+          const idTarget =
+            ativoExistente._id?.$oid ||
+            ativoExistente._id ||
+            ativoExistente.id;
           await api.put(`/ativos/${idTarget}`, payloadAtivo);
         } else {
           await api.post("/ativos", payloadAtivo);

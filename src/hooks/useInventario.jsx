@@ -5,12 +5,15 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 
 export const useInventario = () => {
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Consome os setores e o mapa de setores dinâmico vindo da base de dados/hook
+  const { mapaSetores, setores: listaTodosSetoresBD } = useSetores();
 
   // Estados dos Filtros
   const [unidadeFiltro, setUnidadeFiltro] = useState("Todas");
@@ -210,7 +213,7 @@ export const useInventario = () => {
         `laudo-${new Date().getFullYear()}-${Math.floor(
           1000 + Math.random() * 9000
         )}`;
-      const parecerFinal = dadosBaixaAvulsa?.parecerTecnico || "";
+      const parecerTecnico = dadosBaixaAvulsa?.parecerTecnico || "";
 
       await api.put(
         `/ativos/${idAtivo}`,
@@ -222,7 +225,7 @@ export const useInventario = () => {
           motivoBaixa: motivoFinal.toLowerCase(),
           estadoConservacao: estadoFinal.toLowerCase(),
           numeroProcesso: processoFinal.toLowerCase(),
-          parecerTecnico: parecerFinal.toLowerCase(),
+          parecerTecnico: parecerTecnico.toLowerCase(),
           observacoes: `baixa definitiva realizada em ${new Date(
             dataHoraAtual
           ).toLocaleString("pt-BR")}. ref/os: ${processoFinal}. destino: ${destinoFinal}. motivo: ${motivoFinal}`.toLowerCase(),
@@ -264,19 +267,30 @@ export const useInventario = () => {
       Centro: "Samu Centro",
     };
 
-    const chaveUnidade = deParaUnidades[unidadeFiltro];
+    const chaveUnidade = deParaUnidades[unidadeFiltro] || unidadeFiltro;
     let listaSetores = [];
 
-    if (chaveUnidade && MAPA_SETORES_POR_UNIDADE[chaveUnidade]) {
-      listaSetores = [...MAPA_SETORES_POR_UNIDADE[chaveUnidade]];
+    // Tenta procurar os setores mapeados na estrutura do mapa vindo do banco de dados
+    if (chaveUnidade && mapaSetores && mapaSetores[chaveUnidade]) {
+      listaSetores = [...mapaSetores[chaveUnidade]];
     } else {
+      // Se não encontrar no mapa dinâmico, extrai os setores diretamente dos itens do inventário ou da lista global de setores
       const setoresUnicos = new Set();
-      const listaSegura = Array.isArray(itens) ? itens : [];
-      listaSegura.forEach((item) => {
-        if (item.setor && item.setor.trim() !== "") {
-          setoresUnicos.add(item.setor.trim());
-        }
-      });
+      
+      if (Array.isArray(listaTodosSetoresBD) && listaTodosSetoresBD.length > 0) {
+        listaTodosSetoresBD.forEach((s) => {
+          const nomeSetor = typeof s === "string" ? s : s.nome;
+          if (nomeSetor) setoresUnicos.add(nomeSetor.trim());
+        });
+      } else {
+        const listaSegura = Array.isArray(itens) ? itens : [];
+        listaSegura.forEach((item) => {
+          if (item.setor && item.setor.trim() !== "") {
+            setoresUnicos.add(item.setor.trim());
+          }
+        });
+      }
+      
       listaSetores = Array.from(setoresUnicos);
     }
 

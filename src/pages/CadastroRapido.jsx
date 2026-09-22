@@ -17,7 +17,7 @@ import {
   FiRefreshCw
 } from "react-icons/fi";
 
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 
 const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) => {
   const [loading, setLoading] = useState(false);
@@ -25,6 +25,9 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   const [nomeUsuario, setNomeUsuario] = useState("");
   const [setorManual, setSetorManual] = useState(false);
   
+  // Consome o hook dinâmico de setores
+  const { unidades, mapaSetores } = useSetores();
+
   // Opção para manter Unidade e Setor para o próximo cadastro
   const [manterSetor, setManterSetor] = useState(true);
 
@@ -36,7 +39,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   const estadoInicialForm = {
     patrimonio: "",
     nome: "",
-    tipo: "Mobiliário",
+    tipo: "mobiliário",
     setor: "",
     unidade: "",
     estado: "novo",
@@ -44,7 +47,6 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
   };
 
   const [formData, setFormData] = useState(estadoInicialForm);
-  const unidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -62,16 +64,16 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               setNomeUsuario(data.nome || "Usuário");
               setVerificandoAcesso(false);
             } else {
-              toast.error("Acesso negado: Você não tem permissão de nível técnico.");
+              toast.error("acesso negado: você não tem permissão de nível técnico.");
               if (onClose) onClose();
             }
           } else {
-            toast.error("Perfil de usuário não encontrado.");
+            toast.error("perfil de usuário não encontrado.");
             if (onClose) onClose();
           }
         } catch (error) {
-          console.error("Erro ao validar acesso:", error);
-          toast.error("Erro na verificação de segurança.");
+          console.error("erro ao validar acesso:", error);
+          toast.error("erro na verificação de segurança.");
           if (onClose) onClose();
         }
       } else {
@@ -106,7 +108,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
       ) || unidadeBruta;
 
       const setorAtual = initialData.setor || "";
-      const setoresUnidade = MAPA_SETORES_POR_UNIDADE[unidadeEncontrada] || [];
+      const setoresUnidade = mapaSetores[unidadeEncontrada] || [];
       const existeNaLista = setoresUnidade.some(
         (s) => s.toLowerCase().trim() === setorAtual.toLowerCase().trim()
       );
@@ -114,13 +116,13 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
       setSetorManual(Boolean(setorAtual && !existeNaLista));
 
       setFormData({
-        patrimonio: initialData.patrimonio ? String(initialData.patrimonio).trim() : "",
-        nome: initialData.nome || "",
-        tipo: initialData.tipoItem || initialData.tipo || "Mobiliário",
-        unidade: unidadeEncontrada,
-        setor: setorAtual,
+        patrimonio: initialData.patrimonio ? String(initialData.patrimonio).trim().toLowerCase() : "",
+        nome: (initialData.nome || "").toLowerCase(),
+        tipo: (initialData.tipoItem || initialData.tipo || "mobiliário").toLowerCase(),
+        unidade: unidadeEncontrada.toLowerCase(),
+        setor: setorAtual.toLowerCase(),
         estado: (initialData.estado || "novo").toLowerCase(),
-        observacoes: initialData.observacoes || "",
+        observacoes: (initialData.observacoes || "").toLowerCase(),
       });
     } else {
       setFormData(estadoInicialForm);
@@ -129,17 +131,17 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
       setQuantidade(1);
       setPatrimoniosLote([""]);
     }
-  }, [isEditing, initialData, isOpen]);
+  }, [isEditing, initialData, isOpen, unidades, mapaSetores]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     const acaoTexto = isEditing
-      ? "Atualizando ativo..."
+      ? "atualizando ativo..."
       : modoLote && quantidade > 1
-      ? `Registrando ${quantidade} ativos em lote...`
-      : "Registrando ativo...";
+      ? `registrando ${quantidade} ativos em lote...`
+      : "registrando ativo...";
 
     const idToast = toast.loading(acaoTexto);
 
@@ -152,7 +154,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
 
         if (!idItem) {
           toast.update(idToast, {
-            render: "Erro: ID do equipamento não foi encontrado para edição.",
+            render: "erro: id do equipamento não foi encontrado para edição.",
             type: "error",
             isLoading: false,
             autoClose: 3000,
@@ -167,18 +169,18 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             nome: formData.nome.toLowerCase().trim(),
             setor: formData.setor.toLowerCase().trim(),
             observacoes: formData.observacoes.toLowerCase().trim(),
-            patrimonio: formData.patrimonio.trim(),
-            unidade: formData.unidade,
+            patrimonio: formData.patrimonio.toLowerCase().trim(),
+            unidade: formData.unidade.toLowerCase().trim(),
             estado: formData.estado.toLowerCase().trim(),
             tipo: "equipamento",
-            tipoItem: formData.tipo,
+            tipoItem: formData.tipo.toLowerCase().trim(),
             status: "ativo",
           },
           { headers }
         );
 
         toast.update(idToast, {
-          render: "Ativo atualizado com sucesso!",
+          render: "ativo atualizado com sucesso!",
           type: "success",
           isLoading: false,
           autoClose: 3000,
@@ -188,7 +190,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         if (onClose) onClose();
       } else if (modoLote && quantidade > 1) {
         for (let i = 0; i < quantidade; i++) {
-          const patrimonioAtual = patrimoniosLote[i] ? patrimoniosLote[i].trim() : `S/P-${i + 1}`;
+          const patrimonioAtual = patrimoniosLote[i] ? patrimoniosLote[i].toLowerCase().trim() : `s/p-${i + 1}`;
           await api.post(
             "/ativos",
             {
@@ -196,12 +198,12 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               setor: formData.setor.toLowerCase().trim(),
               observacoes: formData.observacoes.toLowerCase().trim(),
               patrimonio: patrimonioAtual,
-              unidade: formData.unidade,
+              unidade: formData.unidade.toLowerCase().trim(),
               estado: formData.estado.toLowerCase().trim(),
               tipo: "equipamento",
-              tipoItem: formData.tipo,
+              tipoItem: formData.tipo.toLowerCase().trim(),
               status: "ativo",
-              cadastradoPor: nomeUsuario,
+              cadastradoPor: nomeUsuario.toLowerCase(),
             },
             { headers }
           );
@@ -234,25 +236,24 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             nome: formData.nome.toLowerCase().trim(),
             setor: formData.setor.toLowerCase().trim(),
             observacoes: formData.observacoes.toLowerCase().trim(),
-            patrimonio: formData.patrimonio.trim(),
-            unidade: formData.unidade,
+            patrimonio: formData.patrimonio.toLowerCase().trim(),
+            unidade: formData.unidade.toLowerCase().trim(),
             estado: formData.estado.toLowerCase().trim(),
             tipo: "equipamento",
-            tipoItem: formData.tipo,
+            tipoItem: formData.tipo.toLowerCase().trim(),
             status: "ativo",
-            cadastradoPor: nomeUsuario,
+            cadastradoPor: nomeUsuario.toLowerCase(),
           },
           { headers }
         );
 
         toast.update(idToast, {
-          render: "Ativo registrado com sucesso!",
+          render: "ativo registrado com sucesso!",
           type: "success",
           isLoading: false,
           autoClose: 3000,
         });
 
-        // Mantém setor e unidade se a opção estiver marcada
         if (manterSetor) {
           setFormData((prev) => ({
             ...estadoInicialForm,
@@ -266,9 +267,9 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         if (onSuccess) onSuccess();
       }
     } catch (error) {
-      console.error("Erro ao salvar ativo:", error);
+      console.error("erro ao salvar ativo:", error);
       toast.update(idToast, {
-        render: error.response?.data?.message || "Erro ao comunicar com o servidor da API",
+        render: error.response?.data?.message || "erro ao comunicar com o servidor da api",
         type: "error",
         isLoading: false,
         autoClose: 3000,
@@ -286,12 +287,15 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
         <div className="bg-white rounded-3xl p-8 flex flex-col items-center shadow-2xl">
           <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 border-r-4"></div>
           <p className="mt-4 text-blue-600 font-bold uppercase tracking-widest text-xs">
-            Validando permissões...
+            validando permissões...
           </p>
         </div>
       </div>
     );
   }
+
+  // Obtém lista de setores baseada na unidade atualmente selecionada
+  const setoresMapeados = mapaSetores[formData.unidade] || [];
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -305,10 +309,10 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-800">
-                {isEditing ? "Editar Equipamento" : "Cadastro Direto no Setor"}
+                {isEditing ? "editar equipamento" : "cadastro direto no setor"}
               </h1>
               <p className="text-slate-500 text-xs">
-                Registro e alocação imediata de ativo na unidade/setor
+                registro e alocação imediata de ativo na unidade/setor
               </p>
             </div>
           </div>
@@ -324,7 +328,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
-                <FiLayers size={14} /> {modoLote ? "Modo Lote Ativo" : "Cadastrar Vários Iguais"}
+                <FiLayers size={14} /> {modoLote ? "modo lote ativo" : "cadastrar vários iguais"}
               </button>
             )}
 
@@ -333,7 +337,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               onClick={onClose}
               className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-all font-medium bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 text-sm cursor-pointer"
             >
-              <FiArrowLeft /> Voltar
+              <FiArrowLeft /> voltar
             </button>
           </div>
         </div>
@@ -348,8 +352,8 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <div className="flex items-center gap-3">
                   <FiRefreshCw className="text-blue-600" size={18} />
                   <div>
-                    <p className="text-xs font-bold text-blue-900">Modo de Cadastro Sequencial</p>
-                    <p className="text-[11px] text-blue-700">Mantém a unidade e o setor preenchidos ao salvar para cadastrar o próximo item.</p>
+                    <p className="text-xs font-bold text-blue-900">modo de cadastro sequencial</p>
+                    <p className="text-[11px] text-blue-700">mantém a unidade e o setor preenchidos ao salvar para cadastrar o próximo item.</p>
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -369,16 +373,16 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-black text-amber-800 uppercase tracking-wider">
-                    Configuração de Cadastro em Lote (Itens Idênticos)
+                    configuração de cadastro em lote (itens idênticos)
                   </span>
                   <span className="text-xs font-bold text-amber-700">
-                    Total: {quantidade} {quantidade === 1 ? "item" : "itens"}
+                    total: {quantidade} {quantidade === 1 ? "item" : "itens"}
                   </span>
                 </div>
                 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-amber-700 uppercase tracking-widest ml-1 block">
-                    Quantidade de itens idênticos a gerar
+                    quantidade de itens idênticos a gerar
                   </label>
                   <input
                     type="number"
@@ -398,7 +402,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               {(!modoLote || isEditing) && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                    TAG do Patrimônio
+                    tag do patrimônio
                   </label>
                   <div className="relative">
                     <FiHash
@@ -408,7 +412,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     <input
                       type="text"
                       required={!modoLote}
-                      placeholder="Ex: HMC-1234 ou S/P"
+                      placeholder="ex: hmc-1234 ou s/p"
                       className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
                       value={formData.patrimonio}
                       onChange={(e) =>
@@ -422,7 +426,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               {/* Unidade */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                  Unidade Atual
+                  unidade atual
                 </label>
                 <div className="relative">
                   <FiMapPin
@@ -441,7 +445,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                       });
                     }}
                   >
-                    <option value="">Selecione a Unidade...</option>
+                    <option value="">selecione a unidade...</option>
                     {unidades.map((u) => (
                       <option key={u} value={u}>
                         {u}
@@ -456,7 +460,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             {!isEditing && modoLote && quantidade > 1 && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                  Patrimônios Individuais
+                  patrimônios individuais
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2">
                   {Array.from({ length: quantidade }).map((_, index) => (
@@ -464,7 +468,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                       <span className="text-xs font-bold text-slate-500 w-16">#{index + 1}:</span>
                       <input
                         type="text"
-                        placeholder={`Patrimônio ${index + 1} (Opcional)`}
+                        placeholder={`patrimônio ${index + 1} (opcional)`}
                         value={patrimoniosLote[index] || ""}
                         onChange={(e) => {
                           const novaLista = [...patrimoniosLote];
@@ -484,7 +488,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               {/* Tipo de Item */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                  Tipo de Item
+                  tipo de item
                 </label>
                 <div className="relative">
                   <FiInfo
@@ -498,13 +502,13 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                       setFormData({ ...formData, tipo: e.target.value })
                     }
                   >
-                    <option value="Mobiliário">Mobiliário</option>
-                    <option value="Bem durável">Bem durável</option>
-                    <option value="Refrigeração">Refrigeração</option>
-                    <option value="Informática">Informática</option>
-                    <option value="Eletrodoméstico/Eletrônico">Eletrodoméstico/Eletrônico</option>
-                    <option value="Equip. Médico">Equipamento Médico</option>
-                    <option value="Ferramenta">Ferramenta</option>
+                    <option value="mobiliário">mobiliário</option>
+                    <option value="bem durável">bem durável</option>
+                    <option value="refrigeração">refrigeração</option>
+                    <option value="informática">informática</option>
+                    <option value="eletrodoméstico/eletrônico">eletrodoméstico/eletrônico</option>
+                    <option value="equipamento médico">equipamento médico</option>
+                    <option value="ferramenta">ferramenta</option>
                   </select>
                 </div>
               </div>
@@ -513,14 +517,14 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
               <div className="space-y-1">
                 <div className="flex justify-between items-center mb-1 px-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    {setorManual ? "Digitar Setor" : "Setor / Sala"}
+                    {setorManual ? "digitar setor" : "setor / sala"}
                   </label>
                   <button
                     type="button"
                     onClick={() => setSetorManual(!setorManual)}
                     className="text-[9px] font-black text-blue-600 hover:underline uppercase cursor-pointer"
                   >
-                    {setorManual ? "Lista" : "Não achou? Digitar"}
+                    {setorManual ? "lista" : "não achou? digitar"}
                   </button>
                 </div>
                 <div className="relative">
@@ -532,7 +536,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     <input
                       type="text"
                       required
-                      placeholder="Digite o setor..."
+                      placeholder="digite o setor..."
                       className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
                       value={formData.setor}
                       onChange={(e) =>
@@ -551,10 +555,10 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     >
                       <option value="">
                         {formData.unidade
-                          ? "Selecione o setor..."
-                          : "Escolha a unidade primeiro"}
+                          ? "selecione o setor..."
+                          : "escolha a unidade primeiro"}
                       </option>
-                      {(MAPA_SETORES_POR_UNIDADE[formData.unidade] || []).map((s) => (
+                      {setoresMapeados.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -568,7 +572,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             {/* Descrição do Equipamento */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                Descrição do Equipamento
+                descrição do equipamento
               </label>
               <div className="relative">
                 <FiPackage
@@ -578,7 +582,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Cadeira de Escritório, Suporte de Soro, Mesa..."
+                  placeholder="ex: cadeira de escritório, suporte de soro, mesa..."
                   className="w-full bg-slate-50 border-2 border-slate-50 p-4 pl-12 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm font-bold text-slate-700"
                   value={formData.nome}
                   onChange={(e) =>
@@ -591,7 +595,7 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             {/* Estado de Conservação */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                Estado de Conservação
+                estado de conservação
               </label>
               <div className="relative">
                 <FiActivity
@@ -605,11 +609,11 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                     setFormData({ ...formData, estado: e.target.value })
                   }
                 >
-                  <option value="novo">Novo</option>
-                  <option value="bom">Bom</option>
-                  <option value="regular">Regular</option>
-                  <option value="pessimo">Péssimo</option>
-                  <option value="danificado">Danificado</option>
+                  <option value="novo">novo</option>
+                  <option value="bom">bom</option>
+                  <option value="regular">regular</option>
+                  <option value="péssimo">péssimo</option>
+                  <option value="danificado">danificado</option>
                 </select>
               </div>
             </div>
@@ -617,11 +621,11 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
             {/* Observações */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">
-                Observações Adicionais
+                observações adicionais
               </label>
               <textarea
                 rows="3"
-                placeholder="Detalhes como marca, cor, número de série..."
+                placeholder="detalhes como marca, cor, número de série..."
                 className="w-full bg-slate-50 border-2 border-slate-50 p-4 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all resize-none text-sm font-medium text-slate-700"
                 value={formData.observacoes}
                 onChange={(e) =>
@@ -642,10 +646,10 @@ const CadastroRapido = ({ isOpen, onClose, onSuccess, initialData, isEditing }) 
                 <>
                   <FiSave size={16} /> 
                   {isEditing 
-                    ? "Atualizar Equipamento" 
+                    ? "atualizar equipamento" 
                     : modoLote && quantidade > 1 
-                    ? `Registrar ${quantidade} Itens em Lote` 
-                    : "Salvar e Cadastrar Próximo"}
+                    ? `registrar ${quantidade} itens em lote` 
+                    : "salvar e cadastrar próximo"}
                 </>
               )}
             </button>

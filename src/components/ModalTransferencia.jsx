@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { FiX, FiPrinter, FiCheckCircle } from "react-icons/fi";
-import { MAPA_SETORES_POR_UNIDADE } from "./constants/setores"; 
 
 const ModalTransferencia = ({
   isOpen,
@@ -16,6 +15,7 @@ const ModalTransferencia = ({
   handleSaida,
   loading,
   unidades,
+  setores = [], // <--- Recebe a lista de setores vinda do banco de dados
   normalizarParaComparacao
 }) => {
   // Estado local para controlar se o usuário escolheu digitar o setor manualmente
@@ -26,7 +26,12 @@ const ModalTransferencia = ({
   const isResidencial = dadosSaida.novaUnidade === "Residência do Paciente";
   const isEstoque = dadosSaida.novaUnidade === "Estoque Central";
 
-  const listaSetoresDisponiveis = MAPA_SETORES_POR_UNIDADE[dadosSaida.novaUnidade] || [];
+  // Filtra os setores vindos do banco correspondentes à unidade selecionada
+  const setoresFiltradosDoBanco = setores.filter((s) => {
+    // Caso seu banco salve a unidade em 'unidade' ou 'unidadeId'
+    const unidadeSetor = s.unidade || s.unidadeNome || "";
+    return normalizarParaComparacao(unidadeSetor) === normalizarParaComparacao(dadosSaida.novaUnidade);
+  });
 
   const aplicarMascaraTelefone = (valor) => {
     const digitos = valor.replace(/\D/g, "");
@@ -88,7 +93,7 @@ const ModalTransferencia = ({
                 className="w-full p-2 border border-amber-300 rounded outline-none text-slate-700 disabled:bg-slate-100"
                 placeholder="h-0000"
                 value={novoPatrimonioParaSP}
-                onChange={(e) => setNovoPatrimonioParaSP(e.target.value)}
+                onChange={(e) => setNovoPatrimonioParaSP(e.target.value.toLowerCase())}
                 required
               />
             </div>
@@ -105,7 +110,7 @@ const ModalTransferencia = ({
               className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 cursor-pointer disabled:bg-slate-100"
               onChange={(e) => {
                 const selecionado = e.target.value;
-                setModoSetorManual(false); // Reseta o modo manual ao trocar de unidade
+                setModoSetorManual(false);
                 setDadosSaida({
                   ...dadosSaida,
                   novaUnidade: selecionado,
@@ -140,7 +145,7 @@ const ModalTransferencia = ({
                   className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
                   value={dadosSaida.novoSetor}
                   onChange={(e) =>
-                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
+                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value.toLowerCase() })
                   }
                 />
               </div>
@@ -157,7 +162,7 @@ const ModalTransferencia = ({
                   className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 disabled:bg-slate-100"
                   value={dadosSaida.pacienteEndereco || ""}
                   onChange={(e) =>
-                    setDadosSaida({ ...dadosSaida, pacienteEndereco: e.target.value })
+                    setDadosSaida({ ...dadosSaida, pacienteEndereco: e.target.value.toLowerCase() })
                   }
                 />
               </div>
@@ -229,7 +234,7 @@ const ModalTransferencia = ({
                 <label className="text-xs font-bold text-slate-500 uppercase">
                   {isEstoque ? "Classificação no Estoque" : "Novo Setor"}
                 </label>
-                {!isEstoque && listaSetoresDisponiveis.length > 0 && (
+                {!isEstoque && setoresFiltradosDoBanco.length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
@@ -243,7 +248,7 @@ const ModalTransferencia = ({
                 )}
               </div>
 
-              {isEstoque || modoSetorManual || listaSetoresDisponiveis.length === 0 ? (
+              {isEstoque || modoSetorManual || setoresFiltradosDoBanco.length === 0 ? (
                 <input
                   type="text"
                   required
@@ -252,7 +257,7 @@ const ModalTransferencia = ({
                   value={dadosSaida.novoSetor}
                   className="w-full border p-2 rounded-lg outline-blue-500 text-slate-700 disabled:bg-slate-100 bg-white"
                   onChange={(e) =>
-                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
+                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value.toLowerCase() })
                   }
                 />
               ) : (
@@ -262,15 +267,18 @@ const ModalTransferencia = ({
                   value={dadosSaida.novoSetor}
                   className="w-full border p-2 rounded-lg outline-blue-500 bg-white text-slate-700 cursor-pointer disabled:bg-slate-100"
                   onChange={(e) =>
-                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value })
+                    setDadosSaida({ ...dadosSaida, novoSetor: e.target.value.toLowerCase() })
                   }
                 >
                   <option value="">Selecione o setor...</option>
-                  {listaSetoresDisponiveis.map((setor) => (
-                    <option key={setor} value={setor}>
-                      {setor}
-                    </option>
-                  ))}
+                  {setoresFiltradosDoBanco.map((itemSetor) => {
+                    const nomeDoSetor = typeof itemSetor === "string" ? itemSetor : itemSetor.nome;
+                    return (
+                      <option key={itemSetor.id || nomeDoSetor} value={nomeDoSetor.toLowerCase()}>
+                        {nomeDoSetor}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
             </div>
@@ -291,7 +299,7 @@ const ModalTransferencia = ({
               onChange={(e) =>
                 setDadosSaida({
                   ...dadosSaida,
-                  responsavelRecebimento: e.target.value,
+                  responsavelRecebimento: e.target.value.toLowerCase(),
                 })
               }
             />

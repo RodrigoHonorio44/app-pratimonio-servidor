@@ -7,19 +7,22 @@ import { useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 import { useTelaVistoriaPatrimonio } from "../hooks/useTelaVistoriaPatrimonio";
 import TelaVistoriaPatrimonioModal from "../components/TelaVistoriaPatrimonioModal";
 
 const OPCOES_ESTADO = [
-  { id: "bom", label: "Bom", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-  { id: "ocioso", label: "Ocioso", icon: AlertTriangle, color: "text-amber-600 bg-amber-50 border-amber-200" },
-  { id: "recuperavel", label: "Recuperável", icon: RefreshCw, color: "text-blue-600 bg-blue-50 border-blue-200" },
-  { id: "irrecuperavel", label: "Irrecuperável", icon: XCircle, color: "text-rose-600 bg-rose-50 border-rose-200" },
+  { id: "bom", label: "bom", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
+  { id: "ocioso", label: "ocioso", icon: AlertTriangle, color: "text-amber-600 bg-amber-50 border-amber-200" },
+  { id: "recuperavel", label: "recuperável", icon: RefreshCw, color: "text-blue-600 bg-blue-50 border-blue-200" },
+  { id: "irrecuperavel", label: "irrecuperável", icon: XCircle, color: "text-rose-600 bg-rose-50 border-rose-200" },
 ];
 
 const TelaVistoriaPatrimonio = () => {
   const navigate = useNavigate();
+
+  // Consome as unidades e o mapa dinâmico de setores da base de dados
+  const { unidades, mapaSetores } = useSetores();
 
   const {
     unidadeSelecionada,
@@ -123,7 +126,7 @@ const TelaVistoriaPatrimonio = () => {
 
   const handleAdicionarAoLote = () => {
     if (!itemEmEdicao) return;
-    const nomeEquipamento = itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "Equipamento";
+    const nomeEquipamento = (itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome || "equipamento").toLowerCase();
 
     if (itemEmEdicao.isEditing) {
       setItensAvaliados((prev) =>
@@ -131,8 +134,8 @@ const TelaVistoriaPatrimonio = () => {
           i.idTemp === itemEmEdicao.idTemp
             ? {
                 ...i,
-                estado: estadoModal,
-                observacao: obsModal.trim(),
+                estado: estadoModal.toLowerCase(),
+                observacao: obsModal.trim().toLowerCase(),
                 foto: fotoModal,
               }
             : i
@@ -141,10 +144,10 @@ const TelaVistoriaPatrimonio = () => {
     } else {
       const novoItem = {
         idTemp: Date.now(),
-        patrimonio: itemEmEdicao.patrimonio || "s/p",
+        patrimonio: (itemEmEdicao.patrimonio || "s/p").toLowerCase(),
         equipamento: nomeEquipamento,
-        estado: estadoModal,
-        observacao: obsModal.trim(),
+        estado: estadoModal.toLowerCase(),
+        observacao: obsModal.trim().toLowerCase(),
         foto: fotoModal,
         dataHora: new Date().toLocaleString("pt-BR")
       };
@@ -163,10 +166,10 @@ const TelaVistoriaPatrimonio = () => {
 
     const itemManual = {
       idTemp: Date.now(),
-      patrimonio: manualPatrimonio.trim() || "s/p",
-      equipamento: manualNome.trim(),
-      estado: estadoModal,
-      observacao: obsModal.trim(),
+      patrimonio: (manualPatrimonio.trim() || "s/p").toLowerCase(),
+      equipamento: manualNome.trim().toLowerCase(),
+      estado: estadoModal.toLowerCase(),
+      observacao: obsModal.trim().toLowerCase(),
       foto: fotoModal,
       dataHora: new Date().toLocaleString("pt-BR")
     };
@@ -208,6 +211,17 @@ const TelaVistoriaPatrimonio = () => {
     window.print();
   };
 
+  // Obtém setores dinâmicos mapeados conforme a unidade selecionada
+  const setoresMapeados = useMemo(() => {
+    if (!unidadeSelecionada) return [];
+    if (mapaSetores[unidadeSelecionada]) return mapaSetores[unidadeSelecionada];
+    
+    const chave = Object.keys(mapaSetores).find(
+      (k) => k.toLowerCase() === unidadeSelecionada.toLowerCase()
+    );
+    return chave ? mapaSetores[chave] : [];
+  }, [unidadeSelecionada, mapaSetores]);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
       <div className="no-print">
@@ -221,34 +235,34 @@ const TelaVistoriaPatrimonio = () => {
             className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors mb-4 group cursor-pointer"
           >
             <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Voltar à Dashboard
+            voltar à dashboard
           </button>
           
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">
-            <ClipboardCheck className="text-blue-600" size={28} /> Central de Vistoria de Patrimônio
+            <ClipboardCheck className="text-blue-600" size={28} /> central de vistoria de patrimônio
           </h1>
           <p className="text-slate-500 text-sm font-medium">
-            Selecione a unidade e o setor, avalie os equipamentos do local e gere o relatório consolidado com data e hora.
+            selecione a unidade e o setor, avalie os equipamentos do local e gere o relatório consolidado com data e hora.
           </p>
         </header>
 
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 mb-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <span className="text-xs font-black text-slate-600 uppercase tracking-wider">Filtros da Vistoria</span>
+            <span className="text-xs font-black text-slate-600 uppercase tracking-wider">filtros da vistoria</span>
             {(unidadeSelecionada || setorSelecionado || busca || inputSetorManual) && (
               <button
                 type="button"
                 onClick={handleLimparTudo}
                 className="flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition-all cursor-pointer border border-rose-200"
               >
-                <RotateCcw size={14} /> Limpar Pesquisa
+                <RotateCcw size={14} /> limpar pesquisa
               </button>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">1. Unidade Destino/Vistoria</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">1. unidade destino/vistoria</label>
               <select 
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                 value={unidadeSelecionada} 
@@ -257,16 +271,18 @@ const TelaVistoriaPatrimonio = () => {
                   setSetorSelecionado(""); 
                   setInputSetorManual("");
                   setSetorManualMode(false);
+                  setItemEmEdicao(null);
+                  setModoManual(false);
                 }}
               >
-                <option value="">Selecione a Unidade...</option>
-                {Object.keys(MAPA_SETORES_POR_UNIDADE).map((u) => <option key={u} value={u}>{u}</option>)}
+                <option value="">selecione a unidade...</option>
+                {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Setor Interno</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. setor interno</label>
                 {unidadeSelecionada && (
                   <button
                     type="button"
@@ -274,11 +290,13 @@ const TelaVistoriaPatrimonio = () => {
                       setSetorManualMode(!setorManualMode);
                       setSetorSelecionado("");
                       setInputSetorManual("");
+                      setItemEmEdicao(null);
+                      setModoManual(false);
                     }}
                     className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Edit3 size={12} />
-                    {setorManualMode ? "Selecionar da lista" : "Digitar setor manual"}
+                    {setorManualMode ? "selecionar da lista" : "digitar setor manual"}
                   </button>
                 )}
               </div>
@@ -287,7 +305,7 @@ const TelaVistoriaPatrimonio = () => {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Digite o nome do novo setor..."
+                    placeholder="digite o nome do novo setor..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                     value={inputSetorManual}
                     onChange={(e) => {
@@ -303,11 +321,13 @@ const TelaVistoriaPatrimonio = () => {
                   value={setorSelecionado} 
                   onChange={(e) => {
                     setSetorSelecionado(e.target.value);
+                    setItemEmEdicao(null);
+                    setModoManual(false);
                   }}
                   disabled={!unidadeSelecionada}
                 >
-                  <option value="">Selecione o Setor...</option>
-                  {(MAPA_SETORES_POR_UNIDADE[unidadeSelecionada] || MAPA_SETORES_POR_UNIDADE[Object.keys(MAPA_SETORES_POR_UNIDADE).find(k => k.toLowerCase() === unidadeSelecionada?.toLowerCase())] || []).map((s) => (
+                  <option value="">selecione o setor...</option>
+                  {setoresMapeados.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
@@ -320,15 +340,15 @@ const TelaVistoriaPatrimonio = () => {
           <div className="lg:col-span-7 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
               <div>
-                <h2 className="font-black text-slate-800 text-base uppercase tracking-tight">Equipamentos Cadastrados no Setor</h2>
-                <p className="text-xs text-slate-400 font-semibold">Selecione os itens para avaliar</p>
+                <h2 className="font-black text-slate-800 text-base uppercase tracking-tight">equipamentos cadastrados no setor</h2>
+                <p className="text-xs text-slate-400 font-semibold">selecione os itens para avaliar</p>
               </div>
               <button
                 type="button"
-                onClick={() => { setModoManual(true); setFotoModal(null); }}
+                onClick={() => { setModoManual(true); setFotoModal(null); setItemEmEdicao(null); }}
                 className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer"
               >
-                <PackagePlus size={16} className="text-blue-600" /> + Item Não Encontrado
+                <PackagePlus size={16} className="text-blue-600" /> + item não encontrado
               </button>
             </div>
 
@@ -336,7 +356,7 @@ const TelaVistoriaPatrimonio = () => {
               <Search className="absolute left-3.5 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Buscar por patrimônio ou descrição..." 
+                placeholder="buscar por patrimônio ou descrição..." 
                 className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
@@ -349,20 +369,20 @@ const TelaVistoriaPatrimonio = () => {
             {modoManual && (
               <form onSubmit={handleAdicionarManual} className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-blue-800 uppercase tracking-wider">Descrever Equipamento Manualmente</span>
-                  <button type="button" onClick={() => setModoManual(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">Cancelar</button>
+                  <span className="text-xs font-black text-blue-800 uppercase tracking-wider">descrever equipamento manualmente</span>
+                  <button type="button" onClick={() => setModoManual(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer">cancelar</button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <input 
                     type="text" 
-                    placeholder="Patrimônio (Ex: 37031)" 
+                    placeholder="patrimônio (ex: 37031)" 
                     className="sm:col-span-1 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualPatrimonio}
                     onChange={(e) => setManualPatrimonio(e.target.value)}
                   />
                   <input 
                     type="text" 
-                    placeholder="Descrição do Equipamento" 
+                    placeholder="descrição do equipamento" 
                     className="sm:col-span-2 bg-white border border-slate-200 p-2.5 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     value={manualNome}
                     onChange={(e) => setManualNome(e.target.value)}
@@ -370,14 +390,14 @@ const TelaVistoriaPatrimonio = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Estado de Conservação</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">estado de conservação</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {OPCOES_ESTADO.map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
                         onClick={() => setEstadoModal(opt.id)}
-                        className={`p-2 rounded-lg text-[11px] font-bold border transition-all text-center ${
+                        className={`p-2 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer ${
                           estadoModal === opt.id ? opt.color : 'bg-white border-slate-200 text-slate-600'
                         }`}
                       >
@@ -388,17 +408,17 @@ const TelaVistoriaPatrimonio = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Anexar Foto da Avaria / Item (Opcional)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">anexar foto da avaria / item (opcional)</label>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
                       <Camera size={16} className="text-blue-600" />
-                      <span>{compactandoFoto ? "Processando Foto..." : "Tirar / Escolher Foto"}</span>
+                      <span>{compactandoFoto ? "processando foto..." : "tirar / escolher foto"}</span>
                       <input type="file" accept="image/*" capture="environment" onChange={handleCapturarFoto} className="hidden" />
                     </label>
                     {fotoModal && (
                       <div className="relative group">
                         <img src={fotoModal} alt="Preview" className="w-10 h-10 object-cover rounded-lg border border-slate-300" />
-                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px]">✕</button>
+                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px] cursor-pointer">✕</button>
                       </div>
                     )}
                   </div>
@@ -406,35 +426,35 @@ const TelaVistoriaPatrimonio = () => {
 
                 <input 
                   type="text" 
-                  placeholder="Observação..." 
+                  placeholder="observação..." 
                   className="w-full bg-white border border-slate-200 p-2 rounded-xl text-xs font-medium outline-none"
                   value={obsModal}
                   onChange={(e) => setObsModal(e.target.value)}
                 />
                 <button type="submit" disabled={compactandoFoto} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer">
-                  + Adicionar à Vistoria
+                  + adicionar à vistoria
                 </button>
               </form>
             )}
 
             {!setorSelecionado ? (
               <div className="p-8 text-center text-slate-400 text-sm font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
-                Selecione a Unidade e o Setor acima para carregar a lista de patrimônios.
+                selecione a unidade e o setor acima para carregar a lista de patrimônios.
               </div>
             ) : loadingAtivos ? (
-              <div className="p-8 text-center text-slate-400 font-bold animate-pulse">Buscando equipamentos no setor...</div>
+              <div className="p-8 text-center text-slate-400 font-bold animate-pulse">buscando equipamentos no setor...</div>
             ) : equipamentosFiltrados.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-2xl space-y-2">
-                <p>Nenhum equipamento cadastrado foi encontrado para este setor.</p>
-                <button type="button" onClick={() => { setModoManual(true); setFotoModal(null); }} className="text-xs font-bold text-blue-600 hover:underline">
-                  Clique para descrever o item manualmente
+                <p>nenhum equipamento cadastrado foi encontrado para este setor.</p>
+                <button type="button" onClick={() => { setModoManual(true); setFotoModal(null); setItemEmEdicao(null); }} className="text-xs font-bold text-blue-600 hover:underline cursor-pointer">
+                  clique para descrever o item manualmente
                 </button>
               </div>
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {equipamentosFiltrados.map((item) => {
-                  const pat = item.patrimonio || "s/p";
-                  const nomeItem = item.descricao || item.equipamento || item.nome || "";
+                  const pat = (item.patrimonio || "s/p").toLowerCase();
+                  const nomeItem = (item.descricao || item.equipamento || item.nome || "").toLowerCase();
                   const jaAvaliado = itensAvaliados.some((i) => i.patrimonio === pat && i.equipamento === nomeItem);
 
                   return (
@@ -456,7 +476,7 @@ const TelaVistoriaPatrimonio = () => {
 
                       {jaAvaliado ? (
                         <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                          <Check size={14} /> Avaliado
+                          <Check size={14} /> avaliado
                         </span>
                       ) : (
                         <button
@@ -464,7 +484,7 @@ const TelaVistoriaPatrimonio = () => {
                           onClick={() => handleAbrirAvaliacao(item)}
                           className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
                         >
-                          <Plus size={14} /> Avaliar
+                          <Plus size={14} /> avaliar
                         </button>
                       )}
                     </div>
@@ -474,11 +494,10 @@ const TelaVistoriaPatrimonio = () => {
             )}
           </div>
 
-          {/* SESSÃO DE VISTORIA (COLUNA DA DIREITA) */}
           <div className="lg:col-span-5 bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5">
             <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
               <div>
-                <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Sessão de Vistoria</h3>
+                <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">sessão de vistoria</h3>
                 <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
                   <Clock size={12} /> {dataHoraVistoria}
                 </p>
@@ -493,18 +512,18 @@ const TelaVistoriaPatrimonio = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
-                      {itemEmEdicao.isEditing ? "Editando Avaliação" : "Avaliando Item"}
+                      {itemEmEdicao.isEditing ? "editando avaliação" : "avaliando item"}
                     </span>
                     <h4 className="font-extrabold text-slate-800 text-sm">
                       {itemEmEdicao.descricao || itemEmEdicao.equipamento || itemEmEdicao.nome}
                     </h4>
-                    <span className="text-xs font-mono font-bold text-slate-500">Patrimônio: #{itemEmEdicao.patrimonio || "s/p"}</span>
+                    <span className="text-xs font-mono font-bold text-slate-500">patrimônio: #{itemEmEdicao.patrimonio || "s/p"}</span>
                   </div>
-                  <button type="button" onClick={() => setItemEmEdicao(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">Cancelar</button>
+                  <button type="button" onClick={() => setItemEmEdicao(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">cancelar</button>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Classificação de Conservação</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">classificação de conservação</label>
                   <div className="grid grid-cols-2 gap-2">
                     {OPCOES_ESTADO.map((opt) => (
                       <button
@@ -523,24 +542,24 @@ const TelaVistoriaPatrimonio = () => {
 
                 <textarea
                   rows={2}
-                  placeholder="Observações técnicas ou motivo do estado..."
+                  placeholder="observações técnicas ou motivo do estado..."
                   className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 outline-none resize-none"
                   value={obsModal}
                   onChange={(e) => setObsModal(e.target.value)}
                 />
 
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Foto da Avaria / Item (Opcional)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">foto da avaria / item (opcional)</label>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
                       <Camera size={16} className="text-blue-600" />
-                      <span>{compactandoFoto ? "Processando Foto..." : "Tirar / Escolher Foto"}</span>
+                      <span>{compactandoFoto ? "processando foto..." : "tirar / escolher foto"}</span>
                       <input type="file" accept="image/*" capture="environment" onChange={handleCapturarFoto} className="hidden" />
                     </label>
                     {fotoModal && (
                       <div className="relative group">
                         <img src={fotoModal} alt="Preview Avaria" className="w-10 h-10 object-cover rounded-lg border border-slate-300" />
-                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px]">✕</button>
+                        <button type="button" onClick={() => setFotoModal(null)} className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-0.5 text-[10px] cursor-pointer">✕</button>
                       </div>
                     )}
                   </div>
@@ -552,16 +571,15 @@ const TelaVistoriaPatrimonio = () => {
                   onClick={handleAdicionarAoLote}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold p-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
                 >
-                  <CheckCircle2 size={16} /> {itemEmEdicao.isEditing ? "Salvar Alterações" : "Confirmar Avaliação do Item"}
+                  <CheckCircle2 size={16} /> {itemEmEdicao.isEditing ? "salvar alterações" : "confirmar avaliação do item"}
                 </button>
               </div>
             )}
 
-            {/* LISTA DOS CARDS AVALIADOS */}
             <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
               {itensAvaliados.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs font-semibold border-2 border-dashed border-slate-100 rounded-2xl">
-                  Nenhum item adicionado à vistoria até o momento. Selecione itens da lista para avaliar.
+                  nenhum item adicionado à vistoria até o momento. selecione itens da lista para avaliar.
                 </div>
               ) : (
                 itensAvaliados.map((item) => {
@@ -586,13 +604,12 @@ const TelaVistoriaPatrimonio = () => {
                         </div>
                       </div>
 
-                      {/* BOTÕES DE AÇÃO DO CARD: EDITAR E EXCLUIR */}
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => handleEditarItemAvaliated(item)}
                           className="text-slate-400 hover:text-blue-600 p-1.5 transition-colors cursor-pointer"
-                          title="Editar avaliação deste item"
+                          title="editar avaliação deste item"
                         >
                           <Pencil size={15} />
                         </button>
@@ -601,7 +618,7 @@ const TelaVistoriaPatrimonio = () => {
                           type="button"
                           onClick={() => handleRemoverItem(item.idTemp)}
                           className="text-slate-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
-                          title="Remover item da vistoria"
+                          title="remover item da vistoria"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -619,7 +636,7 @@ const TelaVistoriaPatrimonio = () => {
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-100 cursor-pointer text-sm"
             >
               <FileText size={18} />
-              Conferir e Gerar Termo ({itensAvaliados.length})
+              conferir e gerar termo ({itensAvaliados.length})
             </button>
           </div>
         </div>

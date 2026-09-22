@@ -5,12 +5,15 @@ import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { MAPA_SETORES_POR_UNIDADE } from "../components/constants/setores";
+import { useSetores } from "../components/constants/setores";
 
 export const useGerenciarSetor = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [verificandoAcesso, setVerificandoAcesso] = useState(true);
+
+  // Consome as unidades e o mapa dinâmico de setores
+  const { unidades, mapaSetores } = useSetores();
 
   // Estados de busca e filtros
   const [patrimonioBusca, setPatrimonioBusca] = useState("");
@@ -43,8 +46,6 @@ export const useGerenciarSetor = () => {
     observacoes: ""
   });
 
-  const unidades = Object.keys(MAPA_SETORES_POR_UNIDADE || {});
-
   // Normalização refinada para lidar com acentos, caracteres especiais e abreviações comuns
   const normalizarParaComparacao = (texto) => {
     if (!texto) return "";
@@ -72,7 +73,6 @@ export const useGerenciarSetor = () => {
     if (termoItemNorm === termoBuscaNorm) return true;
 
     // 2. Se o setor cadastrado for exatamente uma subdivisão interna ou começar com o termo buscado 
-    // (Ex: buscar "centro cirurgico" e achar "centro cirurgico / star" ou "centro cirurgico sala 1")
     if (termoItemNorm.startsWith(termoBuscaNorm)) {
       const proximoCaractere = termoItemNorm[termoBuscaNorm.length];
       if (proximoCaractere === " " || proximoCaractere === "/") {
@@ -198,15 +198,15 @@ export const useGerenciarSetor = () => {
   const obterSetoresFiltrados = () => {
     if (!unidadeFiltro) return [];
 
-    const chaveUnidade = Object.keys(MAPA_SETORES_POR_UNIDADE).find(
+    const chaveUnidade = Object.keys(mapaSetores || {}).find(
       (key) => normalizarParaComparacao(key) === normalizarParaComparacao(unidadeFiltro)
     );
 
-    const setoresDaUnidade = chaveUnidade ? MAPA_SETORES_POR_UNIDADE[chaveUnidade] : [];
+    const setoresDaUnidade = chaveUnidade ? mapaSetores[chaveUnidade] : [];
     
     if (!setorBusca.trim()) return setoresDaUnidade;
 
-    // Permite filtrar a listagem do dropdown dinamicamente conforme você digita
+    // Permite filtrar a listagem do dropdown dinamicamente conforme se digita
     return setoresDaUnidade.filter((setor) => {
       const termoBuscaNorm = normalizarParaComparacao(setorBusca);
       const setorNorm = normalizarParaComparacao(setor);
@@ -341,6 +341,6 @@ export const useGerenciarSetor = () => {
     handleSalvar,
     handleExcluir,
     loading,
-    MAPA_SETORES_POR_UNIDADE
+    MAPA_SETORES_POR_UNIDADE: mapaSetores
   };
 };
