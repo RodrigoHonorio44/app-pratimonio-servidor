@@ -9,7 +9,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
   const navigate = useNavigate();
   const hook = useCadastroChamado();
 
-  // Garante que, se o setor for preenchido pela busca, ele fique editável
+  // Garante que, se o setor for preenchido pela busca do ativo, ele fique visível em modo de edição manual
   useEffect(() => {
     if (hook.setor) {
       hook.setSetorManual(true);
@@ -29,7 +29,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
       {/* HEADER PRINCIPAL */}
       <Header />
 
-      {/* CONTEÚDO DA PÁGINA CENTRALIZADO (MESMO PADRÃO DA TELA DE LAUDOS) */}
+      {/* CONTEÚDO DA PÁGINA CENTRALIZADO */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
         
         {/* TÍTULO DA PÁGINA */}
@@ -78,7 +78,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
               {/* BLOCO PATRIMÔNIO / TAG */}
               <div className="bg-slate-50/70 border border-slate-200/80 p-4 rounded-2xl space-y-2">
                 <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <label htmlFor="patrimonio-input" className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 cursor-pointer">
                     <Hash size={13} className="text-blue-600" /> Patrimônio / Tag
                   </label>
                   <button 
@@ -93,6 +93,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                   <div className="relative flex-1">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">#</span>
                     <input 
+                      id="patrimonio-input"
                       required 
                       readOnly={hook.naoSeiPatrimonio} 
                       value={hook.patrimonio} 
@@ -105,6 +106,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                     type="button" 
                     disabled={hook.buscandoAtivo || hook.naoSeiPatrimonio} 
                     onClick={hook.handleBotaoBusca} 
+                    title="Buscar dados do ativo"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 min-w-[46px] cursor-pointer shadow-2xs"
                   >
                     {hook.buscandoAtivo ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
@@ -112,6 +114,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                   <button 
                     type="button" 
                     onClick={hook.handleLimparCampos} 
+                    title="Limpar campos"
                     className="bg-slate-200 hover:bg-slate-300 text-slate-600 px-4 rounded-xl flex items-center justify-center transition-all min-w-[46px] cursor-pointer"
                   >
                     <RotateCcw size={16} />
@@ -123,12 +126,13 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Unidade */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                  <label htmlFor="unidade-select" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block cursor-pointer">
                     Unidade
                   </label>
                   <div className="relative">
-                    <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     <select 
+                      id="unidade-select"
                       required 
                       value={hook.unidade} 
                       onChange={(e) => hook.setUnidade(e.target.value)} 
@@ -144,12 +148,13 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
 
                 {/* Equipe */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                  <label htmlFor="equipe-select" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block cursor-pointer">
                     Equipe Responsável
                   </label>
                   <div className="relative">
-                    <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     <select 
+                      id="equipe-select"
                       required 
                       value={hook.equipe} 
                       onChange={(e) => hook.setEquipe(e.target.value)} 
@@ -158,7 +163,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                       <option value="">Para qual equipe é o chamado?</option>
                       <option value="refrigeracao">Refrigeração</option>
                       <option value="patrimonio">Patrimônio</option>
-                      <option value="Manutencao patrimonial">Manutenção Patrimônial</option>
+                      <option value="Manutencao patrimonial">Manutenção Patrimonial</option>
                       <option value="ti computadores impressoras">TI Computadores e Impressoras</option>
                       <option value="ti sistema e redes">TI Sistema e Redes</option>
                       <option value="manutencao predial">Manutenção Predial</option>
@@ -172,12 +177,13 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Equipamento */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                  <label htmlFor="equipamento-input" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block cursor-pointer">
                     Equipamento
                   </label>
                   <div className="relative">
-                    <Monitor className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Monitor className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     <input 
+                      id="equipamento-input"
                       required 
                       value={hook.equipamento} 
                       onChange={(e) => hook.setEquipamento(e.target.value)} 
@@ -190,7 +196,7 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                 {/* Setor */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center px-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <label htmlFor="setor-field" className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer">
                       {hook.setorManual ? "Digitar Setor" : "Setor"}
                     </label>
                     <button 
@@ -202,9 +208,10 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                     </button>
                   </div>
                   <div className="relative">
-                    <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     {hook.setorManual ? (
                       <input 
+                        id="setor-field"
                         required 
                         value={hook.setor} 
                         onChange={(e) => hook.setSetor(e.target.value)} 
@@ -213,11 +220,12 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                       />
                     ) : (
                       <select 
+                        id="setor-field"
                         required 
                         disabled={!hook.unidade} 
                         value={hook.setor} 
                         onChange={(e) => hook.setSetor(e.target.value)} 
-                        className="w-full py-2.5 pl-10 pr-3 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-blue-600 appearance-none text-xs font-bold text-slate-700 transition-all cursor-pointer"
+                        className="w-full py-2.5 pl-10 pr-3 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-blue-600 appearance-none text-xs font-bold text-slate-700 transition-all cursor-pointer disabled:opacity-60"
                       >
                         <option value="">{hook.unidade ? "Selecione o setor..." : "Escolha a unidade primeiro"}</option>
                         {hook.MAPA_SETORES_POR_UNIDADE[hook.unidade]?.map((s) => (
@@ -231,12 +239,13 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
 
               {/* PRIORIDADE */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                <label htmlFor="prioridade-select" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block cursor-pointer">
                   Prioridade
                 </label>
                 <div className="relative">
-                  <BarChart className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <BarChart className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                   <select 
+                    id="prioridade-select"
                     value={hook.prioridade} 
                     onChange={(e) => hook.setPrioridade(e.target.value)} 
                     className="w-full py-2.5 pl-10 pr-3 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:border-blue-600 appearance-none text-xs font-bold text-slate-700 cursor-pointer"
@@ -251,17 +260,18 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
 
               {/* DESCRIÇÃO */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                <label htmlFor="descricao-textarea" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block cursor-pointer">
                   Descrição do Problema
                 </label>
                 <div className="relative">
-                  <FileText className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                  <FileText className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none" size={16} />
                   <textarea 
+                    id="descricao-textarea"
                     required 
                     value={hook.descricao} 
                     onChange={(e) => hook.setDescricao(e.target.value)} 
                     placeholder="Descreva o problema detalhadamente..." 
-                    rows="3" 
+                    rows={3} 
                     className="w-full p-3 pl-10 bg-slate-50/70 border border-slate-200/80 rounded-xl outline-none focus:bg-white focus:border-blue-600 text-xs font-medium text-slate-700 resize-none transition-all" 
                   />
                 </div>
@@ -273,7 +283,13 @@ export default function CadastroChamado({ isOpen = true, onClose }) {
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 uppercase text-xs active:scale-98 disabled:opacity-70 cursor-pointer"
               >
-                {hook.loading ? <Loader2 className="animate-spin" size={16} /> : <><Send size={15} /> Enviar Chamado</>}
+                {hook.loading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <>
+                    <Send size={15} /> Enviar Chamado
+                  </>
+                )}
               </button>
             </form>
           )}

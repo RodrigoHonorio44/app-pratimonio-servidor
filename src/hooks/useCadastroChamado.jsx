@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../services/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import api from "../services/api";
@@ -21,8 +21,37 @@ export const useCadastroChamado = () => {
   const [prioridade, setPrioridade] = useState("média");
   const [naoSeiPatrimonio, setNaoSeiPatrimonio] = useState(false);
 
-  // Consome os setores vindos do MongoDB através douseSetores Hook
+  // Consome os setores vindos do MongoDB através do useSetores Hook
   const { mapaSetores, loading: loadingSetores } = useSetores();
+
+  // Consolida e remove unidades/setores duplicados (case-insensitive)
+  const mapaSetoresFormatado = useMemo(() => {
+    if (!mapaSetores || typeof mapaSetores !== "object") return {};
+
+    const mapaNormalizado = {};
+
+    Object.entries(mapaSetores).forEach(([chaveUnidade, listaSetores]) => {
+      if (!chaveUnidade) return;
+
+      // Padroniza a chave em minúsculo e sem espaços extras
+      const chaveLower = chaveUnidade.trim().toLowerCase();
+
+      if (!mapaNormalizado[chaveLower]) {
+        mapaNormalizado[chaveLower] = [];
+      }
+
+      // Garante que a lista de setores seja tratada e não contenha duplicatas
+      if (Array.isArray(listaSetores)) {
+        listaSetores.forEach((s) => {
+          if (s && !mapaNormalizado[chaveLower].includes(s)) {
+            mapaNormalizado[chaveLower].push(s);
+          }
+        });
+      }
+    });
+
+    return mapaNormalizado;
+  }, [mapaSetores]);
 
   // Altera a unidade mantendo o setor caso tenha sido preenchido por busca manual/automática
   const handleUnidadeChange = (valor) => {
@@ -69,7 +98,7 @@ export const useCadastroChamado = () => {
       });
 
       const ativos = Array.isArray(resposta.data) ? resposta.data : [];
-      
+
       const ativoEncontrado = ativos.find(a => 
         String(a.patrimonio || "").toLowerCase() === tagOriginal.toLowerCase() ||
         String(a.tag || "").toLowerCase() === tagOriginal.toLowerCase() ||
@@ -81,14 +110,14 @@ export const useCadastroChamado = () => {
         setSetor(ativoEncontrado.setor || "");
         setSetorManual(true);
 
-        // Mapeia case-insensitive a unidade do banco para bater com a chave exata das unidades do MongoDB
+        // Mapeia case-insensitive a unidade do banco para bater com a chave exata normalizada
         const unidadeBanco = String(ativoEncontrado.unidade || "").trim().toLowerCase();
-        const chavesUnidades = Object.keys(mapaSetores || {});
+        const chavesUnidades = Object.keys(mapaSetoresFormatado);
         const chaveCorrespondente = chavesUnidades.find(
-          u => u.toLowerCase() === unidadeBanco
+          u => u === unidadeBanco
         );
 
-        setUnidade(chaveCorrespondente || ativoEncontrado.unidade || "");
+        setUnidade(chaveCorrespondente || unidadeBanco || "");
 
         toast.success("equipamento cadastrado");
       } else {
@@ -122,7 +151,7 @@ export const useCadastroChamado = () => {
         const userRes = await api.get(`/usuarios/${uidExibicao}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (userRes.data && userRes.data.nome) {
           nomeParaSalvar = userRes.data.nome.trim();
         }
@@ -150,10 +179,10 @@ export const useCadastroChamado = () => {
         finalizadoEm: null,
         arquivadoEm: null,
         emailSolicitante: currentUser.email ? currentUser.email.toLowerCase() : "",
-        
+
         solicitante: nomeParaSalvar, 
         nome: nomeParaSalvar,
-        
+
         numeroOs: novaOs,
         status: "aberto",
         userId: uidExibicao,
@@ -205,6 +234,6 @@ export const useCadastroChamado = () => {
     toggleNaoSei, 
     handleBotaoBusca, 
     handleNovoChamado,
-    MAPA_SETORES_POR_UNIDADE: mapaSetores // Retorna o mapa vindo do MongoDB com retrocompatibilidade
+    MAPA_SETORES_POR_UNIDADE: mapaSetoresFormatado
   };
 };
