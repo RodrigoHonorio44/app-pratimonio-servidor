@@ -1,5 +1,21 @@
 import toast from 'react-hot-toast';
 
+const escaparHtml = (valor) => String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}[caractere]));
+
+const porcentagemSegura = (valor) => {
+  const correspondencia = /^(\d+(?:\.\d+)?)%$/.exec(String(valor));
+  if (!correspondencia) return null;
+
+  const numero = Number(correspondencia[1]);
+  return numero >= 0 && numero <= 100 ? `${numero}%` : null;
+};
+
 export default function gerarEImprimirChecklist({
   formData = {},
   danos = {},
@@ -89,7 +105,7 @@ export default function gerarEImprimirChecklist({
 
   let assinaturaDinamicaHtml = '';
   if (assinaturaDinamicaUrl) {
-    assinaturaDinamicaHtml = `<img src="${assinaturaDinamicaUrl}" alt="Assinatura" style="max-height: 48px; max-width: 180px; object-fit: contain; margin-bottom: 2px;" />`;
+    assinaturaDinamicaHtml = `<img src="${escaparHtml(assinaturaDinamicaUrl)}" alt="Assinatura" style="max-height: 48px; max-width: 180px; object-fit: contain; margin-bottom: 2px;" />`;
   } else {
     assinaturaDinamicaHtml = `<div style="height: 48px;"></div>`;
   }
@@ -123,12 +139,12 @@ export default function gerarEImprimirChecklist({
 
     linhasAcessoriosHtml += `
       <tr>
-        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item1 ? String(item1).toLowerCase() : ''}</td>
-        <td class="center bold uppercase" style="width: 5%; font-size: 8px;">${item1 ? getSta(key1, item1) : ''}</td>
-        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item2 ? String(item2).toLowerCase() : ''}</td>
-        <td class="center bold uppercase" style="width: 5%; font-size: 8px;">${item2 ? getSta(key2, item2) : ''}</td>
-        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item3 ? String(item3).toLowerCase() : ''}</td>
-        <td class="center bold uppercase" style="width: 6%; font-size: 8px;">${item3 ? getSta(key3, item3) : ''}</td>
+        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item1 ? escaparHtml(String(item1).toLowerCase()) : ''}</td>
+        <td class="center bold uppercase" style="width: 5%; font-size: 8px;">${item1 ? escaparHtml(getSta(key1, item1)) : ''}</td>
+        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item2 ? escaparHtml(String(item2).toLowerCase()) : ''}</td>
+        <td class="center bold uppercase" style="width: 5%; font-size: 8px;">${item2 ? escaparHtml(getSta(key2, item2)) : ''}</td>
+        <td class="bold bg-light" style="width: 28%; font-size: 8px;">${item3 ? escaparHtml(String(item3).toLowerCase()) : ''}</td>
+        <td class="center bold uppercase" style="width: 6%; font-size: 8px;">${item3 ? escaparHtml(getSta(key3, item3)) : ''}</td>
       </tr>
     `;
   }
@@ -156,9 +172,9 @@ export default function gerarEImprimirChecklist({
     const posArray = Array.isArray(posicoesVistoria) ? posicoesVistoria.find(p => String(p.id) === String(chave)) : null;
 
     if (posArray) {
-      posTop = posArray.top;
-      posLeft = posArray.left;
-      if (posArray.label) nomeLocal = posArray.label.toLowerCase();
+      posTop = porcentagemSegura(posArray.top);
+      posLeft = porcentagemSegura(posArray.left);
+      if (posArray.label) nomeLocal = String(posArray.label).toLowerCase();
     } else if (posicoesBolinhas[chave]) {
       posTop = `${posicoesBolinhas[chave].y}%`;
       posLeft = `${posicoesBolinhas[chave].x}%`;
@@ -169,7 +185,7 @@ export default function gerarEImprimirChecklist({
 
     itensAvariasDetalhesHtml += `
       <div style="font-size: 8.5px; font-weight: bold; width: 31%;">
-        • <span style="color: #0f172a;">${nomeLocal}</span>: <span style="color: #ef4444;">[${tipoDano}] ${nomeDano}</span>
+        • <span style="color: #0f172a;">${escaparHtml(nomeLocal)}</span>: <span style="color: #ef4444;">[${escaparHtml(tipoDano)}] ${escaparHtml(nomeDano)}</span>
       </div>
     `;
 
@@ -177,8 +193,8 @@ export default function gerarEImprimirChecklist({
       marcadoresAvariasHtml += `
         <div style="
           position: absolute;
-          top: ${posTop};
-          left: ${posLeft};
+          top: ${escaparHtml(posTop)};
+          left: ${escaparHtml(posLeft)};
           transform: translate(-50%, -50%);
           background-color: #ef4444;
           color: #ffffff;
@@ -194,7 +210,7 @@ export default function gerarEImprimirChecklist({
           box-shadow: 0 1px 2px rgba(0,0,0,0.4);
           z-index: 10;
         ">
-          ${tipoDano}
+          ${escaparHtml(tipoDano)}
         </div>
       `;
     }
@@ -281,10 +297,10 @@ export default function gerarEImprimirChecklist({
               <div class="documento-container">
 
                   <div class="header-images">
-                      <img src="${baseUrl}/Imagem1.png" alt="Hospital" onerror="this.style.display='none'" />
-                      <img src="${baseUrl}/Imagem2.png" alt="Avante" onerror="this.style.display='none'" />
-                      <img src="${baseUrl}/Imagem3.png" alt="Saúde" class="h-menor" onerror="this.style.display='none'" />
-                      <img src="${baseUrl}/Imagem4.png" alt="Maricá" onerror="this.style.display='none'" />
+                      <img src="${escaparHtml(baseUrl)}/Imagem1.png" alt="Hospital" onerror="this.style.display='none'" />
+                      <img src="${escaparHtml(baseUrl)}/Imagem2.png" alt="Avante" onerror="this.style.display='none'" />
+                      <img src="${escaparHtml(baseUrl)}/Imagem3.png" alt="Saúde" class="h-menor" onerror="this.style.display='none'" />
+                      <img src="${escaparHtml(baseUrl)}/Imagem4.png" alt="Maricá" onerror="this.style.display='none'" />
                   </div>
 
                   <div class="title-block">
@@ -296,25 +312,25 @@ export default function gerarEImprimirChecklist({
                   <table>
                       <tr>
                           <td class="bold bg-light" style="width: 12%;">placa</td>
-                          <td class="bold uppercase" style="width: 21%;">${formData.placa ? formData.placa.toLowerCase() : '---'}</td>
+                          <td class="bold uppercase" style="width: 21%;">${escaparHtml(formData.placa ? String(formData.placa).toLowerCase() : '---')}</td>
                           <td class="bold bg-light" style="width: 12%;">modelo</td>
-                          <td class="bold uppercase" style="width: 21%;">${formData.modelo ? formData.modelo.toLowerCase() : '---'}</td>
+                          <td class="bold uppercase" style="width: 21%;">${escaparHtml(formData.modelo ? String(formData.modelo).toLowerCase() : '---')}</td>
                           <td class="bold bg-light" style="width: 12%;">ano</td>
-                          <td class="bold uppercase" style="width: 22%;">${formData.ano ? String(formData.ano).toLowerCase() : '---'}</td>
+                          <td class="bold uppercase" style="width: 22%;">${escaparHtml(formData.ano ? String(formData.ano).toLowerCase() : '---')}</td>
                       </tr>
                       <tr>
                           <td class="bold bg-light">cor</td>
-                          <td class="bold uppercase">${formData.cor ? formData.cor.toLowerCase() : '---'}</td>
+                          <td class="bold uppercase">${escaparHtml(formData.cor ? String(formData.cor).toLowerCase() : '---')}</td>
                           <td class="bold bg-light">condutor</td>
-                          <td class="bold uppercase">${formData.condutor ? formData.condutor.toLowerCase() : '---'}</td>
+                          <td class="bold uppercase">${escaparHtml(formData.condutor ? String(formData.condutor).toLowerCase() : '---')}</td>
                           <td class="bold bg-light">km atual</td>
-                          <td class="bold uppercase">${formData.km || '---'}</td>
+                          <td class="bold uppercase">${escaparHtml(formData.km || '---')}</td>
                       </tr>
                       <tr>
                           <td class="bold bg-light">combustível</td>
-                          <td class="bold uppercase">${formData.combustivel ? formData.combustivel.toLowerCase() : '---'}</td>
+                          <td class="bold uppercase">${escaparHtml(formData.combustivel ? String(formData.combustivel).toLowerCase() : '---')}</td>
                           <td class="bold bg-light">crlv / exercício</td>
-                          <td class="bold uppercase" colspan="3">sim (${formData.exercicio || '2026'})</td>
+                          <td class="bold uppercase" colspan="3">sim (${escaparHtml(formData.exercicio || '2026')})</td>
                       </tr>
                   </table>
 
@@ -322,16 +338,16 @@ export default function gerarEImprimirChecklist({
                   <table>
                       <tr>
                           <td class="bold bg-light" style="width: 20%;">pneu dianteiro</td>
-                          <td class="bold uppercase center" style="width: 13%;">${(formData.pneuDianteiro || 'bom').toLowerCase()}</td>
+                          <td class="bold uppercase center" style="width: 13%;">${escaparHtml(String(formData.pneuDianteiro || 'bom').toLowerCase())}</td>
                           <td class="bold bg-light" style="width: 20%;">pneu traseiro</td>
-                          <td class="bold uppercase center" style="width: 13%;">${(formData.pneuTraseiro || 'bom').toLowerCase()}</td>
+                          <td class="bold uppercase center" style="width: 13%;">${escaparHtml(String(formData.pneuTraseiro || 'bom').toLowerCase())}</td>
                           <td class="bold bg-light" style="width: 20%;">pneu estepe</td>
-                          <td class="bold uppercase center" style="width: 14%;">${(formData.pneuEstepe || 'bom').toLowerCase()}</td>
+                          <td class="bold uppercase center" style="width: 14%;">${escaparHtml(String(formData.pneuEstepe || 'bom').toLowerCase())}</td>
                       </tr>
                   </table>
 
                   <div class="diagram-container">
-                      <img id="diagrama-carro" src="${baseUrl}/carro.jpg" alt="Esquema de Avarias do Veículo" class="car-image" onerror="this.style.display='none'" />
+                      <img id="diagrama-carro" src="${escaparHtml(baseUrl)}/carro.jpg" alt="Esquema de Avarias do Veículo" class="car-image" onerror="this.style.display='none'" />
                       ${marcadoresAvariasHtml}
                   </div>
 
@@ -362,7 +378,7 @@ export default function gerarEImprimirChecklist({
                   <table>
                       <tr>
                           <td style="min-height: 35px; vertical-align: top; padding: 4px; font-size: 8.5px; line-height: 1.3; font-weight: bold;" class="uppercase">
-                              ${formData.obs ? formData.obs.toLowerCase() : 'nenhuma observação ou avaria registrada.'}
+                              ${escaparHtml(formData.obs ? String(formData.obs).toLowerCase() : 'nenhuma observação ou avaria registrada.')}
                           </td>
                       </tr>
                   </table>
@@ -374,8 +390,8 @@ export default function gerarEImprimirChecklist({
                   <div class="signatures">
                       <div class="sig-block">
                           ${assinaturaDinamicaHtml}
-                          <span class="uppercase">${nomeAssinaturaEsquerda || '---'}</span><br>
-                          <span style="font-size: 7px; font-weight: normal; color: #444; text-transform: lowercase;">${cargoAssinaturaEsquerda}</span>
+                          <span class="uppercase">${escaparHtml(nomeAssinaturaEsquerda || '---')}</span><br>
+                          <span style="font-size: 7px; font-weight: normal; color: #444; text-transform: lowercase;">${escaparHtml(cargoAssinaturaEsquerda)}</span>
                       </div>
                       <div class="sig-block">
                           <div style="height: 48px;"></div>
